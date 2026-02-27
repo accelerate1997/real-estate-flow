@@ -4,7 +4,7 @@ services:
   frontend:
     build: .
     restart: always
-    ports:
+    expose:
       - "80"
     environment:
       - VITE_POCKETBASE_URL=${VITE_POCKETBASE_URL}
@@ -15,7 +15,7 @@ services:
   whatsapp-agent:
     build: ./whatsapp-agent
     restart: always
-    ports:
+    expose:
       - "3000"
     environment:
       - OPENAI_API_KEY=${OPENAI_API_KEY}
