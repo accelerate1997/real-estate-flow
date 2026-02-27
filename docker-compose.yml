@@ -5,7 +5,7 @@ services:
     build: .
     restart: always
     ports:
-      - "80:80"
+      - "80"
     environment:
       - VITE_POCKETBASE_URL=${VITE_POCKETBASE_URL}
       - VITE_APP_URL=${VITE_APP_URL}
@@ -16,7 +16,7 @@ services:
     build: ./whatsapp-agent
     restart: always
     ports:
-      - "3000:3000"
+      - "3000"
     environment:
       - OPENAI_API_KEY=${OPENAI_API_KEY}
       - VITE_POCKETBASE_URL=${VITE_POCKETBASE_URL}
