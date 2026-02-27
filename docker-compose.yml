@@ -23,6 +23,7 @@ services:
     labels:
       - "traefik.enable=true"
       - "traefik.http.routers.agent.rule=Host(`agent.elevetoai.com`)"
+      - "traefik.http.services.agent.loadbalancer.server.port=3000"
     environment:
       - OPENAI_API_KEY=${OPENAI_API_KEY}
       - VITE_POCKETBASE_URL=${VITE_POCKETBASE_URL}
