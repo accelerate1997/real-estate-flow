@@ -1,0 +1,33 @@
+version: '3.8'
+
+services:
+  frontend:
+    build: .
+    restart: always
+    ports:
+      - "80:80"
+    environment:
+      - VITE_POCKETBASE_URL=${VITE_POCKETBASE_URL}
+      - VITE_APP_URL=${VITE_APP_URL}
+    networks:
+      - real-estate-network
+
+  whatsapp-agent:
+    build: ./whatsapp-agent
+    restart: always
+    ports:
+      - "3000:3000"
+    environment:
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - VITE_POCKETBASE_URL=${VITE_POCKETBASE_URL}
+      - POCKETBASE_ADMIN_EMAIL=${POCKETBASE_ADMIN_EMAIL}
+      - POCKETBASE_ADMIN_PASSWORD=${POCKETBASE_ADMIN_PASSWORD}
+      - EVOLUTION_API_URL=${EVOLUTION_API_URL}
+      - EVOLUTION_API_KEY=${EVOLUTION_API_KEY}
+      - VITE_APP_URL=${VITE_APP_URL}
+    networks:
+      - real-estate-network
+
+networks:
+  real-estate-network:
+    driver: bridge
