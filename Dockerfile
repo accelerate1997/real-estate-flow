@@ -33,6 +33,14 @@ RUN echo 'server { \
     proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for; \
     proxy_set_header X-Forwarded-Proto $scheme; \
     } \
+    location /api/chats/ { \
+    proxy_pass http://whatsapp_agent:3000/api/chats/; \
+    proxy_set_header Host $host; \
+    } \
+    location /api/whatsapp/ { \
+    proxy_pass http://whatsapp_agent:3000/api/whatsapp/; \
+    proxy_set_header Host $host; \
+    } \
     location /agent-status { \
     proxy_pass http://whatsapp_agent:3000/health; \
     } \

@@ -24,7 +24,7 @@ const LeadDetailsModal = ({ isOpen, onClose, lead }) => {
         try {
             // Remove non-numeric characters for the API call
             const cleanPhone = phone.replace(/\D/g, '');
-            const response = await fetch(`http://localhost:3000/api/chats/${cleanPhone}`);
+            const response = await fetch(`/api/chats/${cleanPhone}`);
             if (response.ok) {
                 const data = await response.json();
                 setChats(data.chats || []);
@@ -169,8 +169,8 @@ const LeadDetailsModal = ({ isOpen, onClose, lead }) => {
                                 return (
                                     <div key={index} className={`flex ${isBot ? 'justify-start' : 'justify-end'} mb-4`}>
                                         <div className={`max-w-[85%] md:max-w-[75%] rounded-2xl px-4 py-3 shadow-md relative ${isBot
-                                                ? 'bg-white text-gray-800 rounded-tl-sm'
-                                                : 'bg-[#dcf8c6] text-gray-900 rounded-tr-sm'
+                                            ? 'bg-white text-gray-800 rounded-tl-sm'
+                                            : 'bg-[#dcf8c6] text-gray-900 rounded-tr-sm'
                                             }`}>
                                             <p className="text-[14.5px] leading-relaxed whitespace-pre-wrap font-messaging">
                                                 {displayContent}
