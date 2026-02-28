@@ -13,18 +13,17 @@ services:
       - VITE_APP_URL=${VITE_APP_URL}
 
   whatsapp_agent:
-    build: ./whatsapp-agent
+    build:
+      context: ./whatsapp-agent
+      dockerfile: Dockerfile
     restart: always
     environment:
-      - OPENAI_API_KEY="${OPENAI_API_KEY}"
-      - POCKETBASE_URL="${POCKETBASE_URL}"
-      - POCKETBASE_ADMIN_EMAIL="${POCKETBASE_ADMIN_EMAIL}"
-      - POCKETBASE_ADMIN_PASSWORD="${POCKETBASE_ADMIN_PASSWORD}"
-      - EVOLUTION_API_URL="${EVOLUTION_API_URL}"
-      - EVOLUTION_API_KEY="${EVOLUTION_API_KEY}"
-      - VITE_APP_URL="${VITE_APP_URL}"
-      - PORT="${PORT}"
-
-networks:
-  coolify:
-    external: true
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - POCKETBASE_URL=${POCKETBASE_URL}
+      - VITE_POCKETBASE_URL=${VITE_POCKETBASE_URL}
+      - POCKETBASE_ADMIN_EMAIL=${POCKETBASE_ADMIN_EMAIL}
+      - POCKETBASE_ADMIN_PASSWORD=${POCKETBASE_ADMIN_PASSWORD}
+      - EVOLUTION_API_URL=${EVOLUTION_API_URL}
+      - EVOLUTION_API_KEY=${EVOLUTION_API_KEY}
+      - VITE_APP_URL=${VITE_APP_URL}
+      - PORT=${PORT}
