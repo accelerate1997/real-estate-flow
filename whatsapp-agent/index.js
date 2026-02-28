@@ -22,8 +22,10 @@ const PORT = process.env.PORT || 80;
 
 app.post('/webhook', async (req, res) => {
     try {
-        console.log("🔥 INCOMING WEBHOOK:", JSON.stringify(req.body, null, 2).substring(0, 500) + '...');
+        console.log("🔥 INCOMING WEBHOOK:", JSON.stringify(req.body, null, 2));
         const { event, data } = req.body;
+        console.log(`[DEBUG] Event: ${event}, Data length: ${Array.isArray(data) ? data.length : 'N/A'}`);
+
 
         // Evolution API sends 'messages.upsert' for new messages
         if (event !== 'messages.upsert') {
