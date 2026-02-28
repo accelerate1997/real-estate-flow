@@ -18,6 +18,7 @@ services:
       - VITE_APP_URL=${VITE_APP_URL}
     networks:
       - real-estate-network
+      - coolify
 
   whatsapp-agent:
     build: ./whatsapp-agent
@@ -38,7 +39,10 @@ services:
       - VITE_APP_URL=${VITE_APP_URL}
     networks:
       - real-estate-network
+      - coolify
 
 networks:
   real-estate-network:
     driver: bridge
+  coolify:
+    external: true
