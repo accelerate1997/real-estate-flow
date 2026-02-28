@@ -12,7 +12,7 @@ services:
       - VITE_POCKETBASE_URL=${VITE_POCKETBASE_URL}
       - VITE_APP_URL=${VITE_APP_URL}
 
-  whatsapp-agent:
+  whatsapp_agent:
     build: ./whatsapp-agent
     restart: always
     environment:
