@@ -18,7 +18,7 @@ app.get('/api/chats/:phone', (req, res) => {
     res.json({ chats: history });
 });
 
-const PORT = process.env.PORT || 80;
+const PORT = process.env.PORT || 3000;
 
 app.post('/webhook', async (req, res) => {
     try {
