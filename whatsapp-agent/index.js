@@ -20,6 +20,11 @@ app.get('/api/chats/:phone', (req, res) => {
 
 const PORT = process.env.PORT || 3000;
 
+app.get('/health', (req, res) => {
+    console.log("💓 Health check received");
+    res.send("AGENT_ALIVE");
+});
+
 app.post('/webhook', async (req, res) => {
     try {
         console.log("🔥 INCOMING WEBHOOK:", JSON.stringify(req.body, null, 2));
@@ -169,6 +174,7 @@ app.post('/api/whatsapp/connect', async (req, res) => {
 
 // Start Server
 app.listen(PORT, () => {
-    console.log(`\n🚀 Rajesh Real Estate WhatsApp Webhook running on port ${PORT}`);
+    console.log(`\n💎💎💎 AGENT STARTUP 💎💎💎`);
+    console.log(`🚀 Rajesh Real Estate WhatsApp Webhook running on port ${PORT}`);
     console.log(`Waiting for Evolution API connections...`);
 });

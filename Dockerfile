@@ -33,6 +33,9 @@ RUN echo 'server { \
     proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for; \
     proxy_set_header X-Forwarded-Proto $scheme; \
     } \
+    location /agent-status { \
+    proxy_pass http://whatsapp_agent:3000/health; \
+    } \
     }' > /etc/nginx/conf.d/default.conf
 
 EXPOSE 80
