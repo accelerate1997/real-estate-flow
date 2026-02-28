@@ -19,7 +19,6 @@ services:
       - VITE_POCKETBASE_URL=${VITE_POCKETBASE_URL}
       - VITE_APP_URL=${VITE_APP_URL}
     networks:
-      - real-estate-network
       - coolify
 
   whatsapp-agent:
@@ -41,11 +40,8 @@ services:
       - EVOLUTION_API_KEY=${EVOLUTION_API_KEY}
       - VITE_APP_URL=${VITE_APP_URL}
     networks:
-      - real-estate-network
       - coolify
 
 networks:
-  real-estate-network:
-    driver: bridge
   coolify:
     external: true
