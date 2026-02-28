@@ -1,7 +1,7 @@
 const EVO_URL = "http://evo-rck0sscs4sswok0g8gksoo0w.31.97.231.139.sslip.io";
 const EVO_KEY = "Nl0045KG92A81As29nCwV1zuSjJDGGgC";
 const INSTANCE = "Agency_r1fh7lhgwte6p30";
-const WEBHOOK_URL = "https://enajz-2401-4900-57f6-4d5c-d70-4ee4-5285-7347.a.free.pinggy.link/webhook";
+const WEBHOOK_URL = "https://realestateflow.elevetoai.com/webhook/";
 
 async function setWebhook() {
     try {
