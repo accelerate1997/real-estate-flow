@@ -26,6 +26,13 @@ RUN echo 'server { \
     proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for; \
     proxy_set_header X-Forwarded-Proto $scheme; \
     } \
+    location /webhook/ { \
+    proxy_pass http://whatsapp_agent:3000/webhook/; \
+    proxy_set_header Host $host; \
+    proxy_set_header X-Real-IP $remote_addr; \
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for; \
+    proxy_set_header X-Forwarded-Proto $scheme; \
+    } \
     }' > /etc/nginx/conf.d/default.conf
 
 EXPOSE 80
