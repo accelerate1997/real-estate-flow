@@ -20,6 +20,28 @@ app.get('/api/chats/:phone', (req, res) => {
 
 const PORT = process.env.PORT || 3000;
 
+// Simple in-memory cache for de-duplication
+const processedMessages = new Map();
+const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+
+function isDuplicate(id) {
+    const now = Date.now();
+    if (processedMessages.has(id)) {
+        return true;
+    }
+    processedMessages.set(id, now);
+
+    // Periodically clean up old entries
+    if (processedMessages.size > 1000) {
+        for (const [key, timestamp] of processedMessages.entries()) {
+            if (now - timestamp > CACHE_TTL) {
+                processedMessages.delete(key);
+            }
+        }
+    }
+    return false;
+}
+
 app.get('/health', (req, res) => {
     console.log("💓 Health check received");
     res.send("AGENT_ALIVE");
@@ -56,9 +78,16 @@ app.post('/webhook', async (req, res) => {
         res.sendStatus(200);
 
         const key = msg?.key;
+        const msgId = key?.id;
         const remoteJid = key?.remoteJid;
         const fromMe = key?.fromMe;
         const message = msg?.message;
+
+        // Skip if already processed
+        if (msgId && isDuplicate(msgId)) {
+            console.log(`[IGNORE] Duplicate message ID: ${msgId}`);
+            return;
+        }
 
         // Skip our own messages
         if (message && remoteJid && !fromMe) {
