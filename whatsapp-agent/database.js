@@ -1,7 +1,7 @@
 require('dotenv').config();
 const PocketBase = require('pocketbase').default; // Using commonjs export
 
-const pbUrl = process.env.POCKETBASE_URL || 'http://127.0.0.1:8090';
+const pbUrl = process.env.POCKETBASE_URL || process.env.VITE_POCKETBASE_URL || 'http://127.0.0.1:8090';
 const email = process.env.POCKETBASE_ADMIN_EMAIL;
 const password = process.env.POCKETBASE_ADMIN_PASSWORD;
 
