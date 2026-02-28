@@ -13,6 +13,7 @@ services:
     labels:
       - "traefik.enable=true"
       - "traefik.http.routers.frontend.rule=Host(`realestateflow.elevetoai.com`)"
+      - "traefik.docker.network=coolify"
     environment:
       - VITE_POCKETBASE_URL=${VITE_POCKETBASE_URL}
       - VITE_APP_URL=${VITE_APP_URL}
@@ -29,6 +30,7 @@ services:
       - "traefik.enable=true"
       - "traefik.http.routers.agent.rule=Host(`agent.elevetoai.com`)"
       - "traefik.http.services.agent.loadbalancer.server.port=3000"
+      - "traefik.docker.network=coolify"
     environment:
       - OPENAI_API_KEY=${OPENAI_API_KEY}
       - VITE_POCKETBASE_URL=${VITE_POCKETBASE_URL}
