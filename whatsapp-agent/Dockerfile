@@ -1,7 +1,8 @@
 FROM node:20-alpine
 WORKDIR /app
-COPY package*.json ./
+COPY whatsapp-agent/package*.json ./
 RUN npm install
-COPY . .
+COPY whatsapp-agent/ .
+
 EXPOSE 80
 CMD ["node", "index.js"]
