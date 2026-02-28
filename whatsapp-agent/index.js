@@ -27,8 +27,11 @@ app.post('/webhook', async (req, res) => {
 
         // Evolution API sends 'messages.upsert' for new messages
         if (event !== 'messages.upsert') {
+            console.log(`[IGNORE] Event type: ${event}`);
             return res.sendStatus(200);
         }
+
+        console.log("✅ Valid message event received.");
 
         const msg = Array.isArray(data) ? data[0] : data;
 
