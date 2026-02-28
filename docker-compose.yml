@@ -11,6 +11,8 @@ services:
     environment:
       - VITE_POCKETBASE_URL=${VITE_POCKETBASE_URL}
       - VITE_APP_URL=${VITE_APP_URL}
+    networks:
+      - coolify
 
   whatsapp_agent:
     build: ./whatsapp-agent
@@ -23,6 +25,8 @@ services:
       - EVOLUTION_API_URL=${EVOLUTION_API_URL}
       - EVOLUTION_API_KEY=${EVOLUTION_API_KEY}
       - VITE_APP_URL=${VITE_APP_URL}
+    networks:
+      - coolify
 
 networks:
   coolify:
