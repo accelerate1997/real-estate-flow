@@ -156,5 +156,27 @@ module.exports = {
         } catch (err) {
             console.error('[DB Error] Failed to upsert Lead:', err.message);
         }
+    },
+
+    /**
+     * Checks if the AI Agent is enabled for a given agency.
+     * @param {string} agencyId
+     * @returns {boolean}
+     */
+    async isAgentEnabled(agencyId) {
+        if (!agencyId) return true; // Default to true if no agency ID is provided
+        await authenticate();
+        try {
+            const agency = await pb.collection('users').getOne(agencyId);
+            // Default to true if the field doesn't exist yet, to not break existing instances
+            if (agency.agentEnabled === false) {
+                return false;
+            }
+            return true;
+        } catch (err) {
+            console.error(`[DB] Error fetching agentEnabled status for agency ${agencyId}:`, err.message);
+            // Default to true on error to ensure we don't accidentally turn off the AI
+            return true;
+        }
     }
 };

@@ -18,7 +18,8 @@ const AgencySettings = () => {
         phone: currentUser?.phone || '',
         address: '123 Business Avenue, Andheri West, Mumbai',
         notificationsEnabled: true,
-        geminiKey: currentUser?.geminiKey || ''
+        geminiKey: currentUser?.geminiKey || '',
+        agentEnabled: currentUser?.agentEnabled ?? true
     });
 
     const handleSave = async () => {
@@ -28,7 +29,8 @@ const AgencySettings = () => {
                 await pb.collection('users').update(currentUser.id, {
                     agencyName: agencyData.agencyName,
                     phone: agencyData.phone,
-                    geminiKey: agencyData.geminiKey
+                    geminiKey: agencyData.geminiKey,
+                    agentEnabled: agencyData.agentEnabled
                     // Note: 'email' is usually protected in PocketBase PB auth components
                     // 'address' and 'notificationsEnabled' would need respective DB fields
                 });
@@ -183,6 +185,24 @@ const AgencySettings = () => {
                                 </div>
 
                                 <div className="space-y-4">
+                                    <div className="flex flex-col sm:flex-row sm:items-center justify-between bg-white p-4 rounded-xl border border-gray-200 gap-4">
+                                        <div>
+                                            <h4 className="font-bold text-gray-900">Enable AI Agent</h4>
+                                            <p className="text-sm text-gray-500 flex items-center gap-1">
+                                                Allow the AI to automatically respond to new leads on WhatsApp
+                                            </p>
+                                        </div>
+                                        <label className="relative inline-flex items-center cursor-pointer shrink-0">
+                                            <input
+                                                type="checkbox"
+                                                className="sr-only peer"
+                                                checked={agencyData.agentEnabled}
+                                                onChange={(e) => setAgencyData({ ...agencyData, agentEnabled: e.target.checked })}
+                                            />
+                                            <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-green-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-green-600"></div>
+                                        </label>
+                                    </div>
+
                                     <div>
                                         <label className="block text-sm font-medium text-gray-700 mb-2">WhatsApp Number (with Country Code)</label>
                                         <input

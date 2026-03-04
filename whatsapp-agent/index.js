@@ -3,6 +3,7 @@ const express = require('express');
 const cors = require('cors');
 const { processMessage, getChats } = require('./openai_service');
 const { sendMessage } = require('./evolution');
+const db = require('./database');
 
 const app = express();
 app.use(cors());
@@ -103,6 +104,15 @@ app.post('/webhook', async (req, res) => {
                 // Extract instance name from webhook body (Format usually: "Agency_1234")
                 const instanceName = req.body.instance || 'Default';
                 const agencyId = instanceName.startsWith('Agency_') ? instanceName.split('_')[1] : null;
+
+                // Check if AI Agent is enabled for this agency before replying
+                if (agencyId) {
+                    const isEnabled = await db.isAgentEnabled(agencyId);
+                    if (!isEnabled) {
+                        console.log(`[IGNORE] AI Agent is disabled for agency ${agencyId}.`);
+                        return; // Ignore and do not reply (webhook already acknowledged earlier)
+                    }
+                }
 
                 // Get AI Response
                 const reply = await processMessage(text, phoneClean, agencyId);
