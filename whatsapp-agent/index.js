@@ -1,6 +1,9 @@
 require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
+
+// DEBUG CACHE for Webhooks
+const recentWebhooks = [];
 const { processMessage, getChats } = require('./openai_service');
 const { sendMessage } = require('./evolution');
 const db = require('./database');
@@ -43,9 +46,9 @@ function isDuplicate(id) {
     return false;
 }
 
+// Health Check for Render/Docker/Coolify
 app.get('/health', (req, res) => {
-    console.log("💓 Health check received");
-    res.send("AGENT_ALIVE");
+    res.status(200).json({ status: 'AGENT_ALIVE_V2', recentWebhooks });
 });
 
 app.post('/webhook', async (req, res) => {
@@ -102,17 +105,30 @@ app.post('/webhook', async (req, res) => {
                 console.log(`\n📨 Received from ${phoneClean}: ${text}`);
 
                 // Extract instance name from webhook body (Format usually: "Agency_1234")
-                const instanceName = req.body.instance || 'Default';
+                const instanceName = req.body.instance || req.body.data?.instance || 'Default';
                 const agencyId = instanceName.startsWith('Agency_') ? instanceName.split('_')[1] : null;
+
+                let isEnabled = true;
 
                 // Check if AI Agent is enabled for this agency before replying
                 if (agencyId) {
-                    const isEnabled = await db.isAgentEnabled(agencyId);
+                    isEnabled = await db.isAgentEnabled(agencyId);
                     if (!isEnabled) {
                         console.log(`[IGNORE] AI Agent is disabled for agency ${agencyId}.`);
-                        return; // Ignore and do not reply (webhook already acknowledged earlier)
                     }
                 }
+
+                // Add to debug cache
+                recentWebhooks.unshift({
+                    time: new Date().toISOString(),
+                    instanceName,
+                    agencyId,
+                    isEnabled,
+                    sender: phoneClean
+                });
+                if (recentWebhooks.length > 10) recentWebhooks.pop();
+
+                if (!isEnabled) return; // Skip actual processing
 
                 // Get AI Response
                 const reply = await processMessage(text, phoneClean, agencyId);
