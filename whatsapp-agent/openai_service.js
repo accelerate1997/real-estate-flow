@@ -191,9 +191,11 @@ async function processMessage(userInput, phone, agencyId) {
 
         } catch (e) {
             console.error('[Error processing JSON AI output]:', e.message);
-            return "I apologize, my system encountered an error understanding that format.";
+            console.error('[Raw AI Response]:', responseText);
+            return "I apologize, my system encountered an error processing that request. Please try briefly stating your preferred date and time again.";
         }
     } catch (error) {
+
         console.error('Process Message Error:', error.message || error);
 
         // Handle explicit OpenAI rate limit error 429

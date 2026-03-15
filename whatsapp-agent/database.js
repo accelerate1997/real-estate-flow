@@ -25,7 +25,19 @@ module.exports = {
     pb,
     authenticate,
     /**
+     * Normalizes a date string to PocketBase compatible format.
+     */
+    normalizeDate(dateStr) {
+        if (!dateStr || dateStr.includes('YYYY')) return null;
+        const d = new Date(dateStr);
+        if (!isNaN(d.getTime())) {
+            return d.toISOString();
+        }
+        return dateStr;
+    },
+    /**
      * Finds a lead by phone number.
+
      * @param {string} phone 
      */
     async getLeadByPhone(phone) {
@@ -305,17 +317,21 @@ module.exports = {
     async scheduleVisit(leadId, propertyId, visitDate, agencyId, notes = '') {
         await authenticate();
         try {
+            const cleanAgencyId = (agencyId && typeof agencyId === 'string') ? agencyId.replace("Agency_", "") : agencyId;
+            const normalizedDate = this.normalizeDate(visitDate);
+
             const data = {
                 lead: leadId,
                 property: propertyId,
-                visit_date: visitDate,
+                visit_date: normalizedDate || visitDate,
                 status: 'Scheduled',
                 notes: notes,
-                agency_id: agencyId.replace("Agency_", "")
+                agency_id: cleanAgencyId
             };
             const record = await pb.collection('site_visits').create(data);
             console.log(`[DB] Scheduled Site Visit ${record.id} for Lead ${leadId}`);
             return record;
+
         } catch (err) {
             console.error('[DB Error] Failed to schedule site visit:', err.message);
             throw err;
