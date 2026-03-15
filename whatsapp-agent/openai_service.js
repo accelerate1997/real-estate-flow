@@ -71,12 +71,10 @@ async function processMessage(userInput, phone, agencyId) {
         let leadExists = false;
         let leadName = "";
         try {
-            const leads = await db.pb.collection('leads').getList(1, 1, {
-                filter: `phone ~ "${cleanPhone}"`
-            });
-            if (leads.totalItems > 0) {
+            const lead = await db.getLeadByPhone(cleanPhone);
+            if (lead) {
                 leadExists = true;
-                leadName = leads.items[0].name;
+                leadName = lead.name;
             }
         } catch (e) {
             console.error("DB Lead Check Error:", e.message);
@@ -162,14 +160,10 @@ async function processMessage(userInput, phone, agencyId) {
                 
                 console.log(`\n[ACTION] AI scheduling site visit for Lead: ${phone} on ${params.visit_date}`);
                 
-                // Fetch lead again to ensure we have the ID (especially if just created)
-                const cleanPhone = phone.replace(/[^\d]/g, '');
-                const leads = await db.pb.collection('leads').getList(1, 1, {
-                    filter: `phone ~ "${cleanPhone}"`
-                });
+                const lead = await db.getLeadByPhone(phone);
 
-                if (leads.totalItems > 0) {
-                    const leadId = leads.items[0].id;
+                if (lead) {
+                    const leadId = lead.id;
                     await db.scheduleVisit(
                         leadId,
                         params.visit_property_id,

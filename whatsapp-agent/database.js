@@ -22,6 +22,21 @@ async function authenticate() {
 }
 
 module.exports = {
+    pb,
+    authenticate,
+    /**
+     * Finds a lead by phone number.
+     * @param {string} phone 
+     */
+    async getLeadByPhone(phone) {
+        await authenticate();
+        const cleanPhone = phone.replace(/[^\d]/g, '');
+        const records = await pb.collection('leads').getList(1, 1, {
+            filter: `phone ~ "${cleanPhone}"`
+        });
+        return records.totalItems > 0 ? records.items[0] : null;
+    },
+
     /**
      * Finds properties matching the specified requirements.
      * @param {Object} requirements  
