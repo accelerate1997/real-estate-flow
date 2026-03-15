@@ -11,60 +11,82 @@ const openai = new OpenAI({
     apiKey: apiKey
 });
 
-const SYSTEM_PROMPT = `You are an AI Assistant for Rajesh Real Estate Agency. Your job is to handle customer inquiries for properties.
+const SYSTEM_PROMPT = `You are an AI Assistant for Rajesh Real Estate Agency. Your job is to handle customer inquiries and schedule SITE VISITS.
 
-STRICT CONVERSATION FLOW & ANTI-HALLUCINATION RULES:
-0. Phone Number Check: If the system note says "NO_PHONE_PROVIDED", and the user hasn't explicitly given a phone number in the chat, your first message MUST ask: "May I have your WhatsApp number for our records?"
-1. Greeting: Ask the user how you can assist them and if they are looking for a property.
-2. Qualification: If they say yes, ask for their name and specific requirements (BHK, Location).
-3. Budget, Timeline, Purpose: Once you have their name and requirements, ask for their budget, when they plan to purchase, and the purpose (Personal, Investment, etc). Do not skip this step!
-4. Search: When the user provides their budget, timeline, and purpose, you MUST return the JSON intent "SEARCH_PROPERTIES" along with the extracted parameters.
-5. Results: Once you receive the search results via SYSTEM NOTE, present them to the user clearly (with URLs). Ask them when you can follow back up to know their decision.
+STRICT CONVERSATION FLOW:
+1. Greet the user professionally.
+2. Lead Check:
+   - YOU ALWAYS KNOW THE USER'S PHONE NUMBER. NEVER ask for their WhatsApp number or phone number.
+   - If SYSTEM NOTE says [LEAD_EXISTS: false], you MUST ask for their NAME before scheduling.
+   - If SYSTEM NOTE says [LEAD_EXISTS: true], use their name (LEAD_NAME) and proceed directly to scheduling.
+3. Scheduling Logic:
+   - When a user is interested in a property (e.g. "I am interested in [Property]"), you MUST ask for their preferred DATE and TIME for a site visit. 
+   - DO NOT skip the date and time request. You cannot schedule without them.
+   - If they are a new lead (LEAD_EXISTS: false), ensure you have their Name as well.
+4. Finalizing:
+   - Once (and ONLY after) you have Name (if new), Date, and Time, confirm the details back including the Property Name and the confirmed timing.
+   - Use intent "SCHEDULE_SITE_VISIT" and return valid JSON when ALL parameters are confirmed.
 
-CRITICAL ANTI-HALLUCINATION WARNING:
-DO NOT EVER INVENT OR HALLUCINATE PROPERTIES OR PROPERTY LINKS. You have NO KNOWLEDGE of the available properties until you trigger the "SEARCH_PROPERTIES" intent and receive the SYSTEM NOTE back. If the user asks for properties before providing their budget and timeline, decline politely and ask for the missing information. NEVER provide fake URLs.
+CRITICAL ANTI-HALLUCINATION:
+DO NOT INVENT PROPERTIES. Only discuss properties mentioned by the user or found in SEARCH_PROPERTIES results.
 
 INTENTS:
-- GENERAL_CHAT: Normal conversational responses.
-- SEARCH_PROPERTIES: User has provided requirements and budget. You need to search the database.
+- GENERAL_CHAT: Normal talk, greetings, or answering questions.
+- SEARCH_PROPERTIES: Search triggered by BHK/Location/Budget.
+- SCHEDULE_SITE_VISIT: When Date, Time, and Name (for new leads) are ALL confirmed by the user.
 
 OUTPUT FORMAT:
-You must ALWAYS output valid JSON ONLY matching exactly this schema:
+Return JSON ONLY:
 {
-  "intent": "GENERAL_CHAT" | "SEARCH_PROPERTIES",
-  "human_response": "What you actually say back to the user",
+  "intent": "GENERAL_CHAT" | "SEARCH_PROPERTIES" | "SCHEDULE_SITE_VISIT",
+  "human_response": "...",
   "parameters": {
-     "name": "User Name (if known)",
-     "extracted_phone": "Numeric phone number if user explicitly types it (e.g. 9876543210)",
-     "bhk": "A single digit representing the BHK, e.g., '2' or '3' (if known). Pick the lowest if they give a range.",
-     "location": "e.g., Mumbai, Andheri, etc. (if known)",
-     "budget_in_rupees": "numeric budget (e.g., 20000000 for 2Cr) (if known)",
-     "timeframe": "When they want to buy (if known)",
-     "purpose": "Personal, Investment, etc (if known)",
-     "follow_up_date": "YYYY-MM-DD or readable date when they said they'll decide (if known)"
+     "name": "...",
+     "visit_date": "YYYY-MM-DD HH:mm",
+     "visit_property_id": "..."
   }
 }`;
 
-// Store active chat sessions by phone number
 const sessions = {};
 
 async function processMessage(userInput, phone, agencyId) {
     try {
-        if (!sessions[phone]) {
+        // Force session reset if it's a new property inquiry (pre-filled message)
+        const isNewInquiry = userInput.includes('I am interested in this property') && userInput.includes('schedule a sitevisit');
+        
+        if (!sessions[phone] || isNewInquiry) {
+            console.log(`[SESSION] Initializing/Resetting session for ${phone}`);
             sessions[phone] = [
                 { role: "system", content: SYSTEM_PROMPT }
             ];
+        } else {
+            // Always ensure the first message is the CURRENT system prompt in case of logic updates
+            sessions[phone][0] = { role: "system", content: SYSTEM_PROMPT };
         }
 
         const chatContext = sessions[phone];
 
-        // Let the AI know if we have a real phone number or a generic ID from a non-whatsapp platform
-        const phoneContext = phone.match(/^\d+$/) ? '' : ' \n[SYSTEM NOTE: NO_PHONE_PROVIDED]';
+        // CHECK IF LEAD EXISTS
+        const cleanPhone = phone.replace(/[^\d]/g, '');
+        let leadExists = false;
+        let leadName = "";
+        try {
+            const leads = await db.pb.collection('leads').getList(1, 1, {
+                filter: `phone ~ "${cleanPhone}"`
+            });
+            if (leads.totalItems > 0) {
+                leadExists = true;
+                leadName = leads.items[0].name;
+            }
+        } catch (e) {
+            console.error("DB Lead Check Error:", e.message);
+        }
+
+        const phoneContext = `\n[SYSTEM NOTE: LEAD_EXISTS: ${leadExists}${leadName ? `, LEAD_NAME: ${leadName}` : ''}]`;
         const finalInput = userInput + phoneContext;
 
         chatContext.push({ role: "user", content: finalInput });
 
-        // Force strictly formatted JSON output
         const response = await openai.chat.completions.create({
             model: "gpt-4o-mini",
             messages: chatContext,
@@ -75,15 +97,12 @@ async function processMessage(userInput, phone, agencyId) {
         const responseText = response.choices[0].message.content;
         chatContext.push({ role: "assistant", content: responseText });
 
-        console.log(`\n[DEBUG - Raw AI Output]`);
-        console.log(responseText);
-
         try {
             const parsed = JSON.parse(responseText);
             const intent = parsed.intent;
             const params = parsed.parameters || {};
 
-            // Always attempt to save/update the Lead when the AI learns new information
+            // Always attempt to save/update the Lead
             const hasLeadData = params.name || params.bhk || params.location || params.budget_in_rupees || params.purpose;
             if (hasLeadData && agencyId) {
                 const leadPhone = phone.match(/^\d+$/) ? phone : (params.extracted_phone || phone);
@@ -91,9 +110,6 @@ async function processMessage(userInput, phone, agencyId) {
             }
 
             if (intent === 'SEARCH_PROPERTIES') {
-                console.log(`\n[ACTION] AI requesting property search for ${params.name || 'User'} with budget: Rs ${params.budget_in_rupees}`);
-
-                // Query PocketBase
                 const properties = await db.findProperties({
                     budget: params.budget_in_rupees,
                     bhk: params.bhk,
@@ -101,41 +117,82 @@ async function processMessage(userInput, phone, agencyId) {
                 });
 
                 if (properties.length === 0) {
-                    const failMsg = `SYSTEM NOTE: The database search returned NO properties matching the criteria. Inform the user politely and ask if they'd like to adjust their budget or location.`;
+                    const failMsg = `SYSTEM NOTE: The database search returned NO properties matching the criteria. Inform the user politely.`;
                     chatContext.push({ role: "system", content: failMsg });
-
                     const failResponse = await openai.chat.completions.create({
                         model: "gpt-4o-mini",
                         messages: chatContext,
                         response_format: { type: "json_object" }
                     });
-
                     const failData = JSON.parse(failResponse.choices[0].message.content);
                     chatContext.push({ role: "assistant", content: JSON.stringify(failData) });
-                    return failData.human_response || "I couldn't find any properties matching that criteria.";
+                    return failData.human_response;
                 }
 
-                // Format properties into a readable string
                 const baseUrl = process.env.VITE_APP_URL || 'http://localhost:5173';
                 const propertyList = properties.map(p =>
-                    `🏡 *${p.title}*\n📍 ${p.location} | ${p.bhk || 'N/A'}\n💰 ₹${(p.price / 10000000).toFixed(2)} Cr\n🔗 Link: ${baseUrl}/properties/${p.id}`
+                    `🏡 *${p.title}*\n📍 ${p.location}\n💰 ₹${(p.price / 10000000).toFixed(2)} Cr\n🔗 Link: ${baseUrl}/properties/${p.id}`
                 ).join('\n\n');
 
-                const successMsg = `SYSTEM NOTE: The database found these properties:\n${propertyList}\n\nPresent these to the user perfectly formatted and ask when you can follow up regarding their decision.`;
+                const successMsg = `SYSTEM NOTE: The database found these properties:\n${propertyList}\n\nPresent these clearly and ASK if they want to schedule a SITE VISIT for any of them.`;
                 chatContext.push({ role: "system", content: successMsg });
-
                 const successResponse = await openai.chat.completions.create({
                     model: "gpt-4o-mini",
                     messages: chatContext,
                     response_format: { type: "json_object" }
                 });
-
                 const successData = JSON.parse(successResponse.choices[0].message.content);
                 chatContext.push({ role: "assistant", content: JSON.stringify(successData) });
-                return successData.human_response || "Here are some properties I found:\n\n" + propertyList;
+                return successData.human_response;
             }
 
-            // Default fallback for GENERAL_CHAT
+            if (intent === 'SCHEDULE_SITE_VISIT') {
+                if (!params.visit_date || params.visit_date.includes('YYYY')) {
+                    const validationMsg = "SYSTEM NOTE: You attempted to schedule a visit but the DATE or TIME is missing or invalid. You MUST ask the user for a specific date and time before you can use the SCHEDULE_SITE_VISIT intent.";
+                    chatContext.push({ role: "system", content: validationMsg });
+                    const retryResponse = await openai.chat.completions.create({
+                        model: "gpt-4o-mini",
+                        messages: chatContext,
+                        response_format: { type: "json_object" }
+                    });
+                    const retryData = JSON.parse(retryResponse.choices[0].message.content);
+                    chatContext.push({ role: "assistant", content: JSON.stringify(retryData) });
+                    return retryData.human_response;
+                }
+                
+                console.log(`\n[ACTION] AI scheduling site visit for Lead: ${phone} on ${params.visit_date}`);
+                
+                // Fetch lead again to ensure we have the ID (especially if just created)
+                const cleanPhone = phone.replace(/[^\d]/g, '');
+                const leads = await db.pb.collection('leads').getList(1, 1, {
+                    filter: `phone ~ "${cleanPhone}"`
+                });
+
+                if (leads.totalItems > 0) {
+                    const leadId = leads.items[0].id;
+                    await db.scheduleVisit(
+                        leadId,
+                        params.visit_property_id,
+                        params.visit_date,
+                        agencyId,
+                        `Scheduled via WhatsApp AI. User requested: ${params.visit_date}`
+                    );
+                    
+                    const confirmationMsg = `SYSTEM NOTE: Site visit has been successfully recorded in the database. Confirm this to the user professionally, mentioning the property name and visit date/time.`;
+                    chatContext.push({ role: "system", content: confirmationMsg });
+                    const confirmResponse = await openai.chat.completions.create({
+                        model: "gpt-4o-mini",
+                        messages: chatContext,
+                        response_format: { type: "json_object" }
+                    });
+                    const confirmData = JSON.parse(confirmResponse.choices[0].message.content);
+                    chatContext.push({ role: "assistant", content: JSON.stringify(confirmData) });
+                    return confirmData.human_response;
+                } else {
+                    return "I'm sorry, I couldn't find your lead record to schedule the visit. Could you please tell me your name again?";
+                }
+            }
+
             return parsed.human_response || "I am still learning how to help you.";
 
         } catch (e) {
@@ -163,9 +220,18 @@ function getChats(phone) {
     // Filter out system prompts so the agency owner only sees actual user & assistant messages
     return sessions[sessionKey].filter(msg => msg.role === 'user' || msg.role === 'assistant').map(msg => ({
         role: msg.role,
-        // Remove the invisible phone context note from user messages before displaying
-        content: msg.content.replace(/\n\[SYSTEM NOTE: NO_PHONE_PROVIDED\]$/, '')
+        content: msg.content.split('\n[SYSTEM NOTE:')[0].trim()
     }));
 }
 
-module.exports = { processMessage, getChats };
+function logMessage(phone, role, content) {
+    if (!sessions[phone]) {
+        sessions[phone] = [
+            { role: "system", content: SYSTEM_PROMPT }
+        ];
+    }
+    sessions[phone].push({ role, content });
+    console.log(`[LOG] Manually logged ${role} message for ${phone}`);
+}
+
+module.exports = { processMessage, getChats, logMessage };

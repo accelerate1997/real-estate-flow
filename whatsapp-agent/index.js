@@ -22,6 +22,17 @@ app.get('/api/chats/:phone', (req, res) => {
     res.json({ chats: history });
 });
 
+// API Endpoint for Voice Agent to log transcripts
+const { logMessage } = require('./openai_service');
+app.post('/api/chats/log', (req, res) => {
+    const { phone, role, content } = req.body;
+    if (!phone || !role || !content) {
+        return res.status(400).json({ error: "phone, role, and content required" });
+    }
+    logMessage(phone, role, content);
+    res.json({ success: true });
+});
+
 const PORT = process.env.PORT || 3000;
 
 // Simple in-memory cache for de-duplication
@@ -224,6 +235,72 @@ app.post('/api/whatsapp/connect', async (req, res) => {
     } catch (error) {
         console.error('API Error /whatsapp/connect:', error);
         res.status(500).json({ error: 'Internal Server Error' });
+    }
+});
+
+// API Endpoint to trigger property match engine
+app.post('/api/properties/match', async (req, res) => {
+    try {
+        const { propertyId } = req.body;
+        if (!propertyId) return res.status(400).json({ error: "Property ID required" });
+        
+        console.log(`\n🔍 [Match Engine] Triggered for Property: ${propertyId}`);
+        const matchCount = await db.matchProperty(propertyId);
+        res.json({ success: true, matchesFound: matchCount });
+    } catch(err) {
+        res.status(500).json({ error: "Match engine error" });
+    }
+});
+
+// API Endpoint to schedule a site visit
+app.post('/api/visits/schedule', async (req, res) => {
+    try {
+        const { leadId, propertyId, visitDate, agencyId, notes } = req.body;
+        if (!leadId || !propertyId || !visitDate || !agencyId) {
+            return res.status(400).json({ error: "Missing required fields" });
+        }
+        
+        console.log(`\n📅 [Visit Engine] Scheduling visit for Lead: ${leadId}`);
+        const visit = await db.scheduleVisit(leadId, propertyId, visitDate, agencyId, notes);
+        res.json({ success: true, visitId: visit.id });
+    } catch(err) {
+        console.error("Visit scheduling error:", err);
+        res.status(500).json({ error: "Failed to schedule visit" });
+    }
+});
+
+// API Endpoint to fetch visits for an agency
+app.get('/api/visits/:agencyId', async (req, res) => {
+    try {
+        const { agencyId } = req.params;
+        const visits = await db.getVisits(agencyId);
+        res.json({ success: true, visits });
+    } catch(err) {
+        console.error("Fetch visits error:", err);
+        res.status(500).json({ error: "Failed to fetch visits" });
+    }
+});
+
+// API Endpoint to send WhatsApp alert for a match
+app.post('/api/properties/alert', async (req, res) => {
+    try {
+        const { matchId } = req.body;
+        if (!matchId) return res.status(400).json({ error: "Match ID required" });
+        
+        console.log(`\n📲 [Alert Engine] Preparing WhatsApp alert for match: ${matchId}`);
+        const alertData = await db.getMatchAlertData(matchId);
+        
+        // Send message via Evolution API
+        await sendMessage(alertData.leadPhone, alertData.messageText, alertData.instanceName);
+        
+        // Update DB status
+        await db.updateMatchStatus(matchId, 'Alert Sent');
+        
+        console.log(`✅ [Alert Engine] Alert sent to ${alertData.leadPhone}`);
+        res.json({ success: true });
+    } catch(err) {
+        console.error("Alert engine error:", err);
+        res.status(500).json({ error: "Failed to send alert" });
     }
 });
 

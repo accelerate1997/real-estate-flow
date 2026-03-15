@@ -245,10 +245,24 @@ const PropertyDetails = () => {
                                 </div>
 
                                 <div className="space-y-4">
-                                    <a href="https://wa.me/something" target="_blank" rel="noreferrer" className="w-full flex items-center justify-center gap-3 bg-[#25D366] text-white py-4 rounded-xl font-bold hover:bg-[#128C7E] transition-colors shadow-sm">
-                                        <Phone className="w-5 h-5" />
-                                        Contact via WhatsApp
-                                    </a>
+                                    {(() => {
+                                        let rawPhone = property.expand?.agencyId?.phone?.replace(/[^\d]/g, '') || '918268919143';
+                                        
+                                        // Ensure international format (Prepend 91 if it's a 10-digit number)
+                                        if (rawPhone.length === 10) {
+                                            rawPhone = `91${rawPhone}`;
+                                        }
+
+                                        const message = encodeURIComponent(`I am interested in this property "${property.title}" (ID: ${property.id}). I would like to schedule a sitevisit.`);
+                                        const waLink = `https://api.whatsapp.com/send?phone=${rawPhone}&text=${message}`;
+                                        
+                                        return (
+                                            <a href={waLink} target="_blank" rel="noreferrer" className="w-full flex items-center justify-center gap-3 bg-[#25D366] text-white py-4 rounded-xl font-bold hover:bg-[#128C7E] transition-colors shadow-sm">
+                                                <Phone className="w-5 h-5" />
+                                                Contact via WhatsApp
+                                            </a>
+                                        );
+                                    })()}
                                     <button className="w-full flex items-center justify-center gap-3 bg-white text-gray-700 border-2 border-gray-200 py-4 rounded-xl font-bold hover:bg-gray-50 transition-colors shadow-sm">
                                         <Mail className="w-5 h-5" />
                                         Request Details

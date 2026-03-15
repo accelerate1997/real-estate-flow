@@ -53,9 +53,8 @@ module.exports = {
             }
 
             if (requirements.budget && requirements.budget > 0) {
-                // Add a small buffer to budget (e.g. + 10%) so strict filtering isn't too rigid
-                const maxBudget = requirements.budget * 1.1;
-                filters.push(`price <= ${maxBudget}`);
+                // Remove the 10% buffer for strict compliance with user request
+                filters.push(`price <= ${requirements.budget}`);
             }
 
             const filterString = filters.length > 0 ? filters.join(' && ') : '';
@@ -96,9 +95,15 @@ module.exports = {
         await authenticate();
 
         try {
+            // Standardize phone number format (remove + and spaces)
+            const cleanPhone = phone.replace(/[^\d]/g, '');
+            
             // Check if lead already exists for this phone and agency
             const existingLeads = await pb.collection('leads').getList(1, 1, {
-                filter: pb.filter('phone = {:phone} && agencyId = {:agencyId}', { phone, agencyId })
+                filter: pb.filter('phone ~ {:phone} && agencyId = {:agencyId}', { 
+                    phone: cleanPhone, 
+                    agencyId 
+                })
             });
 
             // Combine details into a requirement overview
@@ -116,6 +121,10 @@ module.exports = {
                 name: params.name || 'WhatsApp Contact',
                 phone: phone,
                 requirement: requirementText,
+                // Synchronize structured fields for automated matching engine
+                target_bhk: params.bhk || "",
+                target_location: params.location || "",
+                max_budget: params.budget_in_rupees ? parseFloat(params.budget_in_rupees) : 0
             };
 
             // Only update follow-up date if the AI extracted a valid one
@@ -177,6 +186,143 @@ module.exports = {
             console.error(`[DB] Error fetching agentEnabled status for agency ${agencyId}:`, err.message);
             // Default to true on error to ensure we don't accidentally turn off the AI
             return true;
+        }
+    },
+
+    /**
+     * Finds and creates matches for a new property against existing leads.
+     */
+    async matchProperty(propertyId) {
+        await authenticate();
+        try {
+            const property = await pb.collection('properties').getOne(propertyId);
+            
+            const filters = [];
+            
+            // Only match leads within the same agency
+            filters.push(`agencyId = "${property.agencyId}"`);
+
+            if (property.bhkType) {
+                 const match = property.bhkType.match(/\d+/);
+                 if (match) {
+                     filters.push(`target_bhk ~ "${match[0]}"`);
+                 } else {
+                     filters.push(`target_bhk ~ "${property.bhkType}"`);
+                 }
+            }
+            if (property.location) {
+                const locKeywords = property.location.split(/[\s,]+/).filter(k => k.length > 3);
+                if (locKeywords.length > 0) {
+                    const locFilter = locKeywords.map(k => `target_location ~ "${k}"`).join(' || ');
+                    filters.push(`(${locFilter})`);
+                }
+            }
+            if (property.price && property.price > 0) {
+                filters.push(`max_budget >= ${property.price}`);
+            }
+            
+            const filterString = filters.length > 0 ? filters.join(' && ') : '';
+            console.log(`[DB] Matching Leads for Property ${propertyId}. Filter: ${filterString}`);
+            
+            if (!filterString) return 0;
+            
+            const leads = await pb.collection('leads').getList(1, 100, {
+                 filter: filterString
+            });
+            
+            let matchCount = 0;
+            for (const lead of leads.items) {
+                try {
+                    // CRITICAL: Double check de-duplication by lead record ID and property record ID
+                    const existing = await pb.collection('matches').getList(1, 1, {
+                        filter: pb.filter('lead_id = {:leadId} && property_id = {:propId}', { 
+                            leadId: lead.id, 
+                            propId: property.id 
+                        })
+                    });
+                    
+                    if (existing.totalItems === 0) {
+                        await pb.collection('matches').create({
+                            lead_id: lead.id,
+                            property_id: property.id,
+                            agency_id: property.agencyId,
+                            status: "Pending Review"
+                        });
+                        matchCount++;
+                        console.log(`[DB] Created Match: Lead ${lead.name} <-> Property ${property.title}`);
+                    }
+                } catch(e) {
+                    console.error("Error creating match:", e.message);
+                }
+            }
+            return matchCount;
+        } catch(e) {
+             console.error("Match Engine Error:", e.message);
+             return 0;
+        }
+    },
+
+    /**
+     * Prepares data to send a WhatsApp alert for a specific match
+     */
+    async getMatchAlertData(matchId) {
+        await authenticate();
+        const match = await pb.collection('matches').getOne(matchId, { expand: 'lead_id,property_id' });
+        
+        const lead = match.expand.lead_id;
+        const property = match.expand.property_id;
+        const instanceName = `Agency_${match.agency_id}`;
+        
+        const priceCrores = property.price ? (property.price / 10000000).toFixed(2) + ' Cr' : 'On Request';
+        const messageText = `Hi ${lead.name || 'there'},\n\nYou recently asked us to find a property for you. We just listed an exclusive new property that perfectly matches your requirements:\n\n🏡 *${property.title}*\n📍 *Location*: ${property.location}\n🛏️ *Config*: ${property.bhkType}\n💰 *Price*: ₹${priceCrores}\n\nWould you like to see photos or schedule a site visit? Reply to this message and our AI assistant will arrange everything!`;
+
+        return { leadPhone: lead.phone, messageText, instanceName };
+    },
+
+    async updateMatchStatus(matchId, status) {
+        await authenticate();
+        await pb.collection('matches').update(matchId, { status });
+    },
+
+    /**
+     * Schedules a site visit for a lead.
+     */
+    async scheduleVisit(leadId, propertyId, visitDate, agencyId, notes = '') {
+        await authenticate();
+        try {
+            const data = {
+                lead: leadId,
+                property: propertyId,
+                visit_date: visitDate,
+                status: 'Scheduled',
+                notes: notes,
+                agency_id: agencyId.replace("Agency_", "")
+            };
+            const record = await pb.collection('site_visits').create(data);
+            console.log(`[DB] Scheduled Site Visit ${record.id} for Lead ${leadId}`);
+            return record;
+        } catch (err) {
+            console.error('[DB Error] Failed to schedule site visit:', err.message);
+            throw err;
+        }
+    },
+
+    /**
+     * Fetches all site visits for an agency.
+     */
+    async getVisits(agencyId) {
+        await authenticate();
+        try {
+            const aid = agencyId.replace("Agency_", "");
+            const result = await pb.collection('site_visits').getFullList({
+                filter: `agency_id = "${aid}"`,
+                expand: 'lead,property',
+                sort: '-visit_date'
+            });
+            return result;
+        } catch (err) {
+            console.error('[DB Error] Failed to fetch visits:', err.message);
+            return [];
         }
     }
 };
