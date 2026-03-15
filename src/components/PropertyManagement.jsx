@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Settings, Image as ImageIcon, Plus, Building2, MapPin, Edit, Search, Trash2, ShieldCheck, CheckSquare, Square, Check, X, Ruler, Filter, Loader2, Home, Upload, Layers, Star, Bed, Bath, Construction } from 'lucide-react';
+import { Settings, Image as ImageIcon, Plus, Building2, MapPin, Edit, Search, Trash2, ShieldCheck, CheckSquare, Square, Check, X, Ruler, Filter, Loader2, Home, Upload, Layers, Star, Bed, Bath, Construction, Target } from 'lucide-react';
 import { pb } from '../services/pocketbase';
 import AddPropertyWizard from './AddPropertyWizard';
 import BulkUploadWizard from './BulkUploadWizard';
@@ -355,7 +355,7 @@ const PropertyManagement = () => {
                                                 className="text-gray-400 hover:text-amber-500 transition-colors tooltip-trigger"
                                                 title="Find Smart Matches"
                                             >
-                                                <Zap className="w-4 h-4" />
+                                                <Target className="w-4 h-4" />
                                             </button>
                                             <button
                                                 onClick={() => handleToggleFeatured(property.id, property.isFeatured)}

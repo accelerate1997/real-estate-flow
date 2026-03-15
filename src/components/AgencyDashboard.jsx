@@ -13,7 +13,7 @@ import AgencySettings from './AgencySettings';
 import LeadManagement from './LeadManagement';
 import SmartMatches from './SmartMatches';
 import SiteVisits from './SiteVisits';
-import { Target, Zap, CalendarDays } from 'lucide-react';
+import { Target, Calendar } from 'lucide-react';
 
 // Removed mock data
 
@@ -22,8 +22,8 @@ const Sidebar = ({ activeTab, setActiveTab, isOpen, setIsOpen, onLogout, isOwner
         { name: 'Overview', icon: LayoutDashboard, id: 'overview' },
         { name: 'Leads', icon: Target, id: 'leads' },
         { name: 'Properties', icon: Home, id: 'properties' },
-        { name: 'Smart Matches', icon: Zap, id: 'matches' },
-        { name: 'Site Visits', icon: CalendarDays, id: 'visits' },
+        { name: 'Smart Matches', icon: Target, id: 'matches' },
+        { name: 'Site Visits', icon: Calendar, id: 'visits' },
         { name: isOwner ? 'Manage Agents' : 'Agency Directory', icon: Users, id: 'agents' },
     ];
 
@@ -312,12 +312,12 @@ const AgencyDashboard = () => {
                         <button onClick={() => setSidebarOpen(true)} className="md:hidden text-gray-500">
                             <Menu className="w-6 h-6" />
                         </button>
-                        <h1 className="text-lg font-semibold text-gray-900 capitalize">{activeTab.replace('-', ' ')}</h1>
+                        <h1 className="text-lg font-semibold text-gray-900 capitalize">{activeTab?.replace('-', ' ')}</h1>
                     </div>
                     <div className="flex items-center gap-4">
                         <div className="flex items-center gap-2">
                             <div className="w-8 h-8 rounded-full bg-primary/10 text-primary flex items-center justify-center font-bold text-sm">
-                                {userName.charAt(0)}
+                                {userName?.charAt(0) || 'U'}
                             </div>
                             <span className="text-sm font-medium text-gray-700 hidden sm:block">{userName}</span>
                         </div>
