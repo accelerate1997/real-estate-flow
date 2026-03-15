@@ -42,7 +42,8 @@ Return JSON ONLY:
   "human_response": "...",
   "parameters": {
      "name": "...",
-     "visit_date": "YYYY-MM-DD HH:mm",
+     "visit_date": "YYYY-MM-DD",
+     "visit_time": "HH:mm or user provided time string",
      "visit_property_id": "..."
   }
 }`;
@@ -168,8 +169,9 @@ async function processMessage(userInput, phone, agencyId) {
                         leadId,
                         params.visit_property_id,
                         params.visit_date,
+                        params.visit_time || '',
                         agencyId,
-                        `Scheduled via WhatsApp AI. User requested: ${params.visit_date}`
+                        `Scheduled via WhatsApp AI. User requested: ${params.visit_date} at ${params.visit_time}`
                     );
                     
                     const confirmationMsg = `SYSTEM NOTE: Site visit has been successfully recorded in the database. Confirm this to the user professionally, mentioning the property name and visit date/time.`;

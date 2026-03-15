@@ -314,7 +314,7 @@ module.exports = {
     /**
      * Schedules a site visit for a lead.
      */
-    async scheduleVisit(leadId, propertyId, visitDate, agencyId, notes = '') {
+    async scheduleVisit(leadId, propertyId, visitDate, visitTime, agencyId, notes = '') {
         await authenticate();
         try {
             const cleanAgencyId = (agencyId && typeof agencyId === 'string') ? agencyId.replace("Agency_", "") : agencyId;
@@ -324,6 +324,7 @@ module.exports = {
                 lead: leadId,
                 property: propertyId,
                 visit_date: normalizedDate || visitDate,
+                visit_time: visitTime,
                 status: 'Scheduled',
                 notes: notes,
                 agency_id: cleanAgencyId
