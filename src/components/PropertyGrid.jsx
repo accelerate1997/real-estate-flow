@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { MapPin, BedDouble, Bath, Square, Heart, ArrowRight, Loader2, Star } from 'lucide-react';
 import LeadModal from './LeadModal';
+import { PropertyCardSkeleton } from './ui/PropertyCardSkeleton';
 import clsx from 'clsx';
 import { pb } from '../services/pocketbase';
 import { useNavigate } from 'react-router-dom';
@@ -187,10 +188,10 @@ const PropertyGrid = () => {
             setIsLoading(true);
             try {
                 const records = await pb.collection('properties').getList(1, 40, {
-                    filter: 'isFeatured = true && price >= 0' // show only featured properties
+                    sort: '-isFeatured,-created' // prioritize featured, then newest
                 });
-                const sortedItems = records.items.sort((a, b) => new Date(b.created) - new Date(a.created));
-                setProperties(sortedItems);
+                setProperties(records.items);
+
             } catch (error) {
                 console.error("Error fetching properties for grid:", error);
             } finally {
@@ -215,8 +216,10 @@ const PropertyGrid = () => {
                 </div>
 
                 {isLoading ? (
-                    <div className="flex justify-center py-20">
-                        <Loader2 className="w-12 h-12 animate-spin text-primary" />
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                        {[1, 2, 3, 4, 5, 6, 7, 8].map((i) => (
+                            <PropertyCardSkeleton key={i} />
+                        ))}
                     </div>
                 ) : (
                     <>
