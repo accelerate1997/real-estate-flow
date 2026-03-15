@@ -24,38 +24,61 @@ const Hero = () => {
             </div>
 
             {/* Content */}
-            <div className="relative h-full flex flex-col justify-center items-center text-center px-4 max-w-5xl mx-auto">
-                <motion.h1
-                    initial={{ opacity: 0, y: 20 }}
+            <div className="relative h-full flex flex-col justify-center items-center text-center px-4 max-w-5xl mx-auto pt-20">
+                <motion.div
+                    initial={{ opacity: 0, y: 30 }}
                     animate={{ opacity: 1, y: 0 }}
-                    transition={{ duration: 0.8, ease: "easeOut" }}
-                    className="text-4xl md:text-6xl lg:text-7xl font-bold text-white tracking-tight leading-tight mb-6"
+                    transition={{ duration: 1, ease: [0.16, 1, 0.3, 1] }}
                 >
-                    Finding Your Legacy, <br />
-                    <span className="text-transparent bg-clip-text bg-gradient-to-r from-white to-gray-300">
-                        One Door at a Time.
-                    </span>
-                </motion.h1>
+                    <h1 className="text-4xl md:text-6xl lg:text-7xl font-bold text-white tracking-tight leading-tight mb-6">
+                        Finding Your Legacy, <br />
+                        <span className="text-transparent bg-clip-text bg-gradient-to-r from-white to-gray-300">
+                            One Door at a Time.
+                        </span>
+                    </h1>
+                </motion.div>
 
                 <motion.p
                     initial={{ opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0 }}
-                    transition={{ duration: 0.8, delay: 0.2, ease: "easeOut" }}
+                    transition={{ duration: 1, delay: 0.2, ease: [0.16, 1, 0.3, 1] }}
                     className="text-lg md:text-xl text-gray-200 mb-10 max-w-2xl font-light"
                 >
                     Discover exclusive properties in prime locations using our platform.
                 </motion.p>
 
-                <motion.button
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ duration: 0.8, delay: 0.4, ease: "easeOut" }}
-                    onClick={scrollToProperties}
-                    className="group flex items-center gap-2 bg-white text-text px-8 py-3.5 rounded-full font-semibold text-lg hover:bg-gray-100 transition-all shadow-2xl hover:shadow-white/20"
-                >
-                    Browse Properties
-                    <ArrowDown className="w-5 h-5 group-hover:translate-y-1 transition-transform" />
-                </motion.button>
+                <div className="flex flex-col sm:flex-row items-center gap-4">
+                    <motion.button
+                        initial={{ opacity: 0, y: 20 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ duration: 0.8, delay: 0.4, ease: "easeOut" }}
+                        onClick={scrollToProperties}
+                        className="group flex items-center gap-2 bg-white text-text px-8 py-3.5 rounded-full font-semibold text-lg hover:bg-gray-100 transition-all shadow-2xl hover:shadow-white/20 w-full sm:w-auto justify-center"
+                    >
+                        Browse Properties
+                        <ArrowDown className="w-5 h-5 group-hover:translate-y-1 transition-transform" />
+                    </motion.button>
+
+                    <motion.button
+                        initial={{ opacity: 0, y: 20 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ duration: 0.8, delay: 0.5, ease: "easeOut" }}
+                        onClick={() => {
+                            // Find the VoiceAgent button and click it to open
+                            const event = new CustomEvent('openVoiceAgent');
+                            window.dispatchEvent(event);
+                        }}
+                        className="group flex items-center gap-2 bg-primary/20 backdrop-blur-md border border-white/30 text-white px-8 py-3.5 rounded-full font-semibold text-lg hover:bg-primary/30 transition-all shadow-2xl w-full sm:w-auto justify-center"
+                    >
+                        Talk to Saathi
+                        <div className="flex gap-1">
+                            <span className="w-1 h-1 bg-white rounded-full animate-bounce"></span>
+                            <span className="w-1 h-1 bg-white rounded-full animate-bounce [animation-delay:0.2s]"></span>
+                            <span className="w-1 h-1 bg-white rounded-full animate-bounce [animation-delay:0.4s]"></span>
+                        </div>
+                    </motion.button>
+                </div>
+
             </div>
         </div>
     );

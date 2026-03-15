@@ -325,7 +325,34 @@ const AddPropertyWizard = ({ onClose, onSuccess, targetAgencyId, currentUserId, 
             if (initialData?.id) {
                 await pb.collection('properties').update(initialData.id, pbData);
             } else {
-                await pb.collection('properties').create(pbData);
+                // Defensive check: Prevent duplicate property entries
+                const currentLocation = `${formData.locality}, ${formData.city}`;
+                try {
+                    const existing = await pb.collection('properties').getFirstListItem(
+                        pb.filter('title = {:title} && price = {:price} && location = {:location} && agencyId = {:agencyId}', {
+                            title: formData.title,
+                            price: parseFloat(formData.price),
+                            location: currentLocation,
+                            agencyId: targetAgencyId
+                        })
+                    );
+                    
+                    if (existing && !window.confirm(`Warning: A property with this title, price, and location already exists (ID: ${existing.id}). Do you still want to list it?`)) {
+                        setIsSubmitting(false);
+                        return;
+                    }
+                } catch (e) {
+                    // 404 is expected if no duplicate exists, continue normally
+                }
+
+                const newRecord = await pb.collection('properties').create(pbData);
+                // Trigger Smart Match Backend
+                const agentApiUrl = import.meta.env.VITE_AGENT_API_URL || 'http://localhost:3000';
+                fetch(`${agentApiUrl}/api/properties/match`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ propertyId: newRecord.id })
+                }).catch(console.error);
             }
             onSuccess(); // Close and refresh list
         } catch (error) {

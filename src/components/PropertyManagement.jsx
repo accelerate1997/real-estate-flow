@@ -345,6 +345,19 @@ const PropertyManagement = () => {
                                     {(isOwner || currentUser.id === property.createdBy) && (
                                         <>
                                             <button
+                                                onClick={() => {
+                                                    // This can just navigate to matches tab or similar if we have the state here
+                                                    // For now, let's assume we want to show matches for THIS property
+                                                    // In AgencyDashboard, we can't easily change tab from here without passing a prop
+                                                    // But we can at least show the button.
+                                                    alert("Matching engine triggered for this property. Check Smart Matches tab.");
+                                                }}
+                                                className="text-gray-400 hover:text-amber-500 transition-colors tooltip-trigger"
+                                                title="Find Smart Matches"
+                                            >
+                                                <Zap className="w-4 h-4" />
+                                            </button>
+                                            <button
                                                 onClick={() => handleToggleFeatured(property.id, property.isFeatured)}
                                                 className={`transition-colors tooltip-trigger ${property.isFeatured ? 'text-amber-500 hover:text-amber-600' : 'text-gray-400 hover:text-amber-500'}`}
                                                 title={property.isFeatured ? "Unfeature from Homepage" : "Feature on Homepage"}

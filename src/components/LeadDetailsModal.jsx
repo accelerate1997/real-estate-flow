@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { X, MessageCircle, Clock, CheckCircle2, Bot, User, Loader2 } from 'lucide-react';
+import { X, MessageCircle, Clock, CheckCircle2, Bot, User, Loader2, Zap, CalendarDays } from 'lucide-react';
 
 const LeadDetailsModal = ({ isOpen, onClose, lead }) => {
     const [chats, setChats] = useState([]);
@@ -64,13 +64,27 @@ const LeadDetailsModal = ({ isOpen, onClose, lead }) => {
                             {lead.phone}
                         </div>
 
-                        <div className="flex gap-2">
+                        <div className="flex flex-wrap gap-2">
                             <button
                                 onClick={() => window.open(`https://wa.me/${lead.phone.replace(/\D/g, '')}`, '_blank')}
-                                className="flex-1 bg-green-50 hover:bg-green-100 text-green-700 font-semibold py-2 px-4 rounded-xl transition-colors flex justify-center items-center gap-2 text-sm"
+                                className="flex-1 min-w-[120px] bg-green-50 hover:bg-green-100 text-green-700 font-semibold py-2 px-4 rounded-xl transition-colors flex justify-center items-center gap-2 text-sm"
                             >
                                 <MessageCircle className="w-4 h-4" />
                                 WhatsApp
+                            </button>
+                            <button
+                                onClick={() => alert("Searching for property matches for this lead...")}
+                                className="flex-1 min-w-[120px] bg-blue-50 hover:bg-blue-100 text-blue-700 font-semibold py-2 px-4 rounded-xl transition-colors flex justify-center items-center gap-2 text-sm"
+                            >
+                                <Zap className="w-4 h-4" />
+                                Find Match
+                            </button>
+                            <button
+                                onClick={() => alert("Opening site visit scheduler...")}
+                                className="flex-1 min-w-[120px] bg-red-50 hover:bg-red-100 text-primary font-semibold py-2 px-4 rounded-xl transition-colors flex justify-center items-center gap-2 text-sm"
+                            >
+                                <CalendarDays className="w-4 h-4" />
+                                Schedule Visit
                             </button>
                         </div>
                     </div>

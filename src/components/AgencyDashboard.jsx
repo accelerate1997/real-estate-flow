@@ -11,7 +11,9 @@ import AgentManagement from './AgentManagement';
 import PropertyManagement from './PropertyManagement';
 import AgencySettings from './AgencySettings';
 import LeadManagement from './LeadManagement';
-import { Target } from 'lucide-react';
+import SmartMatches from './SmartMatches';
+import SiteVisits from './SiteVisits';
+import { Target, Zap, CalendarDays } from 'lucide-react';
 
 // Removed mock data
 
@@ -20,6 +22,8 @@ const Sidebar = ({ activeTab, setActiveTab, isOpen, setIsOpen, onLogout, isOwner
         { name: 'Overview', icon: LayoutDashboard, id: 'overview' },
         { name: 'Leads', icon: Target, id: 'leads' },
         { name: 'Properties', icon: Home, id: 'properties' },
+        { name: 'Smart Matches', icon: Zap, id: 'matches' },
+        { name: 'Site Visits', icon: CalendarDays, id: 'visits' },
         { name: isOwner ? 'Manage Agents' : 'Agency Directory', icon: Users, id: 'agents' },
     ];
 
@@ -138,7 +142,7 @@ const DashboardOverview = ({ currentUser, isOwner }) => {
                 // Fetch up to 500 recent leads (assuming reasonable volume per week)
                 const recentLeads = await pb.collection('leads').getFullList({
                     filter: recentLeadsFilter,
-                    sort: 'created'
+                    sort: '-id'
                 });
 
                 // Initialize days array (Last 7 days, ending today)
@@ -277,6 +281,8 @@ const AgencyDashboard = () => {
             case 'overview': return <DashboardOverview currentUser={currentUser} isOwner={isOwner} />;
             case 'leads': return <LeadManagement />;
             case 'properties': return <PropertyManagement />;
+            case 'matches': return <SmartMatches />;
+            case 'visits': return <SiteVisits />;
             case 'agents': return <AgentManagement />;
             case 'settings': return isOwner ? <AgencySettings /> : <div className="p-10 text-center text-red-500 font-bold text-xl mt-12">Access Denied: Owner Privileges Required</div>;
             default: return <div className="p-10 text-center text-gray-500">Module under development</div>;
