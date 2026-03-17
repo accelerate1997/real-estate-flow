@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { MapPin, Building2, Square, ArrowRight, Filter, Loader2, Home } from 'lucide-react';
+import { MapPin, Building2, Square, ArrowRight, Filter, Loader2, Home, Heart, Ruler, Search } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import LeadModal from './LeadModal';
 import { pb } from '../services/pocketbase';
