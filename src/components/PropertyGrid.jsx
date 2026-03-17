@@ -188,8 +188,9 @@ const PropertyGrid = () => {
             setIsLoading(true);
             try {
                 const records = await pb.collection('properties').getList(1, 40, {
-                    sort: '-isFeatured,-created' // prioritize featured, then newest
+                    sort: '-id' // Fallback to id-based temporal sorting
                 });
+                console.log("PropertyGrid: Fetched records:", records.items.length, records.items);
                 setProperties(records.items);
 
             } catch (error) {
@@ -203,9 +204,14 @@ const PropertyGrid = () => {
     }, []);
 
     // Filter data for sections (max 4 per section for the home page grid)
-    const residential = properties.filter(p => p.propertyCategory === 'Residential').slice(0, 4);
-    const commercial = properties.filter(p => p.propertyCategory === 'Commercial').slice(0, 4);
-    const newProjects = properties.filter(p => p.propertyCategory === 'NewProjects').slice(0, 4);
+    // Using case-insensitive normalization just in case
+    const getCategoryMatch = (p, cat) => (p.propertyCategory || '').toLowerCase() === cat.toLowerCase();
+
+    const residential = properties.filter(p => getCategoryMatch(p, 'Residential')).slice(0, 4);
+    const commercial = properties.filter(p => getCategoryMatch(p, 'Commercial')).slice(0, 4);
+    const newProjects = properties.filter(p => getCategoryMatch(p, 'NewProjects')).slice(0, 4);
+
+    console.log("PropertyGrid: Section counts - Residential:", residential.length, "Commercial:", commercial.length, "NewProjects:", newProjects.length);
 
     return (
         <section id="properties" className="py-20 bg-white">

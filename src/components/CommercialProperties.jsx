@@ -22,9 +22,10 @@ const CommercialProperties = () => {
                 // Fetch only commercial properties
                 const records = await pb.collection('properties').getFullList({
                     filter: `propertyCategory = "Commercial"`,
+                    sort: '-id'
                 });
-                const sortedRecords = records.sort((a, b) => new Date(b.created) - new Date(a.created));
-                setProperties(sortedRecords);
+                console.log("CommercialProperties: Fetched records:", records.length, records);
+                setProperties(records);
             } catch (error) {
                 console.error("Error fetching commercial properties:", error);
             } finally {

@@ -24,9 +24,10 @@ const ResidentialProperties = () => {
                 // Fetch only residential properties
                 const records = await pb.collection('properties').getFullList({
                     filter: `propertyCategory = "Residential"`,
+                    sort: '-id'
                 });
-                const sortedRecords = records.sort((a, b) => new Date(b.created) - new Date(a.created));
-                setProperties(sortedRecords);
+                console.log("ResidentialProperties: Fetched records:", records.length, records);
+                setProperties(records);
             } catch (error) {
                 console.error("Error fetching residential properties:", error);
             } finally {
