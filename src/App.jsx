@@ -2,9 +2,7 @@ import React from 'react';
 import { BrowserRouter as Router, Routes, Route, useLocation } from 'react-router-dom';
 import Header from './components/Header';
 import Hero from './components/Hero';
-import FloatingSearch from './components/FloatingSearch';
 import PropertyGrid from './components/PropertyGrid';
-import TopBar from './components/TopBar';
 import ResidentialProperties from './components/ResidentialProperties';
 import CommercialProperties from './components/CommercialProperties';
 import UnderDevelopment from './components/UnderDevelopment';
@@ -14,6 +12,16 @@ import AgencyDashboard from './components/AgencyDashboard';
 import AgentInviteRegister from './components/AgentInviteRegister';
 import PropertyDetails from './components/PropertyDetails';
 
+// New Redesign Components
+import Features from './components/Features';
+import Neighborhoods from './components/Neighborhoods';
+import Newsletter from './components/Newsletter';
+import Testimonials from './components/Testimonials';
+import Team from './components/Team';
+import PropertyCard from './components/PropertyCard';
+import Partners from './components/Partners';
+import Footer from './components/Footer';
+
 // Layout wrapper to conditionally render Header/Footer
 const Layout = ({ children }) => {
   const location = useLocation();
@@ -21,26 +29,11 @@ const Layout = ({ children }) => {
 
   return (
     <>
-      {!isAuthPage && <TopBar />}
       {!isAuthPage && <Header />}
       <main>
         {children}
       </main>
-      {!isAuthPage && (
-        <footer className="bg-white border-t border-gray-100 py-12 mt-12">
-          <div className="max-w-7xl mx-auto px-4 flex flex-col md:flex-row justify-between items-center text-center md:text-left gap-6">
-            <div>
-              <span className="text-xl font-bold text-primary">RR Estate</span>
-              <p className="text-gray-500 text-sm mt-2">© 2026 RR Estate. All rights reserved.</p>
-            </div>
-            <div className="flex gap-8 text-gray-500 text-sm">
-              <a href="#" className="hover:text-primary transition-colors">Privacy Policy</a>
-              <a href="#" className="hover:text-primary transition-colors">Terms of Service</a>
-              <a href="#" className="hover:text-primary transition-colors">Contact</a>
-            </div>
-          </div>
-        </footer>
-      )}
+      {!isAuthPage && <Footer />}
     </>
   );
 };
@@ -49,15 +42,28 @@ const Layout = ({ children }) => {
 const Home = () => (
   <>
     <Hero />
-    <FloatingSearch />
-    <PropertyGrid />
+    <Partners />
+    <Features />
+    <div className="section-padding bg-white">
+      <div className="container-custom">
+        <div className="mb-12">
+          <span className="text-primary font-bold tracking-widest uppercase text-sm">Featured</span>
+          <h2 className="text-4xl md:text-5xl font-bold mt-2">Latest <span className="text-accent-teal">Properties</span></h2>
+        </div>
+        <PropertyGrid />
+      </div>
+    </div>
+    <Newsletter />
+    <Neighborhoods />
+    <Testimonials />
+    <Team />
   </>
 );
 
 function App() {
   return (
     <Router>
-      <div className="min-h-screen bg-gray-50 font-sans text-text">
+      <div className="min-h-screen bg-white font-sans text-text">
         <Layout>
           <Routes>
             <Route path="/" element={<Home />} />

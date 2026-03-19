@@ -8,7 +8,25 @@
     scroll-behavior: smooth;
   }
   body {
-    @apply bg-background text-text antialiased;
+    @apply bg-background text-text antialiased overflow-x-hidden;
+  }
+  h1, h2, h3, h4, h5, h6 {
+    @apply font-display;
+  }
+}
+
+@layer components {
+  .glass-panel {
+    @apply bg-white/70 backdrop-blur-md border border-white/20 shadow-glass;
+  }
+  .glass-dark {
+    @apply bg-black/40 backdrop-blur-lg border border-white/10 shadow-xl;
+  }
+  .section-padding {
+    @apply py-16 md:py-24;
+  }
+  .container-custom {
+    @apply max-w-7xl mx-auto px-4 sm:px-6 lg:px-8;
   }
 }
 

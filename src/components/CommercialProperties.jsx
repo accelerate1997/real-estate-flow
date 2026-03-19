@@ -3,6 +3,7 @@ import { motion } from 'framer-motion';
 import { MapPin, Building2, Square, ArrowRight, Filter, Loader2, Home, Heart, Ruler, Search } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import LeadModal from './LeadModal';
+import PropertyCard from './PropertyCard';
 import { pb } from '../services/pocketbase';
 
 const CommercialProperties = () => {
@@ -73,6 +74,10 @@ const CommercialProperties = () => {
         return matchesType && matchesArea;
     });
 
+    const handlePropertyClick = (property) => {
+        setSelectedProperty(property);
+    };
+
     return (
         <div className="min-h-screen bg-gray-50 pt-32 pb-20">
             <div className="max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-8">
@@ -128,79 +133,14 @@ const CommercialProperties = () => {
                 ) : (
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
                         {filteredProperties.map((property) => (
-                            <motion.div
-                                key={property.id}
-                                initial={{ opacity: 0, y: 20 }}
-                                whileInView={{ opacity: 1, y: 0 }}
-                                viewport={{ once: true }}
-                                whileHover={{ y: -5 }}
-                                transition={{ duration: 0.3 }}
+                            <PropertyCard 
+                                key={property.id} 
+                                property={{
+                                    ...property,
+                                    images: [getImageUrl(property)]
+                                }} 
                                 onClick={() => navigate(`/property/${property.id}`)}
-                                className="bg-white rounded-xl overflow-hidden shadow-sm hover:shadow-xl transition-all duration-300 border border-gray-100 flex flex-col group cursor-pointer"
-                            >
-                                {/* Image */}
-                                <div className="relative aspect-video overflow-hidden">
-                                    <img
-                                        src={getImageUrl(property)}
-                                        alt={property.title}
-                                        className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
-                                    />
-                                    <div className="absolute top-2 left-2 flex gap-1 flex-wrap">
-                                        {property.transactionType && (
-                                            <span className="bg-white border-l-4 border-primary text-[#1A1A1A] text-[10px] font-bold px-2 py-0.5 shadow-sm uppercase tracking-wide">
-                                                For {property.transactionType}
-                                            </span>
-                                        )}
-                                        {property.tags && Array.isArray(property.tags) && property.tags.map(tag => (
-                                            <span key={tag} className="bg-white border-l-4 border-primary text-[#1A1A1A] text-[10px] font-bold px-2 py-0.5 shadow-sm uppercase tracking-wide">
-                                                {tag}
-                                            </span>
-                                        ))}
-                                    </div>
-                                    <button className="absolute top-2 right-2 bg-white/90 p-1.5 rounded-none hover:bg-white hover:text-primary transition-colors text-gray-700 shadow-sm">
-                                        <Heart className="w-4 h-4" />
-                                    </button>
-                                </div>
-
-                                {/* Content */}
-                                <div className="p-5 flex flex-col flex-grow">
-                                    <h3 className="text-base font-bold text-[#1A1A1A] mb-1 truncate group-hover:text-primary transition-colors">{property.title}</h3>
-                                    <div className="flex items-center gap-1 text-gray-500 mb-4">
-                                        <MapPin className="w-3 h-3" />
-                                        <span className="text-xs truncate">{property.location}</span>
-                                    </div>
-
-                                    {/* Features */}
-                                    <div className="flex items-center gap-4 text-xs text-gray-600 mb-4 font-medium uppercase tracking-wide">
-                                        <div className="flex items-center gap-1">
-                                            <Building2 className="w-3.5 h-3.5 text-primary" />
-                                            <span className="truncate max-w-[100px]" title={property.businessTypeSuitability || 'Commercial'}>
-                                                {property.businessTypeSuitability || 'Commercial'}
-                                            </span>
-                                        </div>
-                                        <div className="flex items-center gap-1">
-                                            <Ruler className="w-3.5 h-3.5 text-primary" />
-                                            <span>{property.carpetArea || property.builtUpArea} sqft</span>
-                                        </div>
-                                    </div>
-
-                                    <div className="mt-auto flex justify-between items-center gap-2 pt-4 border-t border-gray-100">
-                                        <div className="text-sm font-bold text-[#1A1A1A]">
-                                            {formatCurrency(property.price)}
-                                            {property.transactionType === 'Rent' && <span className="text-[10px] text-gray-500"> /mo</span>}
-                                        </div>
-                                        <button
-                                            onClick={(e) => {
-                                                e.stopPropagation();
-                                                navigate(`/property/${property.id}`);
-                                            }}
-                                            className="bg-primary hover:bg-red-800 text-white text-xs px-4 py-2 rounded font-semibold shadow-md transition-all whitespace-nowrap"
-                                        >
-                                            Show Property
-                                        </button>
-                                    </div>
-                                </div>
-                            </motion.div>
+                            />
                         ))}
                     </div>
                 )}

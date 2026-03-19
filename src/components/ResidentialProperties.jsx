@@ -3,8 +3,7 @@ import { motion } from 'framer-motion';
 import { MapPin, BedDouble, Bath, Square, Heart, ArrowRight, Filter, Loader2, Home } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import LeadModal from './LeadModal';
-import Header from './Header';
-import TopBar from './TopBar';
+import PropertyCard from './PropertyCard';
 import { pb } from '../services/pocketbase';
 
 const ResidentialProperties = () => {
@@ -52,7 +51,11 @@ const ResidentialProperties = () => {
         if (imageList.length > 0) {
             return pb.files.getURL(property, imageList[0], { token: pb.authStore.token });
         }
-        return "https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?q=80&w=2675&auto=format&fit=crop"; // Default fallback
+        return "https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?q=80&w=2675&auto=format&fit=crop"; 
+    };
+
+    const handlePropertyClick = (property) => {
+        setSelectedProperty(property);
     };
 
     // Apply Filters
@@ -127,83 +130,14 @@ const ResidentialProperties = () => {
                 ) : (
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
                         {filteredProperties.map((property) => (
-                            <motion.div
-                                key={property.id}
-                                initial={{ opacity: 0, y: 20 }}
-                                whileInView={{ opacity: 1, y: 0 }}
-                                viewport={{ once: true }}
-                                whileHover={{ y: -5 }}
-                                transition={{ duration: 0.3 }}
+                            <PropertyCard 
+                                key={property.id} 
+                                property={{
+                                    ...property,
+                                    images: [getImageUrl(property)]
+                                }} 
                                 onClick={() => navigate(`/property/${property.id}`)}
-                                className="bg-white rounded-xl overflow-hidden shadow-sm hover:shadow-xl transition-all duration-300 border border-gray-100 flex flex-col group cursor-pointer"
-                            >
-                                {/* Image */}
-                                <div className="relative aspect-video overflow-hidden">
-                                    <img
-                                        src={getImageUrl(property)}
-                                        alt={property.title}
-                                        className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
-                                    />
-                                    <div className="absolute top-2 left-2 flex gap-1 flex-wrap">
-                                        {property.transactionType && (
-                                            <span className="bg-white text-primary text-[10px] font-bold px-2 py-0.5 rounded shadow-sm uppercase tracking-wide">
-                                                For {property.transactionType}
-                                            </span>
-                                        )}
-                                        {property.tags && Array.isArray(property.tags) && property.tags.map(tag => (
-                                            <span key={tag} className="bg-white text-primary text-[10px] font-bold px-2 py-0.5 rounded shadow-sm uppercase tracking-wide">
-                                                {tag}
-                                            </span>
-                                        ))}
-                                    </div>
-                                    <button className="absolute top-2 right-2 bg-white/90 p-1.5 rounded-full hover:bg-white hover:text-primary transition-colors text-gray-700 shadow-sm">
-                                        <Heart className="w-4 h-4" />
-                                    </button>
-                                </div>
-
-                                {/* Content */}
-                                <div className="p-4 flex flex-col flex-grow">
-                                    <h3 className="text-base font-bold text-[#1A1A1A] mb-1 truncate group-hover:text-primary transition-colors">{property.title}</h3>
-                                    <div className="flex items-center gap-1 text-gray-500 mb-3">
-                                        <MapPin className="w-3 h-3" />
-                                        <span className="text-xs truncate">{property.location}</span>
-                                    </div>
-
-                                    {/* Features */}
-                                    <div className="flex items-center justify-between border-t border-b border-gray-50 py-2 mb-3">
-                                        <div className="flex items-center gap-1">
-                                            <BedDouble className="w-3.5 h-3.5 text-gray-400" />
-                                            <span className="text-[11px] font-medium text-[#1A1A1A]">{property.bhkType || '-'}</span>
-                                        </div>
-                                        <div className="w-px h-3 bg-gray-200"></div>
-                                        <div className="flex items-center gap-1">
-                                            <Bath className="w-3.5 h-3.5 text-gray-400" />
-                                            <span className="text-[11px] font-medium text-[#1A1A1A]">{property.furnishing || '-'}</span>
-                                        </div>
-                                        <div className="w-px h-3 bg-gray-200"></div>
-                                        <div className="flex items-center gap-1">
-                                            <Square className="w-3.5 h-3.5 text-gray-400" />
-                                            <span className="text-[11px] font-medium text-[#1A1A1A]">{property.carpetArea || property.builtUpArea} sqft</span>
-                                        </div>
-                                    </div>
-
-                                    <div className="mt-auto flex justify-between items-center gap-2">
-                                        <div className="text-sm font-bold text-[#1A1A1A]">
-                                            {formatCurrency(property.price)}
-                                            {property.transactionType === 'Rent' && <span className="text-[10px] text-gray-500"> /mo</span>}
-                                        </div>
-                                        <button
-                                            onClick={(e) => {
-                                                e.stopPropagation();
-                                                navigate(`/property/${property.id}`);
-                                            }}
-                                            className="bg-primary hover:bg-red-800 text-white text-xs px-4 py-2 rounded font-semibold shadow-md transition-all whitespace-nowrap"
-                                        >
-                                            Show Property
-                                        </button>
-                                    </div>
-                                </div>
-                            </motion.div>
+                            />
                         ))}
                     </div>
                 )}

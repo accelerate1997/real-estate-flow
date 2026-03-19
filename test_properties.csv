@@ -1,4 +1,0 @@
-Title,Price (Number),Description,Location / Area,Category (Residential/Commercial),Transaction Type (Sale/Rent),BHK Type (e.g. 2BHK),Carpet Area (sqft),Built-up Area (sqft),Furnishing Status
-Test Bulk Villa 1,15000000,A luxurious test villa uploaded via CSV bulk.,Andheri East,Residential,Sale,4BHK,3500,4000,Furnished
-Test Commerical Hub,85000000,Modern office space in CSV test.,Bandra Kurla Complex,Commercial,Rent,,8000,10000,Unfurnished
-Test Cozy Apartment,6500000,Small apartment test.,Borivali West,Residential,Sale,1BHK,500,650,Semi-Furnished

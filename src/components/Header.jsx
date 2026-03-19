@@ -1,13 +1,23 @@
 import React, { useState } from 'react';
 import { Menu, X, ChevronDown } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Link } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import clsx from 'clsx';
 
 const Header = () => {
     const [isOpen, setIsOpen] = useState(false);
+    const [scrolled, setScrolled] = useState(false);
     const [activeDropdown, setActiveDropdown] = useState(null);
     const [mobileExpanded, setMobileExpanded] = useState(null);
+    const pathname = useLocation().pathname;
+
+    React.useEffect(() => {
+        const handleScroll = () => {
+            setScrolled(window.scrollY > 50);
+        };
+        window.addEventListener('scroll', handleScroll);
+        return () => window.removeEventListener('scroll', handleScroll);
+    }, []);
 
     const navLinks = [
         { name: 'Home', href: '/' },
@@ -17,166 +27,141 @@ const Header = () => {
             submenu: [
                 { name: 'Residential Property', href: '/properties/residential' },
                 { name: 'Commercial Property', href: '/properties/commercial' },
-                { name: 'Under Development Properties', href: '/properties/under-development' }
+                { name: 'Under Development', href: '/properties/under-development' }
             ]
         },
-        { name: 'About', href: '#' },
+        { name: 'About Us', href: '/' },
+        { name: 'Contact', href: '/' },
     ];
 
-    const handleMouseEnter = (index) => {
-        setActiveDropdown(index);
-    };
-
-    const handleMouseLeave = () => {
-        setActiveDropdown(null);
-    };
-
-    const toggleMobileSubmenu = (index) => {
-        setMobileExpanded(mobileExpanded === index ? null : index);
-    };
+    const isHomePage = pathname === '/';
+    const forceGlassy = !isHomePage || scrolled;
 
     return (
-        <header className="fixed w-full top-0 md:top-10 z-50 glass-panel border-b border-gray-100 transition-all duration-300 font-sans">
-            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-                <div className="flex justify-between items-center h-20">
-                    {/* Logo */}
-                    <div className="flex-shrink-0 flex items-center">
-                        <Link to="/" className="text-2xl font-bold bg-gradient-to-r from-primary to-red-800 bg-clip-text text-transparent cursor-pointer">
-                            RR Estate
-                        </Link>
-                    </div>
+        <header className={clsx(
+            "fixed left-1/2 -translate-x-1/2 top-0 md:top-6 z-50 transition-all duration-500 w-full container-custom px-4 sm:px-6 lg:px-8",
+            scrolled ? "md:translate-y-[-10px]" : "md:translate-y-0"
+        )}>
+            <div className={clsx(
+                "rounded-2xl transition-all duration-300 px-6 py-4 flex justify-between items-center",
+                forceGlassy ? "glass-panel bg-white/90 shadow-premium text-dark" : "bg-transparent text-white"
+            )}>
+                {/* Logo Area */}
+                <div className="flex-1 flex justify-start">
+                    <Link to="/" className="text-3xl font-black italic tracking-tighter">
+                        <span className={clsx(
+                            forceGlassy ? "text-primary" : "text-white"
+                        )}>RR</span>
+                        <span className={clsx(
+                        forceGlassy ? "text-dark" : "text-white/80"
+                        )}> Estate</span>
+                    </Link>
+                </div>
 
-                    {/* Desktop Navigation */}
-                    <nav className="hidden md:flex space-x-8 items-center">
-                        {navLinks.map((link, index) => (
-                            <div
-                                key={link.name}
-                                className="relative group"
-                                onMouseEnter={() => handleMouseEnter(index)}
-                                onMouseLeave={handleMouseLeave}
-                            >
-                                {link.submenu ? (
-                                    <button
-                                        className="flex items-center gap-1 text-[#1A1A1A] hover:text-primary font-medium transition-colors py-2 focus:outline-none"
-                                    >
-                                        {link.name}
-                                        <ChevronDown className={clsx(
-                                            "w-4 h-4 transition-transform duration-200",
-                                            activeDropdown === index ? "rotate-180" : ""
-                                        )} />
-                                    </button>
-                                ) : (
-                                    <Link
-                                        to={link.href}
-                                        className="flex items-center gap-1 text-[#1A1A1A] hover:text-primary font-medium transition-colors py-2"
-                                    >
-                                        {link.name}
-                                    </Link>
-                                )}
-
-                                {/* Desktop Dropdown */}
-                                <AnimatePresence>
-                                    {link.submenu && activeDropdown === index && (
-                                        <motion.div
-                                            initial={{ opacity: 0, y: 10 }}
-                                            animate={{ opacity: 1, y: 0 }}
-                                            exit={{ opacity: 0, y: 10 }}
-                                            transition={{ duration: 0.2 }}
-                                            className="absolute left-0 pt-2 w-64 z-50"
-                                        >
-                                            <div className="bg-white rounded-xl shadow-premium border border-gray-100 overflow-hidden py-2">
-                                                {link.submenu.map((subItem) => (
-                                                    <Link
-                                                        key={subItem.name}
-                                                        to={subItem.href}
-                                                        className="block px-4 py-3 text-sm text-[#1A1A1A] hover:text-primary hover:bg-gray-50 transition-colors"
-                                                    >
-                                                        {subItem.name}
-                                                    </Link>
-                                                ))}
-                                            </div>
-                                        </motion.div>
-                                    )}
-                                </AnimatePresence>
-                            </div>
-                        ))}
-                        <Link to="/login" className="bg-primary text-white px-6 py-2.5 rounded-lg font-medium hover:bg-red-700 transition-all shadow-lg shadow-primary/30 transform hover:-translate-y-0.5">
-                            Post Property
-                        </Link>
-                    </nav>
-
-                    {/* Mobile Menu Button */}
-                    <div className="md:hidden flex items-center">
-                        <button
-                            onClick={() => setIsOpen(!isOpen)}
-                            className="text-[#1A1A1A] hover:text-primary focus:outline-none"
+                {/* Center Navigation */}
+                <nav className="hidden md:flex flex-1 justify-center space-x-8 items-center">
+                    {navLinks.map((link, index) => (
+                        <div
+                            key={link.name}
+                            className="relative group"
+                            onMouseEnter={() => setActiveDropdown(index)}
+                            onMouseLeave={() => setActiveDropdown(null)}
                         >
-                            {isOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
-                        </button>
-                    </div>
+                            {link.submenu ? (
+                                <button className={clsx(
+                                    "flex items-center gap-1 font-bold text-sm tracking-wide transition-all py-2 focus:outline-none",
+                                    forceGlassy ? "text-dark hover:text-primary" : "text-white hover:text-primary-light"
+                                )}>
+                                    {link.name}
+                                    <ChevronDown className={clsx(
+                                        "w-4 h-4 transition-transform duration-300",
+                                        activeDropdown === index ? "rotate-180" : ""
+                                    )} />
+                                </button>
+                            ) : (
+                                <Link
+                                    to={link.href}
+                                    className={clsx(
+                                        "font-bold text-sm tracking-wide transition-all py-2",
+                                        forceGlassy ? "text-dark hover:text-primary" : "text-white hover:text-primary-light"
+                                    )}
+                                >
+                                    {link.name}
+                                </Link>
+                            )}
+
+                            {/* Dropdown */}
+                            <AnimatePresence>
+                                {link.submenu && activeDropdown === index && (
+                                    <motion.div
+                                        initial={{ opacity: 0, y: 10, scale: 0.95, x: "-50%" }}
+                                        animate={{ opacity: 1, y: 0, scale: 1, x: "-50%" }}
+                                        exit={{ opacity: 0, y: 10, scale: 0.95, x: "-50%" }}
+                                        className="absolute left-1/2 pt-4 w-60 z-50"
+                                    >
+                                        <div className="bg-white rounded-2xl shadow-premium border border-gray-50 overflow-hidden py-3">
+                                            {link.submenu.map((subItem) => (
+                                                <Link
+                                                    key={subItem.name}
+                                                    to={subItem.href}
+                                                    className="block px-6 py-3 text-sm font-bold text-dark hover:text-primary hover:bg-gray-50 transition-colors"
+                                                >
+                                                    {subItem.name}
+                                                </Link>
+                                            ))}
+                                        </div>
+                                    </motion.div>
+                                )}
+                            </AnimatePresence>
+                        </div>
+                    ))}
+                </nav>
+
+                {/* Right Area (CTA & Mobile Toggle) */}
+                <div className="flex-1 flex justify-end items-center gap-4">
+                    <Link to="/login" className="hidden md:flex bg-primary hover:bg-primary-dark text-white px-6 py-2.5 rounded-xl font-bold text-xs lg:text-sm transition-all shadow-lg shadow-primary/20 whitespace-nowrap">
+                        Post Property
+                    </Link>
+
+                    {/* Mobile Menu Toggle */}
+                    <button onClick={() => setIsOpen(!isOpen)} className="md:hidden text-inherit">
+                        {isOpen ? <X className="w-8 h-8" /> : <Menu className="w-8 h-8" />}
+                    </button>
                 </div>
             </div>
 
-            {/* Mobile Navigation Menu */}
+            {/* Mobile Nav */}
             <AnimatePresence>
                 {isOpen && (
                     <motion.div
                         initial={{ opacity: 0, height: 0 }}
                         animate={{ opacity: 1, height: 'auto' }}
                         exit={{ opacity: 0, height: 0 }}
-                        className="md:hidden bg-white border-t border-gray-100 overflow-hidden"
+                        className="md:hidden mt-4 bg-white rounded-2xl shadow-2xl overflow-hidden"
                     >
-                        <div className="px-4 pt-2 pb-6 space-y-1">
+                        <div className="px-6 py-6 space-y-2">
                             {navLinks.map((link, index) => (
                                 <div key={link.name}>
                                     {link.submenu ? (
                                         <>
-                                            <button
-                                                onClick={() => toggleMobileSubmenu(index)}
-                                                className="w-full flex justify-between items-center px-3 py-3 text-base font-medium text-[#1A1A1A] hover:text-primary hover:bg-gray-50 rounded-md"
-                                            >
+                                            <button onClick={() => setMobileExpanded(mobileExpanded === index ? null : index)} className="w-full flex justify-between items-center py-4 text-dark font-bold">
                                                 {link.name}
-                                                <ChevronDown className={clsx(
-                                                    "w-5 h-5 transition-transform duration-200",
-                                                    mobileExpanded === index ? "rotate-180" : ""
-                                                )} />
+                                                <ChevronDown className={clsx("w-5 h-5", mobileExpanded === index ? "rotate-180" : "")} />
                                             </button>
-                                            <AnimatePresence>
-                                                {mobileExpanded === index && (
-                                                    <motion.div
-                                                        initial={{ height: 0, opacity: 0 }}
-                                                        animate={{ height: 'auto', opacity: 1 }}
-                                                        exit={{ height: 0, opacity: 0 }}
-                                                        className="overflow-hidden bg-gray-50 rounded-md"
-                                                    >
-                                                        {link.submenu.map((subItem) => (
-                                                            <Link
-                                                                key={subItem.name}
-                                                                to={subItem.href}
-                                                                onClick={() => setIsOpen(false)}
-                                                                className="block pl-8 pr-3 py-3 text-sm font-medium text-gray-600 hover:text-primary"
-                                                            >
-                                                                {subItem.name}
-                                                            </Link>
-                                                        ))}
-                                                    </motion.div>
-                                                )}
-                                            </AnimatePresence>
+                                            {mobileExpanded === index && (
+                                                <div className="bg-gray-50 rounded-xl px-4 pb-2">
+                                                    {link.submenu.map(sub => (
+                                                        <Link key={sub.name} to={sub.href} onClick={() => setIsOpen(false)} className="block py-3 text-dark/70 font-medium">{sub.name}</Link>
+                                                    ))}
+                                                </div>
+                                            )}
                                         </>
                                     ) : (
-                                        <Link
-                                            to={link.href}
-                                            onClick={() => setIsOpen(false)}
-                                            className="block px-3 py-3 text-base font-medium text-[#1A1A1A] hover:text-primary hover:bg-gray-50 rounded-md"
-                                        >
-                                            {link.name}
-                                        </Link>
+                                        <Link to={link.href} onClick={() => setIsOpen(false)} className="block py-4 text-dark font-bold">{link.name}</Link>
                                     )}
                                 </div>
                             ))}
-                            <Link to="/login" onClick={() => setIsOpen(false)} className="block text-center w-full mt-4 bg-primary text-white px-6 py-3 rounded-lg font-medium shadow-md">
-                                Post Property
-                            </Link>
+                            <Link to="/login" onClick={() => setIsOpen(false)} className="block text-center bg-primary text-white py-4 rounded-xl font-bold mt-6">Post Property</Link>
                         </div>
                     </motion.div>
                 )}

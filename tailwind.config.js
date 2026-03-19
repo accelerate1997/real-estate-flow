@@ -7,16 +7,35 @@ export default {
     theme: {
         extend: {
             colors: {
-                primary: '#CC0000', // Bold Red
-                secondary: '#FFFFFF', // Pure White
-                text: '#1A1A1A', // Jet Black
-                background: '#FFFFFF', // Pure White background
+                primary: {
+                    DEFAULT: '#CC0000',
+                    dark: '#990000',
+                    light: '#ff3333',
+                },
+                accent: {
+                    teal: '#008080',
+                    'teal-dark': '#006666',
+                    'teal-light': '#339999',
+                },
+                secondary: '#FFFFFF',
+                text: {
+                    DEFAULT: '#1A1A1A',
+                    muted: '#666666',
+                    light: '#999999',
+                },
+                background: '#FFFFFF',
+                dark: '#0A0A0A',
             },
             fontFamily: {
                 sans: ['Inter', 'system-ui', 'sans-serif'],
+                display: ['Outfit', 'Inter', 'system-ui', 'sans-serif'],
             },
             boxShadow: {
-                'premium': '0 4px 20px rgba(0, 0, 0, 0.08)',
+                'premium': '0 10px 40px rgba(0, 0, 0, 0.08)',
+                'glass': '0 8px 32px 0 rgba(31, 38, 135, 0.07)',
+            },
+            backgroundImage: {
+                'gradient-premium': 'linear-gradient(135deg, #CC0000 0%, #008080 100%)',
             }
         },
     },
