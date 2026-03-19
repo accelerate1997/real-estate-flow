@@ -19,6 +19,7 @@ STRICT CONVERSATION FLOW:
    - YOU ALWAYS KNOW THE USER'S PHONE NUMBER. NEVER ask for their WhatsApp number or phone number.
    - If SYSTEM NOTE says [LEAD_EXISTS: false], you MUST ask for their NAME before scheduling.
    - If SYSTEM NOTE says [LEAD_EXISTS: true], use their name (LEAD_NAME) and proceed directly to scheduling.
+   - GATHER REQUIREMENTS: Before searching, you MUST have at least Location, BHK, and Budget. If any are missing, ASK for them politely.
 3. Scheduling Logic:
    - When a user is interested in a property (e.g. "I am interested in [Property]"), you MUST ask for their preferred DATE and TIME for a site visit. 
    - DO NOT skip the date and time request. You cannot schedule without them.
@@ -81,8 +82,10 @@ async function processMessage(userInput, phone, agencyId) {
             console.error("DB Lead Check Error:", e.message);
         }
 
+        const now = new Date();
+        const dateContext = `\n[CURRENT_DATE: ${now.toDateString()}, CURRENT_TIME: ${now.toLocaleTimeString()}]`;
         const phoneContext = `\n[SYSTEM NOTE: LEAD_EXISTS: ${leadExists}${leadName ? `, LEAD_NAME: ${leadName}` : ''}]`;
-        const finalInput = userInput + phoneContext;
+        const finalInput = userInput + dateContext + phoneContext;
 
         chatContext.push({ role: "user", content: finalInput });
 
@@ -129,9 +132,11 @@ async function processMessage(userInput, phone, agencyId) {
                 }
 
                 const baseUrl = process.env.VITE_APP_URL || 'http://localhost:5173';
-                const propertyList = properties.map(p =>
-                    `🏡 *${p.title}*\n📍 ${p.location}\n💰 ₹${(p.price / 10000000).toFixed(2)} Cr\n🔗 Link: ${baseUrl}/properties/${p.id}`
-                ).join('\n\n');
+                const propertyList = properties.map(p => {
+                    const priceVal = p.price || 0;
+                    const priceCrores = priceVal > 0 ? (priceVal / 10000000).toFixed(2) + ' Cr' : 'Price on Request';
+                    return `🏡 *${p.title}*\n📍 ${p.location}\n💰 ₹${priceCrores}\n🔗 Link: ${baseUrl}/properties/${p.id}`;
+                }).join('\n\n');
 
                 const successMsg = `SYSTEM NOTE: The database found these properties:\n${propertyList}\n\nPresent these clearly and ASK if they want to schedule a SITE VISIT for any of them.`;
                 chatContext.push({ role: "system", content: successMsg });

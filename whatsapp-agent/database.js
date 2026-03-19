@@ -75,8 +75,8 @@ module.exports = {
                 }
             }
 
-            if (requirements.location && requirements.location.toLowerCase() !== 'any') {
-                filters.push(`location ~ "${requirements.location}"`);
+            if (requirements.location && requirements.location.trim().toLowerCase() !== 'any' && requirements.location.trim() !== '') {
+                filters.push(`location ~ "${requirements.location.trim()}"`);
             }
 
             if (requirements.budget && requirements.budget > 0) {
