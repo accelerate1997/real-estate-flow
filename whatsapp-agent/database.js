@@ -79,9 +79,9 @@ module.exports = {
                 filters.push(`location ~ "${requirements.location.trim()}"`);
             }
 
-            if (requirements.budget && requirements.budget > 0) {
-                // Remove the 10% buffer for strict compliance with user request
-                filters.push(`price <= ${requirements.budget}`);
+            if (requirements.budget && parseFloat(requirements.budget) > 0) {
+                // Remove any 10% buffer and ensure it's a number
+                filters.push(`price <= ${parseFloat(requirements.budget)}`);
             }
 
             const filterString = filters.length > 0 ? filters.join(' && ') : '';
@@ -166,22 +166,22 @@ module.exports = {
             if (existingLeads.totalItems > 0) {
                 // Update existing lead safely (merge new data where available)
                 const leadId = existingLeads.items[0].id;
-                const existingReq = existingLeads.items[0].requirement || '';
+                const currentLead = existingLeads.items[0];
 
-                // Only overwrite requirement if we got more details
-                if (requirementText.length > existingReq.length) {
+                // Merge requirement text
+                if (requirementText && (requirementText.length > (currentLead.requirement || '').length || !currentLead.requirement)) {
                     leadData.requirement = requirementText;
                 } else {
                     delete leadData.requirement;
                 }
 
-                // If name was already set and we only have the default now, keep the old one
-                if (existingLeads.items[0].name && !params.name) {
+                // Preserve name if not provided now
+                if (currentLead.name && !params.name) {
                     delete leadData.name;
                 }
 
                 await pb.collection('leads').update(leadId, leadData);
-                console.log(`[DB] Updated existing Lead ${leadId} for ${phone}`);
+                console.log(`[DB] Updated Lead ${leadId} with data:`, JSON.stringify(leadData));
             } else {
                 // Create new lead
                 leadData.status = 'New Lead';

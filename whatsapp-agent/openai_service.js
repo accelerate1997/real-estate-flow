@@ -42,7 +42,11 @@ Return JSON ONLY:
   "intent": "GENERAL_CHAT" | "SEARCH_PROPERTIES" | "SCHEDULE_SITE_VISIT",
   "human_response": "...",
   "parameters": {
-     "name": "...",
+     "name": "User Name (if known)",
+     "bhk": "e.g. 2BHK, 3BHK",
+     "location": "e.g. Worli, Mumbai",
+     "budget_in_rupees": "numeric budget (e.g. 15000000 for 1.5Cr)",
+     "purpose": "Personal or Investment",
      "visit_date": "YYYY-MM-DD",
      "visit_time": "HH:mm or user provided time string",
      "visit_property_id": "..."
@@ -134,8 +138,15 @@ async function processMessage(userInput, phone, agencyId) {
                 const baseUrl = process.env.VITE_APP_URL || 'http://localhost:5173';
                 const propertyList = properties.map(p => {
                     const priceVal = p.price || 0;
-                    const priceCrores = priceVal > 0 ? (priceVal / 10000000).toFixed(2) + ' Cr' : 'Price on Request';
-                    return `🏡 *${p.title}*\n📍 ${p.location}\n💰 ₹${priceCrores}\n🔗 Link: ${baseUrl}/properties/${p.id}`;
+                    let priceText = 'Price on Request';
+                    if (priceVal >= 10000000) {
+                        priceText = `₹${(priceVal / 10000000).toFixed(2)} Cr`;
+                    } else if (priceVal >= 100000) {
+                        priceText = `₹${(priceVal / 100000).toFixed(2)} Lakh`;
+                    } else if (priceVal > 0) {
+                        priceText = `₹${priceVal.toLocaleString('en-IN')}`;
+                    }
+                    return `🏡 *${p.title}*\n📍 ${p.location}\n💰 ${priceText}\n🔗 Link: ${baseUrl}/properties/${p.id}`;
                 }).join('\n\n');
 
                 const successMsg = `SYSTEM NOTE: The database found these properties:\n${propertyList}\n\nPresent these clearly and ASK if they want to schedule a SITE VISIT for any of them.`;
