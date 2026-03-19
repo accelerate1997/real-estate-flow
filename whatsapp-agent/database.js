@@ -356,5 +356,44 @@ module.exports = {
             console.error('[DB Error] Failed to fetch visits:', err.message);
             return [];
         }
+    },
+
+    /**
+     * Logs a chat message to PocketBase.
+     */
+    async logChat(phone, role, content, agencyId, leadId = null) {
+        await authenticate();
+        try {
+            await pb.collection('chat_logs').create({
+                phone,
+                role,
+                content,
+                agency_id: agencyId,
+                lead_id: leadId
+            });
+        } catch (err) {
+            console.error('[DB Error] Failed to log chat:', err.message);
+        }
+    },
+
+    /**
+     * Retrieves chat logs for a phone number.
+     */
+    async getChatLogs(phone) {
+        await authenticate();
+        try {
+            const cleanPhone = phone.replace(/[^\d]/g, '');
+            const records = await pb.collection('chat_logs').getFullList({
+                filter: `phone ~ "${cleanPhone}"`,
+                sort: 'created'
+            });
+            return records.map(r => ({
+                role: r.role,
+                content: r.content
+            }));
+        } catch (err) {
+            console.error('[DB Error] Failed to fetch chat logs:', err.message);
+            return [];
+        }
     }
 };

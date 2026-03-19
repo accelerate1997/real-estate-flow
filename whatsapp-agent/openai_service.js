@@ -11,20 +11,24 @@ const openai = new OpenAI({
     apiKey: apiKey
 });
 
-const SYSTEM_PROMPT = `You are an AI Assistant for Rajesh Real Estate Agency. Your job is to handle customer inquiries and schedule SITE VISITS.
+const SYSTEM_PROMPT = `You are a professional Real Estate AI Assistant. Your job is to handle customer inquiries, showcase available properties, and schedule SITE VISITS.
 
 STRICT CONVERSATION FLOW:
-1. Greet the user professionally.
+1. Greet the user professionally. NEVER mention "Rajesh Real Estate Agency". Just say "I am your dedicated real estate assistant."
 2. Lead Check:
    - YOU ALWAYS KNOW THE USER'S PHONE NUMBER. NEVER ask for their WhatsApp number or phone number.
    - If SYSTEM NOTE says [LEAD_EXISTS: false], you MUST ask for their NAME before scheduling.
-   - If SYSTEM NOTE says [LEAD_EXISTS: true], use their name (LEAD_NAME) and proceed directly to scheduling.
+   - If SYSTEM NOTE says [LEAD_EXISTS: true], use their name (LEAD_NAME) and proceed directly to qualifying their needs.
    - GATHER REQUIREMENTS: Before searching, you MUST have at least Location, BHK, and Budget. If any are missing, ASK for them politely.
-3. Scheduling Logic:
-   - When a user is interested in a property (e.g. "I am interested in [Property]"), you MUST ask for their preferred DATE and TIME for a site visit. 
+3. Interaction Logic:
+   - Once requirements are known, you MUST return the JSON intent "SEARCH_PROPERTIES" to find matching properties.
+   - SHOW PROPERTIES FIRST: You MUST present matching properties and ask for the user's feedback or interest items.
+   - ONLY after showing properties, if the user expresses interest in a specific one, proceed to ask for a preferred DATE and TIME for a site visit.
+   - NEVER skip showing properties and go directly to site visit scheduling.
+4. Scheduling Logic:
+   - When a user is interested in a specific property, you MUST ask for their preferred DATE and TIME.
    - DO NOT skip the date and time request. You cannot schedule without them.
-   - If they are a new lead (LEAD_EXISTS: false), ensure you have their Name as well.
-4. Finalizing:
+5. Finalizing:
    - Once (and ONLY after) you have Name (if new), Date, and Time, confirm the details back including the Property Name and the confirmed timing.
    - Use intent "SCHEDULE_SITE_VISIT" and return valid JSON when ALL parameters are confirmed.
 
@@ -76,11 +80,13 @@ async function processMessage(userInput, phone, agencyId) {
         const cleanPhone = phone.replace(/[^\d]/g, '');
         let leadExists = false;
         let leadName = "";
+        let leadIdFound = null;
         try {
             const lead = await db.getLeadByPhone(cleanPhone);
             if (lead) {
                 leadExists = true;
                 leadName = lead.name;
+                leadIdFound = lead.id;
             }
         } catch (e) {
             console.error("DB Lead Check Error:", e.message);
@@ -92,6 +98,8 @@ async function processMessage(userInput, phone, agencyId) {
         const finalInput = userInput + dateContext + phoneContext;
 
         chatContext.push({ role: "user", content: finalInput });
+        // Log user message to DB
+        await db.logChat(phone, "user", userInput, agencyId, leadIdFound);
 
         const response = await openai.chat.completions.create({
             model: "gpt-4o-mini",
@@ -105,6 +113,9 @@ async function processMessage(userInput, phone, agencyId) {
 
         try {
             const parsed = JSON.parse(responseText);
+            // Log assistant message to DB (storing the human response for the dashboard)
+            await db.logChat(phone, "assistant", parsed.human_response || responseText, agencyId, leadIdFound);
+
             const intent = parsed.intent;
             const params = parsed.parameters || {};
 
@@ -224,27 +235,19 @@ async function processMessage(userInput, phone, agencyId) {
     }
 }
 
-// New function to retrieve live chat history for the dashboard
-function getChats(phone) {
-    // Find the session key that includes this phone number (e.g. "918268919143@s.whatsapp.net")
-    const sessionKey = Object.keys(sessions).find(key => key.includes(phone));
-
-    if (!sessionKey || !sessions[sessionKey]) return [];
-
-    // Filter out system prompts so the agency owner only sees actual user & assistant messages
-    return sessions[sessionKey].filter(msg => msg.role === 'user' || msg.role === 'assistant').map(msg => ({
-        role: msg.role,
-        content: msg.content.split('\n[SYSTEM NOTE:')[0].trim()
-    }));
+// Retrieve live chat history from database
+async function getChats(phone) {
+    return await db.getChatLogs(phone);
 }
 
-function logMessage(phone, role, content) {
+async function logMessage(phone, role, content, agencyId = null) {
     if (!sessions[phone]) {
         sessions[phone] = [
             { role: "system", content: SYSTEM_PROMPT }
         ];
     }
     sessions[phone].push({ role, content });
+    await db.logChat(phone, role, content, agencyId);
     console.log(`[LOG] Manually logged ${role} message for ${phone}`);
 }
 

@@ -13,12 +13,12 @@ app.use(cors());
 app.use(express.json());
 
 // API Endpoint for Dashboard to fetch live AI Chat History
-app.get('/api/chats/:phone', (req, res) => {
+app.get('/api/chats/:phone', async (req, res) => {
     const phone = req.params.phone;
     if (!phone) {
         return res.status(400).json({ error: "Phone number required" });
     }
-    const history = getChats(phone);
+    const history = await getChats(phone);
     res.json({ chats: history });
 });
 
