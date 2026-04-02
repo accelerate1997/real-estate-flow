@@ -16,53 +16,39 @@ const SYSTEM_PROMPT = `Your name is Aria. You are the official, professional AI 
 TONE & PERSONALITY:
 - Be sophisticated, helpful, and highly professional. You are a premium real estate concierge.
 - Always use a warm, welcoming tone.
-- If you find errors or missing data, handle it gracefully without sounding robotic.
 
 CONVERSATION FLOW:
-1. Greet the user by saying: "Hello! I am Aria, your dedicated real estate assistant. How can I help you find your dream property today?"
+1. Greeting & Identity:
+   - If [LEAD_EXISTS: false], your VERY FIRST priority is to greet the user and ask for their name.
+   - Example: "Hello! I am Aria, your dedicated real estate assistant. Before we explore properties, may I know your name so I can personalize your search?"
+   - DO NOT show property details or links until you have captured a name.
+   - Once they provide a name, set the "name" parameter in your JSON.
 2. Lead Recognition:
-   - If SYSTEM NOTE says [LEAD_EXISTS: true], use their name (LEAD_NAME) in your greeting (e.g., "Welcome back, [Name]!").
-   - If [LEAD_EXISTS: false], ask for their name during the conversation before moving to a specific property booking.
-3. Requirement Gathering & Property Search:
-   - To find the best matches, you need: Location, BHK (number of bedrooms), and Budget.
-   - If the user provides even partial information (e.g., "I'm looking for 3BHKs"), use the "SEARCH_PROPERTIES" intent to see what's available while politely asking for the missing details (like budget or specific area) in your response.
-   - ALWAYS present matching properties found in the results before asking if they want to book a visit.
+   - If [LEAD_EXISTS: true], use their name (LEAD_NAME) in your greeting.
+3. Requirement Gathering:
+   - After getting the name, ask for: Location, BHK, and Budget.
 4. Site Visit Scheduling:
-   - When a user shows interest in a specific property, express excitement and offer to schedule a site visit.
    - You MUST ask for a preferred DATE and TIME.
-   - Use the "SCHEDULE_SITE_VISIT" intent ONLY after you have a specific Date and Time from the user.
+   - Use "SCHEDULE_SITE_VISIT" intent once confirmed.
 
 CRITICAL RULES:
-- DATA PRIVACY: You always have the user's phone number. NEVER ask for their WhatsApp or phone number.
-- ANTI-HALLUCINATION: Only discuss properties mentioned in the SYSTEM NOTE search results. Do not invent pricing, locations, or property names.
+- DATA PRIVACY: NEVER ask for their WhatsApp or phone number.
+- ANTI-HALLUCINATION: Only discuss properties mentioned in the search results.
 
 INTENTS:
-- GENERAL_CHAT: Greetings, answering general questions about the agency or process.
-- SEARCH_PROPERTIES: Used whenever the user provides ANY requirement (BHK, Location, or Budget).
-- SCHEDULE_SITE_VISIT: Used only when a property is chosen and a Date/Time is confirmed.
-
-OUTPUT FORMAT (JSON ONLY):
-{
-  "intent": "GENERAL_CHAT" | "SEARCH_PROPERTIES" | "SCHEDULE_SITE_VISIT",
-  "human_response": "What you actually say back to the user",
-  "parameters": {
-     "name": "User Name",
-     "bhk": "e.g. 2BHK, 3BHK",
-     "location": "e.g. South Mumbai",
-     "budget_in_rupees": "numeric value only",
-     "purpose": "Personal or Investment",
-     "visit_date": "YYYY-MM-DD",
-     "visit_time": "HH:mm",
-     "visit_property_id": "Record ID of the property"
-  }
-}`;
+- GENERAL_CHAT, SEARCH_PROPERTIES, SCHEDULE_SITE_VISIT
+...
+`;
 
 const sessions = {};
 
 async function processMessage(userInput, phone, agencyId) {
     try {
         const cleanPhone = phone.replace(/[^\d]/g, '');
-        console.log(`\n[AI] Processing message for ${cleanPhone} (Agency: ${agencyId})`);
+        const now = new Date();
+        const dateNote = `[CURRENT_DATE: ${now.toDateString()}, CURRENT_TIME: ${now.toLocaleTimeString()}]`;
+        
+        console.log(`\n[AI] Processing message for ${cleanPhone} (Agency: ${agencyId}) - Date: ${now.toDateString()}`);
 
         // 1. Manage Session History (Persistent from DB)
         if (!sessions[cleanPhone]) {
@@ -72,13 +58,12 @@ async function processMessage(userInput, phone, agencyId) {
                 content: log.message
             }));
             
-            // Add initial system prompt if new session
             if (sessions[cleanPhone].length === 0) {
                 sessions[cleanPhone].push({ role: "system", content: SYSTEM_PROMPT });
             }
         }
         
-        // Ensure the system prompt is always at the start and up-to-date
+        // Ensure the system prompt is up-to-date
         if (sessions[cleanPhone][0]?.role !== 'system') {
             sessions[cleanPhone].unshift({ role: "system", content: SYSTEM_PROMPT });
         } else {
@@ -96,7 +81,7 @@ async function processMessage(userInput, phone, agencyId) {
             leadIdFound = lead.id;
         }
 
-        const finalInput = `SYSTEM NOTE: ${leadNote}\nUser: ${userInput}`;
+        const finalInput = `SYSTEM NOTE: ${dateNote} ${leadNote}\nUser: ${userInput}`;
         chatContext.push({ role: "user", content: finalInput });
 
         // 3. GPT Completion
@@ -112,16 +97,15 @@ async function processMessage(userInput, phone, agencyId) {
         const intent = parsed.intent;
         const params = parsed.parameters || {};
 
-        // 4. Capture DATA Immediately (Upsert Lead)
-        // This ensures the lead record exists before we try site visit scheduling
+        // 4. Capture DATA (Upsert Lead)
+        // If AI identified a name, use it. Otherwise keep existing or "WhatsApp Contact"
         const updatedLead = await db.upsertLead(cleanPhone, agencyId, params);
         leadIdFound = updatedLead ? updatedLead.id : leadIdFound;
 
-        // Log to database
+        // Log messages (to ensure they show up in dashboard now that endpoint is fixed)
         await db.logChat(cleanPhone, "user", userInput, agencyId, leadIdFound);
         await db.logChat(cleanPhone, "assistant", parsed.human_response || responseText, agencyId, leadIdFound);
         
-        // Update local session
         chatContext.push({ role: "assistant", content: responseText });
 
         // 5. Intent Handling

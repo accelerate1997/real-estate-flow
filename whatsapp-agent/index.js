@@ -18,12 +18,16 @@ app.use(express.json());
 
 // API Endpoint for Dashboard to fetch live AI Chat History
 app.get('/api/chats/:phone', async (req, res) => {
-    const phone = req.params.phone;
-    if (!phone) {
-        return res.status(400).json({ error: "Phone number required" });
+    try {
+        const { phone } = req.params;
+        const cleanPhone = phone.replace(/[^\d]/g, '');
+        console.log(`\n💬 [Chat Engine] Fetching history for: ${cleanPhone}`);
+        const chats = await db.getChatLogs(cleanPhone);
+        res.json({ success: true, chats });
+    } catch(err) {
+        console.error("Fetch chats error:", err);
+        res.status(500).json({ error: "Failed to fetch chat logs" });
     }
-    const history = await getChats(phone);
-    res.json({ chats: history });
 });
 
 // API Endpoint for Voice Agent to log transcripts
@@ -70,17 +74,12 @@ app.post('/webhook', async (req, res) => {
     try {
         console.log("🔥 INCOMING WEBHOOK:", JSON.stringify(req.body, null, 2));
         const { event, data } = req.body;
-        console.log(`[DEBUG] Event: ${event}, Data length: ${Array.isArray(data) ? data.length : 'N/A'}`);
-
 
         // Evolution API sends 'messages.upsert' or 'MESSAGES_UPSERT' for new messages
         const normalizedEvent = event ? event.toLowerCase() : '';
         if (normalizedEvent !== 'messages.upsert') {
-            console.log(`[IGNORE] Event type: ${event}`);
             return res.sendStatus(200);
         }
-
-        console.log("✅ Valid message event received.");
 
         const msg = Array.isArray(data) ? data[0] : data;
 
@@ -89,12 +88,11 @@ app.post('/webhook', async (req, res) => {
         if (rawTimestamp) {
             const age = Math.floor(Date.now() / 1000) - rawTimestamp;
             if (age > 60 && age < 3600) {
-                console.log(`[IGNORE] Message too old (${age}s). Ignoring to prevent loops/duplicate replies.`);
                 return res.sendStatus(200);
             }
         }
 
-        // Acknowledge receipt early to prevent WhatsApp from aggressively retrying
+        // Acknowledge receipt early
         res.sendStatus(200);
 
         const key = msg?.key;
@@ -103,13 +101,8 @@ app.post('/webhook', async (req, res) => {
         const fromMe = key?.fromMe;
         const message = msg?.message;
 
-        // Skip if already processed
-        if (msgId && isDuplicate(msgId)) {
-            console.log(`[IGNORE] Duplicate message ID: ${msgId}`);
-            return;
-        }
+        if (msgId && isDuplicate(msgId)) return;
 
-        // Skip our own messages
         if (message && remoteJid && !fromMe) {
             const text = message.conversation ||
                 message.extendedTextMessage?.text ||
@@ -120,17 +113,11 @@ app.post('/webhook', async (req, res) => {
             if (text) {
                 console.log(`\n📨 Received from ${phoneClean}: ${text}`);
 
-                // Extract instance name from webhook body (Format usually: "Agency_1234")
                 const instanceName = req.body.instance || req.body.data?.instance || 'Default';
                 const agencyId = instanceName.startsWith('Agency_') ? instanceName.split('_')[1] : null;
 
-                // Check if AI Agent is enabled for this agency before replying
                 let isEnabled = await db.isAgentEnabled(agencyId);
-                if (!isEnabled) {
-                    console.log(`[IGNORE] AI Agent is disabled for agency ${agencyId || 'default'}.`);
-                }
-
-                // Add to debug cache
+                
                 recentWebhooks.unshift({
                     time: new Date().toISOString(),
                     instanceName,
@@ -140,13 +127,12 @@ app.post('/webhook', async (req, res) => {
                 });
                 if (recentWebhooks.length > 10) recentWebhooks.pop();
 
-                if (!isEnabled) return; // Skip actual processing
+                if (!isEnabled) return;
 
-                // Get AI Response
+                // Process with AI
                 const reply = await processMessage(text, phoneClean, agencyId);
                 console.log(`💬 Replying to ${phoneClean}: ${reply}`);
 
-                // Send reply back to Evolution API
                 await sendMessage(phoneClean, reply, instanceName);
             }
         }
@@ -156,196 +142,63 @@ app.post('/webhook', async (req, res) => {
     }
 });
 
-// API Endpoint for frontend to request WhatsApp connection
+// WhatsApp Instance Connection Management
 app.post('/api/whatsapp/connect', async (req, res) => {
     try {
         const { agencyId, phoneNumber } = req.body;
-        if (!agencyId || !phoneNumber) {
-            return res.status(400).json({ error: 'Agency ID and Phone Number are required' });
-        }
+        if (!agencyId || !phoneNumber) return res.status(400).json({ error: 'Missing fields' });
 
         const evoUrl = process.env.EVOLUTION_API_URL;
         const evoKey = process.env.EVOLUTION_API_KEY;
-
-        if (!evoUrl || !evoKey) {
-            // Mock response if Evolution API is not configured yet
-            console.log("⚠️ Evolution API not fully configured in .env. Returning Mock QR.");
-            return res.json({
-                success: true,
-                mock: true,
-                message: "Mock connection mode.",
-                qr: null // In frontend, we'll handle this by showing a placeholder or skipping
-            });
-        }
-
         const instanceName = `Agency_${agencyId}`;
 
-        // 0. Force delete any existing instance to ensure a fresh session
+        // 0. Cleanup existing
         try {
-            await fetch(`${evoUrl}/instance/logout/${instanceName}`, { 
-                method: 'DELETE', 
-                headers: { 'apikey': evoKey }
-            });
-            await fetch(`${evoUrl}/instance/delete/${instanceName}`, { 
-                method: 'DELETE', 
-                headers: { 'apikey': evoKey }
-            });
-            console.log(`[WA] Cleaned up existing instance: ${instanceName}`);
-        } catch (e) {
-            // Ignore if it didn't exist
-        }
+            await fetch(`${evoUrl}/instance/delete/${instanceName}`, { method: 'DELETE', headers: { 'apikey': evoKey } });
+        } catch (e) {}
 
-        // 1. Create fresh instance from Evolution API
+        // 1. Create fresh
         const createRes = await fetch(`${evoUrl}/instance/create`, {
             method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'apikey': evoKey
-            },
-            body: JSON.stringify({
-                instanceName: instanceName,
-                qrcode: true,
-                integration: "WHATSAPP-BAILEYS"
-            })
+            headers: { 'Content-Type': 'application/json', 'apikey': evoKey },
+            body: JSON.stringify({ instanceName, qrcode: true, integration: "WHATSAPP-BAILEYS" })
         });
-
         const createData = await createRes.json();
-        console.log("[WA] Create Response:", JSON.stringify(createData));
 
-        // Return the QR base64 right away if possible:
         if (createData?.qrcode?.base64) {
-            return res.json({
-                success: true,
-                instanceName: instanceName,
-                qr: createData.qrcode.base64
-            });
+            return res.json({ success: true, instanceName, qr: createData.qrcode.base64 });
         }
-
-        // If it was already created, we just need to get the connect base64:
-        const connectRes = await fetch(`${evoUrl}/instance/connect/${instanceName}`, {
-            method: 'GET',
-            headers: {
-                'apikey': evoKey
-            }
-        });
-
-        const connectData = await connectRes.json();
-
-        if (connectData?.base64) {
-            return res.json({
-                success: true,
-                instanceName: instanceName,
-                qr: connectData.base64
-            });
-        } else if (connectData?.instance?.state === 'open') {
-            return res.json({
-                success: true,
-                instanceName: instanceName,
-                connected: true,
-                message: "Already connected"
-            });
-        }
-
-        // 3. Automate Webhook setup if we are in production
-        const appUrl = process.env.VITE_APP_URL || 'http://localhost:3000';
-        if (appUrl.includes('sslip.io') || appUrl.includes('elevetoai.com')) {
-            try {
-                const webhookUrl = `${appUrl.replace(/\/$/, '')}/webhook`;
-                console.log(`[WA] Auto-configuring webhook: ${webhookUrl}`);
-                await fetch(`${evoUrl}/webhook/set/${instanceName}`, {
-                    method: 'POST',
-                    headers: { 'apikey': evoKey, 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        webhook: {
-                            enabled: true,
-                            url: webhookUrl,
-                            byEvents: false,
-                            base64: false,
-                            events: ["MESSAGES_UPSERT", "QRCODE_UPDATED", "CONNECTION_UPDATE"]
-                        }
-                    })
-                });
-            } catch (webhookErr) {
-                console.error("[WA] Failed to auto-configure webhook:", webhookErr.message);
-            }
-        }
-
-        res.status(500).json({ error: 'Failed to retrieve QR code', details: connectData });
-
+        res.status(500).json({ error: 'Failed to retrieve QR code' });
     } catch (error) {
-        console.error('API Error /whatsapp/connect:', error);
         res.status(500).json({ error: 'Internal Server Error' });
     }
 });
 
-// API Endpoint to trigger property match engine
 app.post('/api/properties/match', async (req, res) => {
     try {
         const { propertyId } = req.body;
-        if (!propertyId) return res.status(400).json({ error: "Property ID required" });
-        
-        console.log(`\n🔍 [Match Engine] Triggered for Property: ${propertyId}`);
         const matchCount = await db.matchProperty(propertyId);
         res.json({ success: true, matchesFound: matchCount });
-    } catch(err) {
-        res.status(500).json({ error: "Match engine error" });
-    }
+    } catch(err) { res.status(500).json({ error: "Match engine error" }); }
 });
 
-// API Endpoint to schedule a site visit
 app.post('/api/visits/schedule', async (req, res) => {
     try {
         const { leadId, propertyId, visitDate, agencyId, notes } = req.body;
-        if (!leadId || !propertyId || !visitDate || !agencyId) {
-            return res.status(400).json({ error: "Missing required fields" });
-        }
-        
-        console.log(`\n📅 [Visit Engine] Scheduling visit for Lead: ${leadId}`);
         const visit = await db.scheduleVisit(leadId, propertyId, visitDate, agencyId, notes);
         res.json({ success: true, visitId: visit.id });
-    } catch(err) {
-        console.error("Visit scheduling error:", err);
-        res.status(500).json({ error: "Failed to schedule visit" });
-    }
+    } catch(err) { res.status(500).json({ error: "Failed to schedule visit" }); }
 });
 
-// API Endpoint to fetch visits for an agency
 app.get('/api/visits/:agencyId', async (req, res) => {
     try {
         const { agencyId } = req.params;
         const visits = await db.getVisits(agencyId);
         res.json({ success: true, visits });
-    } catch(err) {
-        console.error("Fetch visits error:", err);
-        res.status(500).json({ error: "Failed to fetch visits" });
-    }
-});
-
-// API Endpoint to send WhatsApp alert for a match
-app.post('/api/properties/alert', async (req, res) => {
-    try {
-        const { matchId } = req.body;
-        if (!matchId) return res.status(400).json({ error: "Match ID required" });
-        
-        console.log(`\n📲 [Alert Engine] Preparing WhatsApp alert for match: ${matchId}`);
-        const alertData = await db.getMatchAlertData(matchId);
-        
-        // Send message via Evolution API
-        await sendMessage(alertData.leadPhone, alertData.messageText, alertData.instanceName);
-        
-        // Update DB status
-        await db.updateMatchStatus(matchId, 'Alert Sent');
-        
-        console.log(`✅ [Alert Engine] Alert sent to ${alertData.leadPhone}`);
-        res.json({ success: true });
-    } catch(err) {
-        console.error("Alert engine error:", err);
-        res.status(500).json({ error: "Failed to send alert" });
-    }
+    } catch(err) { res.status(500).json({ error: "Failed to fetch visits" }); }
 });
 
 // Start Server
 app.listen(PORT, () => {
-    console.log(`🚀 WhatsApp Webhook running on port ${PORT}`);
-    console.log(`Waiting for Evolution API connections...`);
+    console.log(`🚀 AI Agent Server running on port ${PORT}`);
 });
