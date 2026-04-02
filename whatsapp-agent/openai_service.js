@@ -19,26 +19,38 @@ TONE & PERSONALITY:
 
 CONVERSATION FLOW:
 1. Greeting & Identity:
-   - If [LEAD_EXISTS: false], your VERY FIRST priority is to greet the user and ask for their name.
+   - If SYSTEM NOTE says [LEAD_EXISTS: false], your VERY FIRST priority is to greet the user and ask for their name.
    - Example: "Hello! I am Aria, your dedicated real estate assistant. Before we explore properties, may I know your name so I can personalize your search?"
    - DO NOT show property details or links until you have captured a name.
    - Once they provide a name, set the "name" parameter in your JSON.
 2. Lead Recognition:
-   - If [LEAD_EXISTS: true], use their name (LEAD_NAME) in your greeting.
+   - If [LEAD_EXISTS: true], use their name (LEAD_NAME) in your greeting (e.g., "Welcome back, [Name]!").
 3. Requirement Gathering:
-   - After getting the name, ask for: Location, BHK, and Budget.
+   - To find the best matches, you need: Location, BHK, and Budget.
+   - If they provide partial info, use SEARCH_PROPERTIES and ask for the rest.
 4. Site Visit Scheduling:
    - You MUST ask for a preferred DATE and TIME.
-   - Use "SCHEDULE_SITE_VISIT" intent once confirmed.
+   - Use "SCHEDULE_SITE_VISIT" intent ONLY after you have a specific Date and Time from the user.
 
 CRITICAL RULES:
 - DATA PRIVACY: NEVER ask for their WhatsApp or phone number.
-- ANTI-HALLUCINATION: Only discuss properties mentioned in the search results.
+- ANTI-HALLUCINATION: Only discuss properties mentioned in the SYSTEM NOTE search results.
 
-INTENTS:
-- GENERAL_CHAT, SEARCH_PROPERTIES, SCHEDULE_SITE_VISIT
-...
-`;
+OUTPUT FORMAT (JSON ONLY):
+{
+  "intent": "GENERAL_CHAT" | "SEARCH_PROPERTIES" | "SCHEDULE_SITE_VISIT",
+  "human_response": "What you actually say back to the user",
+  "parameters": {
+     "name": "User Name",
+     "bhk": "e.g. 2BHK, 3BHK",
+     "location": "e.g. South Mumbai",
+     "budget_in_rupees": "numeric value only",
+     "purpose": "Personal or Investment",
+     "visit_date": "YYYY-MM-DD",
+     "visit_time": "HH:mm",
+     "visit_property_id": "Record ID of the property"
+  }
+}`;
 
 const sessions = {};
 
@@ -98,11 +110,10 @@ async function processMessage(userInput, phone, agencyId) {
         const params = parsed.parameters || {};
 
         // 4. Capture DATA (Upsert Lead)
-        // If AI identified a name, use it. Otherwise keep existing or "WhatsApp Contact"
         const updatedLead = await db.upsertLead(cleanPhone, agencyId, params);
         leadIdFound = updatedLead ? updatedLead.id : leadIdFound;
 
-        // Log messages (to ensure they show up in dashboard now that endpoint is fixed)
+        // Log messages
         await db.logChat(cleanPhone, "user", userInput, agencyId, leadIdFound);
         await db.logChat(cleanPhone, "assistant", parsed.human_response || responseText, agencyId, leadIdFound);
         
@@ -117,7 +128,7 @@ async function processMessage(userInput, phone, agencyId) {
             });
 
             if (properties.length === 0) {
-                const failContext = [...chatContext, { role: "system", content: "SYSTEM NOTE: No properties found matching these criteria. Inform the user gracefully." }];
+                const failContext = [...chatContext, { role: "system", content: "SYSTEM NOTE: No properties found. Inform user gracefully." }];
                 const retryResponse = await openai.chat.completions.create({
                     model: "gpt-4o-mini",
                     messages: failContext,
@@ -133,7 +144,7 @@ async function processMessage(userInput, phone, agencyId) {
                 return `🏡 *${p.title}*\n📍 ${p.location}\n💰 ${priceText}\n🔗 Link: ${baseUrl}/properties/${p.id}`;
             }).join('\n\n');
 
-            const successMsg = `SYSTEM NOTE: Found these properties:\n${propertyList}\n\nPresent them and ask about a site visit.`;
+            const successMsg = `SYSTEM NOTE: Found properties:\n${propertyList}\n\nPresent them and ask about a site visit.`;
             const finalContext = [...chatContext, { role: "system", content: successMsg }];
             const finalResponse = await openai.chat.completions.create({
                 model: "gpt-4o-mini",
@@ -178,29 +189,12 @@ async function processMessage(userInput, phone, agencyId) {
 
     } catch (error) {
         console.error('Process Message Error:', error.message);
-        
-        // Handle explicit OpenAI rate limit error 429
-        if (error.status === 429) {
-            return "Sorry, my OpenAI key has hit its API rate limit or run out of credits! Please check your billing dashboard.";
-        }
         return "I'm having a little trouble connecting to my database. Could you try again in a moment?";
     }
 }
 
-// Retrieve live chat history from database
 async function getChats(phone) {
     return await db.getChatLogs(phone);
 }
 
-async function logMessage(phone, role, content, agencyId = null) {
-    if (!sessions[phone]) {
-        sessions[phone] = [
-            { role: "system", content: SYSTEM_PROMPT }
-        ];
-    }
-    sessions[phone].push({ role, content });
-    await db.logChat(phone, role, content, agencyId);
-    console.log(`[LOG] Manually logged ${role} message for ${phone}`);
-}
-
-module.exports = { processMessage, getChats, logMessage };
+module.exports = { processMessage, getChats };
