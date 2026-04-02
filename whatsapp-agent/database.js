@@ -185,8 +185,20 @@ module.exports = {
             } else {
                 // Create new lead
                 leadData.status = 'New Lead';
-                await pb.collection('leads').create(leadData);
+                const newLead = await pb.collection('leads').create(leadData);
                 console.log(`[DB] Created new Lead for ${phone}`);
+
+                // Automatically enroll in "Welcome Sequence" if it exists
+                try {
+                    const sequences = await pb.collection('sequences').getList(1, 1, {
+                        filter: `name ~ "Welcome Sequence" && agency_id = "${agencyId}"`
+                    });
+                    if (sequences.totalItems > 0) {
+                        await this.enrollLeadInSequence(newLead.id, sequences.items[0].id, agencyId);
+                    }
+                } catch (e) {
+                    console.error("[DB] Welcome sequence enrollment failed:", e.message);
+                }
             }
 
         } catch (err) {
@@ -200,10 +212,18 @@ module.exports = {
      * @returns {boolean}
      */
     async isAgentEnabled(agencyId) {
-        if (!agencyId) return true; // Default to true if no agency ID is provided
         await authenticate();
         try {
-            const agency = await pb.collection('users').getOne(agencyId);
+            let agency;
+            if (!agencyId) {
+                // Fall back to checking the first user if no agencyId is present
+                const records = await pb.collection('users').getList(1, 1);
+                if (records.totalItems === 0) return true;
+                agency = records.items[0];
+            } else {
+                agency = await pb.collection('users').getOne(agencyId);
+            }
+            
             // Default to true if the field doesn't exist yet, to not break existing instances
             if (agency.agentEnabled === false) {
                 return false;
@@ -394,6 +414,66 @@ module.exports = {
         } catch (err) {
             console.error('[DB Error] Failed to fetch chat logs:', err.message);
             return [];
+        }
+    },
+
+    /**
+     * Enrolls a lead into a follow-up sequence.
+     */
+    async enrollLeadInSequence(leadId, sequenceId, agencyId) {
+        await authenticate();
+        try {
+            const sequence = await pb.collection('sequences').getOne(sequenceId);
+            const firstStep = sequence.steps[0];
+            
+            const nextSendAt = new Date();
+            nextSendAt.setHours(nextSendAt.getHours() + (firstStep.delay_hours || 0));
+
+            const data = {
+                lead: leadId,
+                sequence: sequenceId,
+                current_step: 0,
+                next_send_at: nextSendAt.toISOString(),
+                status: 'pending',
+                agency_id: agencyId
+            };
+            
+            const record = await pb.collection('lead_followups').create(data);
+            console.log(`[DB] Enrolled Lead ${leadId} in Sequence ${sequenceId}. Next send at: ${data.next_send_at}`);
+            return record;
+        } catch (err) {
+            console.error('[DB Error] Failed to enroll lead in sequence:', err.message);
+            return null;
+        }
+    },
+
+    /**
+     * Fetches follow-ups that are due to be sent.
+     */
+    async getDueFollowups() {
+        await authenticate();
+        try {
+            const now = new Date().toISOString();
+            const records = await pb.collection('lead_followups').getFullList({
+                filter: `status = "pending" && next_send_at <= "${now}"`,
+                expand: 'lead,sequence'
+            });
+            return records;
+        } catch (err) {
+            console.error('[DB Error] Failed to fetch due follow-ups:', err.message);
+            return [];
+        }
+    },
+
+    /**
+     * Updates the status or progress of a follow-up.
+     */
+    async updateFollowupProgress(followupId, data) {
+        await authenticate();
+        try {
+            await pb.collection('lead_followups').update(followupId, data);
+        } catch (err) {
+            console.error('[DB Error] Failed to update follow-up progress:', err.message);
         }
     }
 };
