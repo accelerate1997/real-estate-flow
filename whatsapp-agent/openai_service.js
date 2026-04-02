@@ -61,46 +61,45 @@ const sessions = {};
 
 async function processMessage(userInput, phone, agencyId) {
     try {
-        // Force session reset if it's a new property inquiry (pre-filled message)
-        const isNewInquiry = userInput.includes('I am interested in this property') && userInput.includes('schedule a sitevisit');
-        
-        if (!sessions[phone] || isNewInquiry) {
-            console.log(`[SESSION] Initializing/Resetting session for ${phone}`);
-            sessions[phone] = [
-                { role: "system", content: SYSTEM_PROMPT }
-            ];
-        } else {
-            // Always ensure the first message is the CURRENT system prompt in case of logic updates
-            sessions[phone][0] = { role: "system", content: SYSTEM_PROMPT };
-        }
-
-        const chatContext = sessions[phone];
-
-        // CHECK IF LEAD EXISTS
         const cleanPhone = phone.replace(/[^\d]/g, '');
-        let leadExists = false;
-        let leadName = "";
-        let leadIdFound = null;
-        try {
-            const lead = await db.getLeadByPhone(cleanPhone);
-            if (lead) {
-                leadExists = true;
-                leadName = lead.name;
-                leadIdFound = lead.id;
+        console.log(`\n[AI] Processing message for ${cleanPhone} (Agency: ${agencyId})`);
+
+        // 1. Manage Session History (Persistent from DB)
+        if (!sessions[cleanPhone]) {
+            const history = await db.getChatLogs(cleanPhone);
+            sessions[cleanPhone] = history.map(log => ({
+                role: log.role === 'user' ? 'user' : 'assistant',
+                content: log.message
+            }));
+            
+            // Add initial system prompt if new session
+            if (sessions[cleanPhone].length === 0) {
+                sessions[cleanPhone].push({ role: "system", content: SYSTEM_PROMPT });
             }
-        } catch (e) {
-            console.error("DB Lead Check Error:", e.message);
+        }
+        
+        // Ensure the system prompt is always at the start and up-to-date
+        if (sessions[cleanPhone][0]?.role !== 'system') {
+            sessions[cleanPhone].unshift({ role: "system", content: SYSTEM_PROMPT });
+        } else {
+            sessions[cleanPhone][0].content = SYSTEM_PROMPT;
         }
 
-        const now = new Date();
-        const dateContext = `\n[CURRENT_DATE: ${now.toDateString()}, CURRENT_TIME: ${now.toLocaleTimeString()}]`;
-        const phoneContext = `\n[SYSTEM NOTE: LEAD_EXISTS: ${leadExists}${leadName ? `, LEAD_NAME: ${leadName}` : ''}]`;
-        const finalInput = userInput + dateContext + phoneContext;
+        const chatContext = sessions[cleanPhone];
 
+        // 2. Lead Context Enrichment
+        const lead = await db.getLeadByPhone(cleanPhone);
+        let leadNote = "[LEAD_EXISTS: false]";
+        let leadIdFound = null;
+        if (lead) {
+            leadNote = `[LEAD_EXISTS: true] [LEAD_NAME: ${lead.name || 'Unknown'}] [LEAD_REQS: ${lead.requirement || 'None'}]`;
+            leadIdFound = lead.id;
+        }
+
+        const finalInput = `SYSTEM NOTE: ${leadNote}\nUser: ${userInput}`;
         chatContext.push({ role: "user", content: finalInput });
-        // Log user message to DB
-        await db.logChat(phone, "user", userInput, agencyId, leadIdFound);
 
+        // 3. GPT Completion
         const response = await openai.chat.completions.create({
             model: "gpt-4o-mini",
             messages: chatContext,
@@ -109,129 +108,98 @@ async function processMessage(userInput, phone, agencyId) {
         });
 
         const responseText = response.choices[0].message.content;
+        const parsed = JSON.parse(responseText);
+        const intent = parsed.intent;
+        const params = parsed.parameters || {};
+
+        // 4. Capture DATA Immediately (Upsert Lead)
+        // This ensures the lead record exists before we try site visit scheduling
+        const updatedLead = await db.upsertLead(cleanPhone, agencyId, params);
+        leadIdFound = updatedLead ? updatedLead.id : leadIdFound;
+
+        // Log to database
+        await db.logChat(cleanPhone, "user", userInput, agencyId, leadIdFound);
+        await db.logChat(cleanPhone, "assistant", parsed.human_response || responseText, agencyId, leadIdFound);
+        
+        // Update local session
         chatContext.push({ role: "assistant", content: responseText });
 
-        try {
-            const parsed = JSON.parse(responseText);
-            // Log assistant message to DB (storing the human response for the dashboard)
-            await db.logChat(phone, "assistant", parsed.human_response || responseText, agencyId, leadIdFound);
+        // 5. Intent Handling
+        if (intent === 'SEARCH_PROPERTIES') {
+            const properties = await db.findProperties({
+                budget: params.budget_in_rupees,
+                bhk: params.bhk,
+                location: params.location
+            });
 
-            const intent = parsed.intent;
-            const params = parsed.parameters || {};
-
-            // Always attempt to save/update the Lead
-            const hasLeadData = params.name || params.bhk || params.location || params.budget_in_rupees || params.purpose;
-            if (hasLeadData && agencyId) {
-                const leadPhone = phone.match(/^\d+$/) ? phone : (params.extracted_phone || phone);
-                await db.upsertLead(leadPhone, agencyId, params);
-            }
-
-            if (intent === 'SEARCH_PROPERTIES') {
-                const properties = await db.findProperties({
-                    budget: params.budget_in_rupees,
-                    bhk: params.bhk,
-                    location: params.location
-                });
-
-                if (properties.length === 0) {
-                    const failMsg = `SYSTEM NOTE: The database search returned NO properties matching the criteria. Inform the user politely.`;
-                    chatContext.push({ role: "system", content: failMsg });
-                    const failResponse = await openai.chat.completions.create({
-                        model: "gpt-4o-mini",
-                        messages: chatContext,
-                        response_format: { type: "json_object" }
-                    });
-                    const failData = JSON.parse(failResponse.choices[0].message.content);
-                    chatContext.push({ role: "assistant", content: JSON.stringify(failData) });
-                    return failData.human_response;
-                }
-
-                const baseUrl = process.env.VITE_APP_URL || 'http://localhost:5173';
-                const propertyList = properties.map(p => {
-                    const priceVal = p.price || 0;
-                    let priceText = 'Price on Request';
-                    if (priceVal >= 10000000) {
-                        priceText = `₹${(priceVal / 10000000).toFixed(2)} Cr`;
-                    } else if (priceVal >= 100000) {
-                        priceText = `₹${(priceVal / 100000).toFixed(2)} Lakh`;
-                    } else if (priceVal > 0) {
-                        priceText = `₹${priceVal.toLocaleString('en-IN')}`;
-                    }
-                    return `🏡 *${p.title}*\n📍 ${p.location}\n💰 ${priceText}\n🔗 Link: ${baseUrl}/properties/${p.id}`;
-                }).join('\n\n');
-
-                const successMsg = `SYSTEM NOTE: The database found these properties:\n${propertyList}\n\nPresent these clearly and ASK if they want to schedule a SITE VISIT for any of them.`;
-                chatContext.push({ role: "system", content: successMsg });
-                const successResponse = await openai.chat.completions.create({
+            if (properties.length === 0) {
+                const failContext = [...chatContext, { role: "system", content: "SYSTEM NOTE: No properties found matching these criteria. Inform the user gracefully." }];
+                const retryResponse = await openai.chat.completions.create({
                     model: "gpt-4o-mini",
-                    messages: chatContext,
+                    messages: failContext,
                     response_format: { type: "json_object" }
                 });
-                const successData = JSON.parse(successResponse.choices[0].message.content);
-                chatContext.push({ role: "assistant", content: JSON.stringify(successData) });
-                return successData.human_response;
+                return JSON.parse(retryResponse.choices[0].message.content).human_response;
             }
 
-            if (intent === 'SCHEDULE_SITE_VISIT') {
-                if (!params.visit_date || params.visit_date.includes('YYYY')) {
-                    const validationMsg = "SYSTEM NOTE: You attempted to schedule a visit but the DATE or TIME is missing or invalid. You MUST ask the user for a specific date and time before you can use the SCHEDULE_SITE_VISIT intent.";
-                    chatContext.push({ role: "system", content: validationMsg });
-                    const retryResponse = await openai.chat.completions.create({
-                        model: "gpt-4o-mini",
-                        messages: chatContext,
-                        response_format: { type: "json_object" }
-                    });
-                    const retryData = JSON.parse(retryResponse.choices[0].message.content);
-                    chatContext.push({ role: "assistant", content: JSON.stringify(retryData) });
-                    return retryData.human_response;
-                }
-                
-                console.log(`\n[ACTION] AI scheduling site visit for Lead: ${phone} on ${params.visit_date}`);
-                
-                const lead = await db.getLeadByPhone(phone);
+            const propertyList = properties.map(p => {
+                const priceVal = p.price || 0;
+                let priceText = priceVal >= 10000000 ? `₹${(priceVal / 10000000).toFixed(2)} Cr` : `₹${(priceVal / 100000).toFixed(2)} Lakh`;
+                const baseUrl = process.env.BASE_URL || 'https://realestateflow.elevetoai.com';
+                return `🏡 *${p.title}*\n📍 ${p.location}\n💰 ${priceText}\n🔗 Link: ${baseUrl}/properties/${p.id}`;
+            }).join('\n\n');
 
-                if (lead) {
-                    const leadId = lead.id;
-                    await db.scheduleVisit(
-                        leadId,
-                        params.visit_property_id,
-                        params.visit_date,
-                        params.visit_time || '',
-                        agencyId,
-                        `Scheduled via WhatsApp AI. User requested: ${params.visit_date} at ${params.visit_time}`
-                    );
-                    
-                    const confirmationMsg = `SYSTEM NOTE: Site visit has been successfully recorded in the database. Confirm this to the user professionally, mentioning the property name and visit date/time.`;
-                    chatContext.push({ role: "system", content: confirmationMsg });
-                    const confirmResponse = await openai.chat.completions.create({
-                        model: "gpt-4o-mini",
-                        messages: chatContext,
-                        response_format: { type: "json_object" }
-                    });
-                    const confirmData = JSON.parse(confirmResponse.choices[0].message.content);
-                    chatContext.push({ role: "assistant", content: JSON.stringify(confirmData) });
-                    return confirmData.human_response;
-                } else {
-                    return "I'm sorry, I couldn't find your lead record to schedule the visit. Could you please tell me your name again?";
-                }
-            }
+            const successMsg = `SYSTEM NOTE: Found these properties:\n${propertyList}\n\nPresent them and ask about a site visit.`;
+            const finalContext = [...chatContext, { role: "system", content: successMsg }];
+            const finalResponse = await openai.chat.completions.create({
+                model: "gpt-4o-mini",
+                messages: finalContext,
+                response_format: { type: "json_object" }
+            });
 
-            return parsed.human_response || "I am still learning how to help you.";
-
-        } catch (e) {
-            console.error('[Error processing JSON AI output]:', e.message);
-            console.error('[Raw AI Response]:', responseText);
-            return "I apologize, my system encountered an error processing that request. Please try briefly stating your preferred date and time again.";
+            const finalData = JSON.parse(finalResponse.choices[0].message.content);
+            chatContext.push({ role: "assistant", content: JSON.stringify(finalData) });
+            return finalData.human_response;
         }
+
+        if (intent === 'SCHEDULE_SITE_VISIT') {
+            const propertyId = params.visit_property_id;
+            const visitDate = params.visit_date;
+            
+            if (!propertyId || !visitDate || visitDate.includes('YYYY')) {
+                return parsed.human_response;
+            }
+
+            if (leadIdFound) {
+                await db.scheduleVisit(
+                    leadIdFound,
+                    propertyId,
+                    visitDate,
+                    params.visit_time || '',
+                    agencyId,
+                    `Scheduled via AI. User requested: ${visitDate} at ${params.visit_time}`
+                );
+                
+                const confirmationMsg = "SYSTEM NOTE: Site visit recorded. Confirm professionally.";
+                const confirmRes = await openai.chat.completions.create({
+                    model: "gpt-4o-mini",
+                    messages: [{ role: "system", content: SYSTEM_PROMPT }, ...chatContext, { role: "user", content: confirmationMsg }],
+                    response_format: { type: "json_object" }
+                });
+                return JSON.parse(confirmRes.choices[0].message.content).human_response;
+            }
+        }
+
+        return parsed.human_response || "How else can I assist you?";
+
     } catch (error) {
-
-        console.error('Process Message Error:', error.message || error);
-
+        console.error('Process Message Error:', error.message);
+        
         // Handle explicit OpenAI rate limit error 429
         if (error.status === 429) {
             return "Sorry, my OpenAI key has hit its API rate limit or run out of credits! Please check your billing dashboard.";
         }
-        return "Sorry, I am having trouble connecting to my brain right now.";
+        return "I'm having a little trouble connecting to my database. Could you try again in a moment?";
     }
 }
 

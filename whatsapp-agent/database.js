@@ -113,7 +113,7 @@ module.exports = {
      * @param {string} agencyId
      * @param {Object} params Extracted parameters from the AI
      */
-    async upsertLead(phone, agencyId, params) {
+    async upsertLead(phone, agencyId, params = {}) {
         if (!agencyId) {
             console.log("[DB] No agencyId provided, skipping lead upsert.");
             return;
@@ -124,6 +124,7 @@ module.exports = {
         try {
             // Standardize phone number format (remove + and spaces)
             const cleanPhone = phone.replace(/[^\d]/g, '');
+            console.log(`[DB] Upserting Lead with Phone: ${cleanPhone}, Agency: ${agencyId}`);
             
             // Check if lead already exists for this phone and agency
             const existingLeads = await pb.collection('leads').getList(1, 1, {
@@ -141,14 +142,13 @@ module.exports = {
             if (params.timeframe) reqParts.push(`Target timeframe: ${params.timeframe}`);
             if (params.purpose) reqParts.push(`Purpose: ${params.purpose}`);
 
-            const requirementText = reqParts.length > 0 ? reqParts.join('. ') + '.' : '';
+            const requirementText = reqParts.length > 0 ? reqParts.join('. ') + '.' : (params.requirement || '');
 
             const leadData = {
                 agencyId: agencyId,
                 name: params.name || 'WhatsApp Contact',
-                phone: phone,
+                phone: cleanPhone,
                 requirement: requirementText,
-                // Synchronize structured fields for automated matching engine
                 target_bhk: params.bhk || "",
                 target_location: params.location || "",
                 max_budget: params.budget_in_rupees ? parseFloat(params.budget_in_rupees) : 0
@@ -156,49 +156,46 @@ module.exports = {
 
             // Only update follow-up date if the AI extracted a valid one
             if (params.follow_up_date) {
-                // Attempt to parse AI date strings into YYYY-MM-DD or standard Date
                 const dateObj = new Date(params.follow_up_date);
-                if (!isNaN(dateObj)) {
-                    leadData.date = dateObj.toISOString();
-                }
+                if (!isNaN(dateObj)) leadData.date = dateObj.toISOString();
             }
 
             if (existingLeads.totalItems > 0) {
-                // Update existing lead safely (merge new data where available)
                 const leadId = existingLeads.items[0].id;
                 const currentLead = existingLeads.items[0];
 
-                // Merge requirement text
-                if (requirementText && (requirementText.length > (currentLead.requirement || '').length || !currentLead.requirement)) {
+                // Merge requirement text safely
+                if (requirementText && (requirementText.length > (currentLead.requirement || '').length)) {
                     leadData.requirement = requirementText;
+                } else if (!currentLead.requirement) {
+                     // Keep it as is
                 } else {
                     delete leadData.requirement;
                 }
 
                 // Preserve name if not provided now
-                if (currentLead.name && !params.name) {
+                if (currentLead.name && (!params.name || params.name === 'WhatsApp Contact')) {
                     delete leadData.name;
                 }
 
                 await pb.collection('leads').update(leadId, leadData);
-                console.log(`[DB] Updated Lead ${leadId} with data:`, JSON.stringify(leadData));
+                console.log(`[DB] Updated Lead ${leadId}`);
+                return existingLeads.items[0];
             } else {
-                // Create new lead
                 leadData.status = 'New Lead';
                 const newLead = await pb.collection('leads').create(leadData);
-                console.log(`[DB] Created new Lead for ${phone}`);
+                console.log(`[DB] Created new Lead: ${newLead.id}`);
 
-                // Automatically enroll in "Welcome Sequence" if it exists
+                // Enroll in sequence
                 try {
                     const sequences = await pb.collection('sequences').getList(1, 1, {
-                        filter: `name ~ "Welcome Sequence" && agency_id = "${agencyId}"`
+                        filter: `name ~ "Welcome" && agency_id = "${agencyId}"`
                     });
                     if (sequences.totalItems > 0) {
                         await this.enrollLeadInSequence(newLead.id, sequences.items[0].id, agencyId);
                     }
-                } catch (e) {
-                    console.error("[DB] Welcome sequence enrollment failed:", e.message);
-                }
+                } catch (e) {}
+                return newLead;
             }
 
         } catch (err) {
