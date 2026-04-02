@@ -346,7 +346,6 @@ app.post('/api/properties/alert', async (req, res) => {
 
 // Start Server
 app.listen(PORT, () => {
-    console.log(`\n💎💎💎 AGENT STARTUP 💎💎💎`);
-    console.log(`🚀 Rajesh Real Estate WhatsApp Webhook running on port ${PORT}`);
+    console.log(`🚀 WhatsApp Webhook running on port ${PORT}`);
     console.log(`Waiting for Evolution API connections...`);
 });

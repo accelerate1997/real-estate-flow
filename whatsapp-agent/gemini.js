@@ -10,7 +10,7 @@ if (!apiKey) {
 const genAI = new GoogleGenerativeAI(apiKey);
 const model = genAI.getGenerativeModel({
     model: "gemini-2.0-flash",
-    systemInstruction: `You are an AI Assistant for Rajesh Real Estate Agency. Your job is to handle customer inquiries for properties.
+    systemInstruction: `You are an AI Assistant for the Real Estate Agency. Your job is to handle customer inquiries for properties.
 
     STRICT CONVERSATION FLOW & ANTI-HALLUCINATION RULES:
     0. Phone Number Check: If the system note says "NO_PHONE_PROVIDED", and the user hasn't explicitly given a phone number in the chat, your first message MUST ask: "May I have your WhatsApp number for our records?"
