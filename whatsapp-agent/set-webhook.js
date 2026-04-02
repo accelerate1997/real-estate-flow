@@ -19,7 +19,9 @@ async function setWebhook() {
                     byEvents: false,
                     base64: false,
                     events: [
-                        "MESSAGES_UPSERT"
+                        "MESSAGES_UPSERT",
+                        "QRCODE_UPDATED",
+                        "CONNECTION_UPDATE"
                     ]
                 }
             })

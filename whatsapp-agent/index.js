@@ -73,8 +73,9 @@ app.post('/webhook', async (req, res) => {
         console.log(`[DEBUG] Event: ${event}, Data length: ${Array.isArray(data) ? data.length : 'N/A'}`);
 
 
-        // Evolution API sends 'messages.upsert' for new messages
-        if (event !== 'messages.upsert') {
+        // Evolution API sends 'messages.upsert' or 'MESSAGES_UPSERT' for new messages
+        const normalizedEvent = event ? event.toLowerCase() : '';
+        if (normalizedEvent !== 'messages.upsert') {
             console.log(`[IGNORE] Event type: ${event}`);
             return res.sendStatus(200);
         }
@@ -243,6 +244,30 @@ app.post('/api/whatsapp/connect', async (req, res) => {
                 connected: true,
                 message: "Already connected"
             });
+        }
+
+        // 3. Automate Webhook setup if we are in production
+        const appUrl = process.env.VITE_APP_URL || 'http://localhost:3000';
+        if (appUrl.includes('sslip.io') || appUrl.includes('elevetoai.com')) {
+            try {
+                const webhookUrl = `${appUrl.replace(/\/$/, '')}/webhook`;
+                console.log(`[WA] Auto-configuring webhook: ${webhookUrl}`);
+                await fetch(`${evoUrl}/webhook/set/${instanceName}`, {
+                    method: 'POST',
+                    headers: { 'apikey': evoKey, 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        webhook: {
+                            enabled: true,
+                            url: webhookUrl,
+                            byEvents: false,
+                            base64: false,
+                            events: ["MESSAGES_UPSERT", "QRCODE_UPDATED", "CONNECTION_UPDATE"]
+                        }
+                    })
+                });
+            } catch (webhookErr) {
+                console.error("[WA] Failed to auto-configure webhook:", webhookErr.message);
+            }
         }
 
         res.status(500).json({ error: 'Failed to retrieve QR code', details: connectData });
