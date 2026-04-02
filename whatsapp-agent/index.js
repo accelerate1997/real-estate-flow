@@ -7,6 +7,10 @@ const recentWebhooks = [];
 const { processMessage, getChats } = require('./openai_service');
 const { sendMessage } = require('./evolution');
 const db = require('./database');
+const followupEngine = require('./followup_engine');
+
+// Start Follow-up Engine
+followupEngine.startEngine();
 
 const app = express();
 app.use(cors());
@@ -119,14 +123,10 @@ app.post('/webhook', async (req, res) => {
                 const instanceName = req.body.instance || req.body.data?.instance || 'Default';
                 const agencyId = instanceName.startsWith('Agency_') ? instanceName.split('_')[1] : null;
 
-                let isEnabled = true;
-
                 // Check if AI Agent is enabled for this agency before replying
-                if (agencyId) {
-                    isEnabled = await db.isAgentEnabled(agencyId);
-                    if (!isEnabled) {
-                        console.log(`[IGNORE] AI Agent is disabled for agency ${agencyId}.`);
-                    }
+                let isEnabled = await db.isAgentEnabled(agencyId);
+                if (!isEnabled) {
+                    console.log(`[IGNORE] AI Agent is disabled for agency ${agencyId || 'default'}.`);
                 }
 
                 // Add to debug cache
@@ -179,7 +179,22 @@ app.post('/api/whatsapp/connect', async (req, res) => {
 
         const instanceName = `Agency_${agencyId}`;
 
-        // 1. Create or fetch instance from Evolution API
+        // 0. Force delete any existing instance to ensure a fresh session
+        try {
+            await fetch(`${evoUrl}/instance/logout/${instanceName}`, { 
+                method: 'DELETE', 
+                headers: { 'apikey': evoKey }
+            });
+            await fetch(`${evoUrl}/instance/delete/${instanceName}`, { 
+                method: 'DELETE', 
+                headers: { 'apikey': evoKey }
+            });
+            console.log(`[WA] Cleaned up existing instance: ${instanceName}`);
+        } catch (e) {
+            // Ignore if it didn't exist
+        }
+
+        // 1. Create fresh instance from Evolution API
         const createRes = await fetch(`${evoUrl}/instance/create`, {
             method: 'POST',
             headers: {
@@ -194,9 +209,9 @@ app.post('/api/whatsapp/connect', async (req, res) => {
         });
 
         const createData = await createRes.json();
+        console.log("[WA] Create Response:", JSON.stringify(createData));
 
-        // Sometimes instance might already exist. 
-        // If the creation returns the QR base64 right away, send it:
+        // Return the QR base64 right away if possible:
         if (createData?.qrcode?.base64) {
             return res.json({
                 success: true,

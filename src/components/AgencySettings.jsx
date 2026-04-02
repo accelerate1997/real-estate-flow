@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Save, Building, Bell, Shield, CreditCard, ChevronRight, MessageSquare, Check, Loader2, BrainCircuit, Key } from 'lucide-react';
+import { Save, Building, Bell, Shield, CreditCard, ChevronRight, MessageSquare, Check, Loader2, BrainCircuit, Key, Plus, Trash2, Clock, Edit2 } from 'lucide-react';
 import { pb } from '../services/pocketbase';
 
 const AgencySettings = () => {
@@ -7,6 +7,9 @@ const AgencySettings = () => {
     const [isSaving, setIsSaving] = useState(false);
     const [qrCode, setQrCode] = useState(null);
     const [waConnectionStatus, setWaConnectionStatus] = useState('idle'); // idle, loading, ready, connected
+    const [sequences, setSequences] = useState([]);
+    const [isSequencesLoading, setIsSequencesLoading] = useState(false);
+    const [editingSequence, setEditingSequence] = useState(null);
 
     // Get current user details to pre-fill basic info
     const currentUser = pb.authStore.model;
@@ -21,6 +24,69 @@ const AgencySettings = () => {
         geminiKey: currentUser?.geminiKey || '',
         agentEnabled: currentUser?.agentEnabled ?? true
     });
+
+    const fetchSequences = async () => {
+        if (!currentUser?.id) return;
+        setIsSequencesLoading(true);
+        try {
+            const records = await pb.collection('sequences').getFullList({
+                filter: `agency_id = "${currentUser.id}"`,
+                sort: '-created'
+            });
+            setSequences(records);
+        } catch (error) {
+            console.error("Error fetching sequences:", error);
+        } finally {
+            setIsSequencesLoading(false);
+        }
+    };
+
+    React.useEffect(() => {
+        if (activeSection === 'sequences') {
+            fetchSequences();
+        }
+    }, [activeSection]);
+
+    const handleSaveSequence = async (e) => {
+        e.preventDefault();
+        if (!editingSequence.name) {
+            alert("Sequence name is required");
+            return;
+        }
+        
+        setIsSaving(true);
+        try {
+            const data = {
+                ...editingSequence,
+                agency_id: currentUser.id
+            };
+            
+            if (editingSequence.id) {
+                await pb.collection('sequences').update(editingSequence.id, data);
+            } else {
+                await pb.collection('sequences').create(data);
+            }
+            
+            setEditingSequence(null);
+            fetchSequences();
+            alert("Sequence saved!");
+        } catch (error) {
+            console.error("Error saving sequence:", error.message);
+            alert("Failed to save sequence. Ensure 'sequences' collection exists.");
+        } finally {
+            setIsSaving(false);
+        }
+    };
+
+    const handleDeleteSequence = async (id) => {
+        if (!window.confirm("Are you sure you want to delete this sequence?")) return;
+        try {
+            await pb.collection('sequences').delete(id);
+            fetchSequences();
+        } catch (error) {
+            console.error("Error deleting sequence:", error);
+        }
+    };
 
     const handleSave = async () => {
         setIsSaving(true);
@@ -67,7 +133,13 @@ const AgencySettings = () => {
                 })
             });
 
+            if (!res.ok) {
+                const errorText = await res.text();
+                throw new Error(`HTTP Error ${res.status}: ${errorText || res.statusText}`);
+            }
+
             const data = await res.json();
+            console.log("WA Connect Data:", data);
 
             if (data.connected || data.instance?.state === 'open') {
                 setWaConnectionStatus('connected');
@@ -75,13 +147,11 @@ const AgencySettings = () => {
                 setQrCode(data.qr);
                 setWaConnectionStatus('ready');
             } else if (data.mock) {
-                setWaConnectionStatus('ready');
-                // Use a placeholder image if backend is just returning a mock success
-                setQrCode("iVBORw0KGgoAAAANSUhEUgAAAGQAAABkCAQAAADa613fAAAAc0lEQVR42u3PMQ0AAAgDsB34d5kF0wz2QoOAEc80QRMkaIIETZCgCRI0QYImSNAECZogQRMkaIIETZCgCRI0QYImSNAECZogQRMkaIIETZCgCRI0QYImSNAECZogQRMkaIIETZCgCRI0QYImSNAECZogIfMAW84C9YItK2gAAAAASUVORK5CYII=");
-            } else {
-                alert("Failed to initialize WhatsApp connection. See console for details.");
                 setWaConnectionStatus('idle');
-                console.error("WA Connection Error Data:", data);
+                alert("WhatsApp integration is in DEMO mode (missing API keys). Check your .env config.");
+            } else {
+                alert("Failed to initialize WhatsApp connection. " + (data.error || "Check console."));
+                setWaConnectionStatus('idle');
             }
         } catch (error) {
             console.error(error);
@@ -96,6 +166,7 @@ const AgencySettings = () => {
         { id: 'brain', name: 'Brain Keys', icon: BrainCircuit, description: 'Configure your custom LLM API keys to power your AI Agent.' },
         { id: 'security', name: 'Security & Access', icon: Shield, description: 'Manage passwords and two-factor authentication.' },
         { id: 'billing', name: 'Billing & Plan', icon: CreditCard, description: 'Manage your subscription and payment methods.' },
+        { id: 'sequences', name: 'Follow-up Sequences', icon: MessageSquare, description: 'Design automated WhatsApp follow-up messages for your leads.' },
         { id: 'notifications', name: 'Notifications', icon: Bell, description: 'Configure how you receive alerts and lead updates.' },
     ];
 
@@ -320,6 +391,188 @@ const AgencySettings = () => {
                         <div className="space-y-6 text-gray-600">
                             <p>Here you can update your password and manage active sessions.</p>
                             <button className="text-primary font-bold hover:underline">Change Password</button>
+                        </div>
+                    )}
+
+                    {activeSection === 'sequences' && (
+                        <div className="space-y-6">
+                            {!editingSequence ? (
+                                <div className="space-y-6">
+                                    <div className="flex justify-between items-center">
+                                        <h3 className="text-lg font-bold text-gray-900">Your Sequences</h3>
+                                        <button 
+                                            onClick={() => setEditingSequence({ name: '', description: '', steps: [{ delay_hours: 0, message_template: '' }] })}
+                                            className="flex items-center gap-2 bg-primary/10 text-primary hover:bg-primary hover:text-white px-4 py-2 rounded-lg font-bold transition-all text-sm"
+                                        >
+                                            <Plus className="w-4 h-4" /> New Sequence
+                                        </button>
+                                    </div>
+
+                                    {isSequencesLoading ? (
+                                        <div className="flex justify-center py-12">
+                                            <Loader2 className="w-8 h-8 animate-spin text-primary/40" />
+                                        </div>
+                                    ) : sequences.length === 0 ? (
+                                        <div className="text-center py-12 bg-gray-50 rounded-2xl border border-dashed border-gray-200">
+                                            <p className="text-gray-500">No follow-up sequences found. Create one to get started!</p>
+                                        </div>
+                                    ) : (
+                                        <div className="grid grid-cols-1 gap-4">
+                                            {sequences.map((seq) => (
+                                                <div key={seq.id} className="bg-white p-5 rounded-xl border border-gray-100 shadow-sm flex items-center justify-between group hover:border-primary/30 transition-all">
+                                                    <div>
+                                                        <h4 className="font-bold text-gray-900">{seq.name}</h4>
+                                                        <p className="text-sm text-gray-500">{seq.description || 'No description'}</p>
+                                                        <div className="flex items-center gap-3 mt-2">
+                                                            <span className="text-xs bg-gray-100 text-gray-600 px-2 py-1 rounded-md font-medium">
+                                                                {seq.steps?.length || 0} Steps
+                                                            </span>
+                                                        </div>
+                                                    </div>
+                                                    <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                        <button 
+                                                            onClick={() => setEditingSequence(seq)}
+                                                            className="p-2 text-gray-400 hover:text-primary hover:bg-primary/5 rounded-lg transition-all"
+                                                        >
+                                                            <Edit2 className="w-4 h-4" />
+                                                        </button>
+                                                        <button 
+                                                            onClick={() => handleDeleteSequence(seq.id)}
+                                                            className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all"
+                                                        >
+                                                            <Trash2 className="w-4 h-4" />
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
+                                </div>
+                            ) : (
+                                <form onSubmit={handleSaveSequence} className="space-y-6">
+                                    <div className="flex items-center justify-between mb-4">
+                                        <button 
+                                            type="button"
+                                            onClick={() => setEditingSequence(null)}
+                                            className="text-sm text-gray-500 hover:text-gray-900 font-medium"
+                                        >
+                                            &larr; Back to list
+                                        </button>
+                                        <h3 className="text-lg font-bold text-gray-900">
+                                            {editingSequence.id ? 'Edit Sequence' : 'Create New Sequence'}
+                                        </h3>
+                                    </div>
+
+                                    <div className="space-y-4">
+                                        <div>
+                                            <label className="block text-sm font-medium text-gray-700 mb-1">Sequence Name</label>
+                                            <input 
+                                                type="text"
+                                                value={editingSequence.name}
+                                                onChange={(e) => setEditingSequence({ ...editingSequence, name: e.target.value })}
+                                                placeholder="e.g. Welcome Sequence"
+                                                className="w-full px-4 py-2 bg-gray-50 border border-gray-200 rounded-lg focus:bg-white focus:outline-none focus:border-primary"
+                                                required
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
+                                            <input 
+                                                type="text"
+                                                value={editingSequence.description}
+                                                onChange={(e) => setEditingSequence({ ...editingSequence, description: e.target.value })}
+                                                placeholder="Short description of this sequence"
+                                                className="w-full px-4 py-2 bg-gray-50 border border-gray-200 rounded-lg focus:bg-white focus:outline-none focus:border-primary"
+                                            />
+                                        </div>
+
+                                        <div className="pt-4">
+                                            <div className="flex justify-between items-center mb-3">
+                                                <label className="block text-sm font-bold text-gray-900">Sequence Steps</label>
+                                                <button 
+                                                    type="button"
+                                                    onClick={() => {
+                                                        const newSteps = [...(editingSequence.steps || [])];
+                                                        newSteps.push({ delay_hours: 24, message_template: '' });
+                                                        setEditingSequence({ ...editingSequence, steps: newSteps });
+                                                    }}
+                                                    className="text-xs text-primary font-bold hover:underline flex items-center gap-1"
+                                                >
+                                                    <Plus className="w-3 h-3" /> Add Step
+                                                </button>
+                                            </div>
+
+                                            <div className="space-y-4">
+                                                {(editingSequence.steps || []).map((step, idx) => (
+                                                    <div key={idx} className="bg-gray-50 p-4 rounded-xl border border-gray-200 relative group">
+                                                        <div className="flex items-center gap-4 mb-3">
+                                                            <div className="flex items-center gap-2 bg-white px-3 py-1.5 rounded-lg border border-gray-100 shadow-sm text-sm">
+                                                                <Clock className="w-4 h-4 text-gray-400" />
+                                                                <span className="text-gray-500">Delay (Hours):</span>
+                                                                <input 
+                                                                    type="number"
+                                                                    value={step.delay_hours}
+                                                                    onChange={(e) => {
+                                                                        const newSteps = [...editingSequence.steps];
+                                                                        newSteps[idx].delay_hours = parseInt(e.target.value);
+                                                                        setEditingSequence({ ...editingSequence, steps: newSteps });
+                                                                    }}
+                                                                    className="w-16 font-bold text-gray-900 focus:outline-none"
+                                                                />
+                                                            </div>
+                                                            <div className="text-xs text-gray-400">
+                                                                {idx === 0 ? '(0 = Immediate)' : `Wait ${step.delay_hours}h after step ${idx}`}
+                                                            </div>
+                                                        </div>
+                                                        <textarea 
+                                                            value={step.message_template}
+                                                            onChange={(e) => {
+                                                                const newSteps = [...editingSequence.steps];
+                                                                newSteps[idx].message_template = e.target.value;
+                                                                setEditingSequence({ ...editingSequence, steps: newSteps });
+                                                            }}
+                                                            placeholder="Enter message template..."
+                                                            rows={3}
+                                                            className="w-full px-4 py-3 bg-white border border-gray-100 rounded-lg focus:outline-none focus:border-primary transition-all text-sm"
+                                                            required
+                                                        />
+                                                        {editingSequence.steps.length > 1 && (
+                                                            <button 
+                                                                type="button"
+                                                                onClick={() => {
+                                                                    const newSteps = editingSequence.steps.filter((_, i) => i !== idx);
+                                                                    setEditingSequence({ ...editingSequence, steps: newSteps });
+                                                                }}
+                                                                className="absolute -top-2 -right-2 bg-white text-red-500 p-1.5 rounded-full shadow-sm border border-red-50 opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-50"
+                                                            >
+                                                                <Trash2 className="w-4 h-4" />
+                                                            </button>
+                                                        )}
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div className="pt-6 flex justify-end gap-3">
+                                        <button 
+                                            type="button"
+                                            onClick={() => setEditingSequence(null)}
+                                            className="px-6 py-2.5 rounded-xl font-bold bg-gray-100 text-gray-600 hover:bg-gray-200"
+                                        >
+                                            Cancel
+                                        </button>
+                                        <button 
+                                            type="submit"
+                                            disabled={isSaving}
+                                            className="bg-primary text-white px-8 py-2.5 rounded-xl font-bold hover:bg-red-800 transition-all shadow-md flex items-center gap-2"
+                                        >
+                                            {isSaving && <Loader2 className="w-4 h-4 animate-spin" />}
+                                            Save Sequence
+                                        </button>
+                                    </div>
+                                </form>
+                            )}
                         </div>
                     )}
 
