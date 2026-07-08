@@ -155,14 +155,29 @@ const PropertyDetails = () => {
         }
     }
 
-    // Static proximity/neighborhood highlights for aesthetic richness
-    const proximityHighlights = [
-        { name: "Metro / Transit Station", distance: "5 mins" },
-        { name: "Premium Shopping Mall", distance: "8 mins" },
-        { name: "International Airport", distance: "25 mins" },
-        { name: "Supermarket & Groceries", distance: "2 mins" },
-        { name: "Multi-specialty Hospital", distance: "10 mins" }
-    ];
+    // Parse Neighborhood Highlights
+    let proximityHighlights = [];
+    if (property.neighborhoodHighlights) {
+        if (Array.isArray(property.neighborhoodHighlights)) {
+            proximityHighlights = property.neighborhoodHighlights;
+        } else if (typeof property.neighborhoodHighlights === 'string') {
+            try {
+                const parsed = JSON.parse(property.neighborhoodHighlights);
+                proximityHighlights = Array.isArray(parsed) ? parsed : [];
+            } catch (e) {}
+        }
+    }
+    
+    // Fallback default list if empty
+    if (proximityHighlights.length === 0) {
+        proximityHighlights = [
+            { name: "Metro / Transit Station", distance: "5 mins" },
+            { name: "Premium Shopping Mall", distance: "8 mins" },
+            { name: "International Airport", distance: "25 mins" },
+            { name: "Supermarket & Groceries", distance: "2 mins" },
+            { name: "Multi-specialty Hospital", distance: "10 mins" }
+        ];
+    }
 
     return (
         <div className="min-h-screen bg-gray-50/30 pt-20 pb-20 font-sans text-text antialiased">

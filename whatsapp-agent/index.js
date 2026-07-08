@@ -123,6 +123,9 @@ async function expandRecords(collectionName, records) {
         if (copy.projectAmenities && typeof copy.projectAmenities === 'string') {
             try { copy.projectAmenities = JSON.parse(copy.projectAmenities); } catch (e) {}
         }
+        if (copy.neighborhoodHighlights && typeof copy.neighborhoodHighlights === 'string') {
+            try { copy.neighborhoodHighlights = JSON.parse(copy.neighborhoodHighlights); } catch (e) {}
+        }
         if (copy.images && typeof copy.images === 'string') {
             try { copy.images = JSON.parse(copy.images); } catch (e) {}
         }
@@ -417,6 +420,11 @@ app.post('/api/collections/:collection', upload.fields([{ name: 'images' }, { na
             if (body.projectAmenities && typeof body.projectAmenities === 'string') {
                 try { JSON.parse(body.projectAmenities); } catch (e) { body.projectAmenities = JSON.stringify(body.projectAmenities.split(',')); }
             }
+            if (body.neighborhoodHighlights) {
+                if (typeof body.neighborhoodHighlights !== 'string') {
+                    body.neighborhoodHighlights = JSON.stringify(body.neighborhoodHighlights);
+                }
+            }
         } else if (collection === 'sequences') {
             if (body.steps && typeof body.steps === 'string') {
                 // Keep it stringified for DB insert
@@ -487,7 +495,7 @@ app.patch('/api/collections/:collection/:id', async (req, res) => {
                 if (val === 'true') val = true;
                 if (val === 'false') val = false;
                 
-                if (matchedCol === 'steps' || matchedCol === 'projectAmenities' || matchedCol === 'images' || matchedCol === 'videos') {
+                if (matchedCol === 'steps' || matchedCol === 'projectAmenities' || matchedCol === 'neighborhoodHighlights' || matchedCol === 'images' || matchedCol === 'videos') {
                     if (typeof val !== 'string') {
                         val = JSON.stringify(val);
                     }

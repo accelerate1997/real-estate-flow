@@ -18,6 +18,29 @@ const AddPropertyWizard = ({ onClose, onSuccess, targetAgencyId, currentUserId, 
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [errors, setErrors] = useState({});
 
+    // Parse initial neighborhood highlights
+    const getInitHighlights = () => {
+        const res = { metro: '', mall: '', airport: '', groceries: '', hospital: '' };
+        if (initialData?.neighborhoodHighlights) {
+            try {
+                const parsed = typeof initialData.neighborhoodHighlights === 'string'
+                    ? JSON.parse(initialData.neighborhoodHighlights)
+                    : initialData.neighborhoodHighlights;
+                if (Array.isArray(parsed)) {
+                    parsed.forEach(h => {
+                        if (h.name === "Metro / Transit Station") res.metro = h.distance;
+                        if (h.name === "Premium Shopping Mall") res.mall = h.distance;
+                        if (h.name === "International Airport") res.airport = h.distance;
+                        if (h.name === "Supermarket & Groceries") res.groceries = h.distance;
+                        if (h.name === "Multi-specialty Hospital") res.hospital = h.distance;
+                    });
+                }
+            } catch (e) {}
+        }
+        return res;
+    };
+    const initHighlights = getInitHighlights();
+
     // Core Form State
     const [formData, setFormData] = useState({
         propertyCategory: initialData?.propertyCategory || 'Residential',
@@ -41,7 +64,12 @@ const AddPropertyWizard = ({ onClose, onSuccess, targetAgencyId, currentUserId, 
         location: initialData?.location || '',
         city: initialData?.location ? initialData.location.split(', ')[1] || '' : '',
         locality: initialData?.location ? initialData.location.split(', ')[0] || '' : '',
-        amenities: initialData?.projectAmenities ? (typeof initialData.projectAmenities === 'string' ? JSON.parse(initialData.projectAmenities) : initialData.projectAmenities) : []
+        amenities: initialData?.projectAmenities ? (typeof initialData.projectAmenities === 'string' ? JSON.parse(initialData.projectAmenities) : initialData.projectAmenities) : [],
+        highlight_metro: initHighlights.metro,
+        highlight_mall: initHighlights.mall,
+        highlight_airport: initHighlights.airport,
+        highlight_groceries: initHighlights.groceries,
+        highlight_hospital: initHighlights.hospital
     });
 
     const [images, setImages] = useState([]);
@@ -311,6 +339,15 @@ const AddPropertyWizard = ({ onClose, onSuccess, targetAgencyId, currentUserId, 
             pbData.append('projectAmenities', JSON.stringify(formData.amenities));
             pbData.append('agencyId', targetAgencyId);
             pbData.append('createdBy', currentUserId);
+
+            // Build neighborhood highlights array
+            const highlights = [];
+            if (formData.highlight_metro) highlights.push({ name: "Metro / Transit Station", distance: formData.highlight_metro });
+            if (formData.highlight_mall) highlights.push({ name: "Premium Shopping Mall", distance: formData.highlight_mall });
+            if (formData.highlight_airport) highlights.push({ name: "International Airport", distance: formData.highlight_airport });
+            if (formData.highlight_groceries) highlights.push({ name: "Supermarket & Groceries", distance: formData.highlight_groceries });
+            if (formData.highlight_hospital) highlights.push({ name: "Multi-specialty Hospital", distance: formData.highlight_hospital });
+            pbData.append('neighborhoodHighlights', JSON.stringify(highlights));
 
             // Append images array
             images.forEach((img) => {
@@ -632,6 +669,70 @@ const AddPropertyWizard = ({ onClose, onSuccess, targetAgencyId, currentUserId, 
                                                 </button>
                                             )
                                         })}
+                                    </div>
+
+                                    {/* Neighborhood Highlights Inputs */}
+                                    <div className="mt-8 border-t border-gray-100 pt-6">
+                                        <h4 className="text-lg font-bold text-gray-900 mb-1">Neighborhood Highlights (Travel Times)</h4>
+                                        <p className="text-gray-500 text-xs mb-6">Specify estimated travel times to local landmarks to make your listing more informative (e.g., 5 mins, 10 mins).</p>
+                                        
+                                        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6">
+                                            <div>
+                                                <label className="block text-sm font-medium text-gray-700 mb-2">Metro / Transit Station</label>
+                                                <input
+                                                    type="text"
+                                                    name="highlight_metro"
+                                                    value={formData.highlight_metro}
+                                                    onChange={handleInputChange}
+                                                    placeholder="E.g. 5 mins"
+                                                    className="w-full px-4 py-3 rounded-lg border border-gray-200 focus:outline-none focus:border-primary"
+                                                />
+                                            </div>
+                                            <div>
+                                                <label className="block text-sm font-medium text-gray-700 mb-2">Premium Shopping Mall</label>
+                                                <input
+                                                    type="text"
+                                                    name="highlight_mall"
+                                                    value={formData.highlight_mall}
+                                                    onChange={handleInputChange}
+                                                    placeholder="E.g. 8 mins"
+                                                    className="w-full px-4 py-3 rounded-lg border border-gray-200 focus:outline-none focus:border-primary"
+                                                />
+                                            </div>
+                                            <div>
+                                                <label className="block text-sm font-medium text-gray-700 mb-2">International Airport</label>
+                                                <input
+                                                    type="text"
+                                                    name="highlight_airport"
+                                                    value={formData.highlight_airport}
+                                                    onChange={handleInputChange}
+                                                    placeholder="E.g. 25 mins"
+                                                    className="w-full px-4 py-3 rounded-lg border border-gray-200 focus:outline-none focus:border-primary"
+                                                />
+                                            </div>
+                                            <div>
+                                                <label className="block text-sm font-medium text-gray-700 mb-2">Supermarket & Groceries</label>
+                                                <input
+                                                    type="text"
+                                                    name="highlight_groceries"
+                                                    value={formData.highlight_groceries}
+                                                    onChange={handleInputChange}
+                                                    placeholder="E.g. 2 mins"
+                                                    className="w-full px-4 py-3 rounded-lg border border-gray-200 focus:outline-none focus:border-primary"
+                                                />
+                                            </div>
+                                            <div>
+                                                <label className="block text-sm font-medium text-gray-700 mb-2">Multi-specialty Hospital</label>
+                                                <input
+                                                    type="text"
+                                                    name="highlight_hospital"
+                                                    value={formData.highlight_hospital}
+                                                    onChange={handleInputChange}
+                                                    placeholder="E.g. 10 mins"
+                                                    className="w-full px-4 py-3 rounded-lg border border-gray-200 focus:outline-none focus:border-primary"
+                                                />
+                                            </div>
+                                        </div>
                                     </div>
                                 </div>
                             )}
