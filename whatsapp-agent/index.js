@@ -30,10 +30,17 @@ const uploadsDir = path.join(__dirname, 'uploads');
 if (!fs.existsSync(uploadsDir)) {
     fs.mkdirSync(uploadsDir, { recursive: true });
 }
-app.use('/api/files/:collection/:id', (req, res, next) => {
-    const { collection, id } = req.params;
-    const recordDir = path.join(uploadsDir, collection, id);
-    express.static(recordDir)(req, res, next);
+app.get('/api/files/:collection/:id/:filename', (req, res) => {
+    const { collection, id, filename } = req.params;
+    const filePath = path.join(uploadsDir, collection, id, filename);
+    
+    if (fs.existsSync(filePath)) {
+        return res.sendFile(filePath);
+    }
+    
+    const pbUrl = (process.env.POCKETBASE_URL || 'http://pocketbase-eos80oss0css04wow848wssg.31.97.231.139.sslip.io/').replace(/\/$/, '');
+    const fallbackUrl = `${pbUrl}/api/files/${collection}/${id}/${filename}`;
+    res.redirect(fallbackUrl);
 });
 
 // Configure Multer Storage for File Uploads
