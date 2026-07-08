@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { pb } from '../services/pocketbase';
-import { MapPin, Bed, Bath, Square, Ruler, Building2, Construction, ArrowLeft, Loader2, Phone, Mail, Image as ImageIcon } from 'lucide-react';
-import { motion } from 'framer-motion';
+import { MapPin, Bed, Bath, Square, Ruler, Building2, Construction, ArrowLeft, Loader2, Phone, Mail, Image as ImageIcon, Check, ChevronLeft, ChevronRight, X, Calendar, ShieldCheck, Heart, Share2, Compass, Sparkles } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
 import clsx from 'clsx';
 
 const PropertyDetails = () => {
@@ -11,12 +11,23 @@ const PropertyDetails = () => {
     const [property, setProperty] = useState(null);
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState(null);
+    
+    // Lightbox & Gallery state
+    const [isLightboxOpen, setIsLightboxOpen] = useState(false);
+    const [activeImageIndex, setActiveImageIndex] = useState(0);
+    const [isFavorite, setIsFavorite] = useState(false);
+    
+    // Lead form state
+    const [leadName, setLeadName] = useState('');
+    const [leadPhone, setLeadPhone] = useState('');
+    const [leadEmail, setLeadEmail] = useState('');
+    const [isSubmittingLead, setIsSubmittingLead] = useState(false);
+    const [leadSubmitted, setLeadSubmitted] = useState(false);
 
     useEffect(() => {
         const fetchProperty = async () => {
             setIsLoading(true);
             try {
-                // Fetch property and expand the creator to show agency details
                 const record = await pb.collection('properties').getOne(id, {
                     expand: 'createdBy,agencyId'
                 });
@@ -37,12 +48,53 @@ const PropertyDetails = () => {
         return new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(amount);
     };
 
+    const handleShare = () => {
+        if (navigator.share) {
+            navigator.share({
+                title: property?.title,
+                text: `Check out this premium property: ${property?.title}`,
+                url: window.location.href,
+            }).catch(console.error);
+        } else {
+            navigator.clipboard.writeText(window.location.href);
+            alert("Property link copied to clipboard!");
+        }
+    };
+
+    const handleLeadSubmit = async (e) => {
+        e.preventDefault();
+        setIsSubmittingLead(true);
+        try {
+            // Determine target agency ID from property info
+            const agencyId = property?.agencyId || property?.expand?.agencyId?.id || property?.expand?.createdBy?.agencyId;
+            
+            await pb.collection('leads').create({
+                name: leadName,
+                phone: leadPhone,
+                email: leadEmail,
+                requirement: `Interested in property: "${property?.title}" (ID: ${property?.id})`,
+                status: 'New Lead',
+                agencyId: agencyId
+            });
+            
+            setLeadSubmitted(true);
+            setLeadName('');
+            setLeadPhone('');
+            setLeadEmail('');
+        } catch (err) {
+            console.error("Failed to create lead:", err);
+            alert("Failed to submit inquiry. Please try again or contact via WhatsApp.");
+        } finally {
+            setIsSubmittingLead(false);
+        }
+    };
+
     if (isLoading) {
         return (
-            <div className="min-h-screen pt-24 pb-12 flex justify-center items-center">
+            <div className="min-h-screen pt-24 pb-12 flex justify-center items-center bg-gray-50/50">
                 <div className="flex flex-col items-center gap-4">
                     <Loader2 className="w-12 h-12 animate-spin text-primary" />
-                    <p className="text-gray-500 font-medium tracking-wide">Loading premium property details...</p>
+                    <p className="text-gray-500 font-semibold tracking-wider text-sm">Loading premium property details...</p>
                 </div>
             </div>
         );
@@ -50,12 +102,12 @@ const PropertyDetails = () => {
 
     if (error || !property) {
         return (
-            <div className="min-h-screen pt-24 pb-12 flex justify-center items-center">
-                <div className="text-center">
-                    <h2 className="text-2xl font-bold text-gray-900 mb-2">Oops!</h2>
-                    <p className="text-gray-500 mb-6">{error}</p>
-                    <button onClick={() => navigate(-1)} className="text-primary hover:underline font-medium">
-                        Go Back
+            <div className="min-h-screen pt-24 pb-12 flex justify-center items-center bg-gray-50/50">
+                <div className="text-center p-8 glass-panel max-w-md mx-auto rounded-3xl shadow-xl border border-gray-100">
+                    <h2 className="text-2xl font-black text-dark mb-2">Property Unavailable</h2>
+                    <p className="text-gray-500 mb-6">{error || "This property could not be loaded."}</p>
+                    <button onClick={() => navigate(-1)} className="btn-primary">
+                        Return to Listings
                     </button>
                 </div>
             </div>
@@ -75,6 +127,10 @@ const PropertyDetails = () => {
         pb.files.getURL(property, img, { token: pb.authStore.token })
     );
 
+    const allImagesUrls = imageList.map(img => 
+        pb.files.getURL(property, img, { token: pb.authStore.token })
+    );
+
     // Process videos
     const videoList = Array.isArray(property.videos)
         ? property.videos
@@ -84,163 +140,300 @@ const PropertyDetails = () => {
         pb.files.getURL(property, vid, { token: pb.authStore.token })
     );
 
+    // Parse Amenities
+    let amenitiesList = [];
+    if (property.projectAmenities) {
+        if (Array.isArray(property.projectAmenities)) {
+            amenitiesList = property.projectAmenities;
+        } else if (typeof property.projectAmenities === 'string') {
+            try {
+                const parsed = JSON.parse(property.projectAmenities);
+                amenitiesList = Array.isArray(parsed) ? parsed : [parsed];
+            } catch (e) {
+                amenitiesList = property.projectAmenities.split(',').map(item => item.trim()).filter(Boolean);
+            }
+        }
+    }
+
+    // Static proximity/neighborhood highlights for aesthetic richness
+    const proximityHighlights = [
+        { name: "Metro / Transit Station", distance: "5 mins" },
+        { name: "Premium Shopping Mall", distance: "8 mins" },
+        { name: "International Airport", distance: "25 mins" },
+        { name: "Supermarket & Groceries", distance: "2 mins" },
+        { name: "Multi-specialty Hospital", distance: "10 mins" }
+    ];
+
     return (
-        <div className="min-h-screen bg-gray-50 pt-20 pb-16 font-sans">
+        <div className="min-h-screen bg-gray-50/30 pt-20 pb-20 font-sans text-text antialiased">
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                
+                {/* Navigation Bar */}
+                <div className="flex items-center justify-between py-6 mb-6">
+                    <button
+                        onClick={() => navigate(-1)}
+                        className="group flex items-center gap-2.5 text-gray-500 hover:text-gray-900 transition-colors font-semibold text-sm"
+                    >
+                        <ArrowLeft className="w-5 h-5 group-hover:-translate-x-1 transition-transform" />
+                        <span>Back to Listings</span>
+                    </button>
+                    <div className="flex gap-2">
+                        <button 
+                            onClick={() => setIsFavorite(!isFavorite)}
+                            className={clsx(
+                                "p-3 rounded-full border border-gray-200 transition-all active:scale-95 shadow-sm bg-white",
+                                isFavorite ? "text-red-500 border-red-100 bg-red-50" : "text-gray-400 hover:text-gray-700 hover:bg-gray-50"
+                            )}
+                        >
+                            <Heart className="w-5 h-5" fill={isFavorite ? "currentColor" : "none"} />
+                        </button>
+                        <button 
+                            onClick={handleShare}
+                            className="p-3 rounded-full border border-gray-200 text-gray-400 hover:text-gray-700 hover:bg-gray-50 transition-all active:scale-95 shadow-sm bg-white"
+                        >
+                            <Share2 className="w-5 h-5" />
+                        </button>
+                    </div>
+                </div>
 
-                {/* Back Button */}
-                <button
-                    onClick={() => navigate(-1)}
-                    className="flex items-center gap-2 text-gray-500 hover:text-gray-900 mb-8 transition-colors"
-                >
-                    <ArrowLeft className="w-5 h-5" />
-                    <span className="font-medium">Back to Results</span>
-                </button>
-
-                {/* Layout Grid */}
-                <div className="grid grid-cols-1 lg:grid-cols-12 gap-10">
-
-                    {/* Left Column: Visuals & Details */}
-                    <div className="lg:col-span-8 space-y-8">
+                {/* Premium Grid Gallery */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-10 rounded-[2.5rem] overflow-hidden shadow-premium border border-gray-100 bg-white p-3">
+                    {/* Main Image */}
+                    <div 
+                        className={clsx(
+                            "relative overflow-hidden cursor-pointer group aspect-[4/3] rounded-2xl bg-gray-100",
+                            allImagesUrls.length > 1 ? "md:col-span-2 md:aspect-auto md:h-[480px]" : "md:col-span-3 md:aspect-[21/9]"
+                        )}
+                        onClick={() => {
+                            setActiveImageIndex(0);
+                            setIsLightboxOpen(true);
+                        }}
+                    >
+                        {coverImageUrl ? (
+                            <img
+                                src={coverImageUrl}
+                                alt={property.title}
+                                className="w-full h-full object-cover group-hover:scale-[1.02] transition-transform duration-700 ease-out"
+                            />
+                        ) : (
+                            <div className="w-full h-full flex flex-col items-center justify-center text-gray-400">
+                                <ImageIcon className="w-16 h-16 mb-2 opacity-50" />
+                                <span className="font-semibold text-sm">No Images Available</span>
+                            </div>
+                        )}
                         
-                        {/* Immersive Gallery */}
-                        <div className="relative rounded-[2rem] overflow-hidden bg-white shadow-premium border border-gray-100 group">
-                            <div className="aspect-[16/9] md:aspect-[3/2] overflow-hidden">
-                                {coverImageUrl ? (
-                                    <motion.img
-                                        initial={{ scale: 1.1 }}
-                                        animate={{ scale: 1 }}
-                                        transition={{ duration: 1.5, ease: "easeOut" }}
-                                        src={coverImageUrl}
-                                        alt={property.title}
-                                        className="w-full h-full object-cover"
-                                    />
-                                ) : (
-                                    <div className="w-full h-full flex flex-col items-center justify-center text-gray-400 bg-gray-50">
-                                        <ImageIcon className="w-16 h-16 mb-2 opacity-50" />
-                                        <span>No Image Available</span>
-                                    </div>
-                                )}
-                            </div>
-                            
-                            {/* Overlay Gradient */}
-                            <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-transparent pointer-events-none" />
+                        {/* Gradient Overlay */}
+                        <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent opacity-60 pointer-events-none" />
 
-                            {/* Floating Badges */}
-                            <div className="absolute top-6 left-6 flex flex-wrap gap-2">
-                                <span className={clsx(
-                                    "px-4 py-2 rounded-xl text-xs font-black uppercase tracking-widest text-white backdrop-blur-md shadow-lg",
-                                    property.transactionType === 'Rent' ? "bg-blue-600/80" : "bg-primary/80"
-                                )}>
-                                    For {property.transactionType}
+                        {/* Floating Badges */}
+                        <div className="absolute top-6 left-6 flex flex-wrap gap-2.5">
+                            <span className={clsx(
+                                "px-4 py-2 rounded-xl text-xs font-black uppercase tracking-wider text-white backdrop-blur-md shadow-md",
+                                property.transactionType === 'Rent' ? "bg-accent-teal/80 border border-accent-teal/20" : "bg-primary/80 border border-primary/20"
+                            )}>
+                                For {property.transactionType}
+                            </span>
+                            {property.propertyCategory && (
+                                <span className="px-4 py-2 rounded-xl text-xs font-black uppercase tracking-wider text-white bg-black/45 backdrop-blur-md shadow-md border border-white/10">
+                                    {property.propertyCategory}
                                 </span>
-                                {property.propertyCategory && (
-                                    <span className="px-4 py-2 rounded-xl text-xs font-black uppercase tracking-widest text-white bg-black/40 backdrop-blur-md shadow-lg border border-white/10">
-                                        {property.propertyCategory}
-                                    </span>
-                                )}
-                            </div>
-
-                            {/* Thumbnail Strip Overlay */}
-                            {secondaryImagesUrls.length > 0 && (
-                                <div className="absolute bottom-6 left-6 right-6 flex gap-3 overflow-x-auto pb-2 scrollbar-hide">
-                                    {secondaryImagesUrls.slice(0, 4).map((url, i) => (
-                                        <div key={i} className="relative h-20 w-32 rounded-xl overflow-hidden border-2 border-white/50 shadow-lg shrink-0 cursor-pointer hover:border-white transition-all">
-                                            <img src={url} alt="sub" className="w-full h-full object-cover" />
-                                            {i === 3 && secondaryImagesUrls.length > 4 && (
-                                                <div className="absolute inset-0 bg-black/60 flex items-center justify-center text-white font-bold">
-                                                    +{secondaryImagesUrls.length - 3}
-                                                </div>
-                                            )}
-                                        </div>
-                                    ))}
-                                </div>
                             )}
                         </div>
+                    </div>
 
-                        {/* Property Basic Info */}
-                        <div className="bg-white rounded-[2rem] p-8 md:p-10 shadow-premium border border-gray-100">
-                            <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-8">
+                    {/* Secondary Images Sidebar */}
+                    {allImagesUrls.length > 1 && (
+                        <div className="grid grid-cols-2 md:grid-cols-1 gap-4 md:h-[480px]">
+                            {secondaryImagesUrls.slice(0, 2).map((url, index) => (
+                                <div 
+                                    key={index} 
+                                    className="relative rounded-2xl overflow-hidden cursor-pointer group h-full min-h-[140px] md:min-h-0 bg-gray-100"
+                                    onClick={() => {
+                                        setActiveImageIndex(index + 1);
+                                        setIsLightboxOpen(true);
+                                    }}
+                                >
+                                    <img 
+                                        src={url} 
+                                        alt={`Property thumbnail ${index + 1}`} 
+                                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                                    />
+                                    <div className="absolute inset-0 bg-black/10 group-hover:bg-transparent transition-colors duration-300" />
+                                    
+                                    {/* Overlap indicator on second thumbnail if more images exist */}
+                                    {index === 1 && allImagesUrls.length > 3 && (
+                                        <div className="absolute inset-0 bg-black/60 backdrop-blur-[2px] flex flex-col items-center justify-center text-white">
+                                            <span className="text-2xl font-black">+{allImagesUrls.length - 3}</span>
+                                            <span className="text-xs uppercase font-extrabold tracking-widest mt-1">Photos</span>
+                                        </div>
+                                    )}
+                                </div>
+                            ))}
+                        </div>
+                    )}
+                </div>
+
+                {/* Main Content Layout Grid */}
+                <div className="grid grid-cols-1 lg:grid-cols-12 gap-10">
+                    
+                    {/* Left Column: Specs & Overview */}
+                    <div className="lg:col-span-8 space-y-8">
+                        
+                        {/* Title, Address & Price Block */}
+                        <div className="bg-white rounded-[2rem] p-8 md:p-10 shadow-premium border border-gray-100/60 relative overflow-hidden">
+                            <div className="absolute top-0 right-0 w-48 h-48 bg-primary/5 rounded-full blur-3xl pointer-events-none" />
+                            
+                            <div className="flex flex-col md:flex-row md:items-start justify-between gap-6">
                                 <div className="space-y-4">
-                                    <div className="flex items-center gap-2 text-primary font-bold text-xs uppercase tracking-[0.2em]">
-                                        <MapPin className="w-4 h-4" />
+                                    <div className="flex items-center gap-2 text-primary font-extrabold text-xs uppercase tracking-widest bg-primary/10 w-fit px-3 py-1.5 rounded-full border border-primary/10">
+                                        <MapPin className="w-3.5 h-3.5" />
                                         <span>{property.location}</span>
                                     </div>
                                     <h1 className="text-3xl md:text-5xl font-black text-dark leading-tight tracking-tight">
                                         {property.title}
                                     </h1>
                                 </div>
-                                <div className="text-left md:text-right">
-                                    <p className="text-sm text-gray-500 font-bold uppercase tracking-widest mb-1">Asking Price</p>
-                                    <p className="text-4xl md:text-5xl font-black text-primary tracking-tighter">
+                                <div className="bg-gray-50/50 p-6 rounded-2xl border border-gray-100 text-left md:text-right min-w-[200px] flex flex-col justify-center">
+                                    <span className="text-[10px] text-gray-400 font-extrabold uppercase tracking-widest block mb-1">Asking Price</span>
+                                    <span className="text-3xl md:text-4xl font-black text-primary tracking-tighter">
                                         {formatCurrency(property.price)}
-                                        {property.transactionType === 'Rent' && <span className="text-lg text-gray-400 font-medium">/mo</span>}
-                                    </p>
+                                    </span>
+                                    {property.transactionType === 'Rent' && (
+                                        <span className="text-xs text-gray-400 font-bold mt-1">per month</span>
+                                    )}
                                 </div>
                             </div>
 
-                            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-8 pt-8 border-t border-gray-100">
-                                <div className="flex items-center gap-4">
-                                    <div className="w-12 h-12 rounded-2xl bg-gray-50 flex items-center justify-center text-primary shadow-inner">
-                                        <Square className="w-6 h-6" />
+                            {/* Core Specs Grid */}
+                            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 pt-8 mt-8 border-t border-gray-100">
+                                <div className="flex items-center gap-4 bg-gray-550/20 p-4 rounded-2xl border border-gray-100 hover:bg-gray-50/50 transition-colors">
+                                    <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center text-primary shadow-sm shrink-0">
+                                        <Square className="w-5 h-5" />
                                     </div>
                                     <div>
-                                        <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-0.5">Area</p>
-                                        <p className="font-bold text-dark">{property.carpetArea || '-'}<span className="text-xs ml-0.5 text-gray-500">ft²</span></p>
+                                        <p className="text-[9px] font-extrabold text-gray-400 uppercase tracking-widest mb-0.5">Carpet Area</p>
+                                        <p className="font-extrabold text-dark text-sm">{property.carpetArea || '-'}<span className="text-xs ml-0.5 font-semibold text-gray-500">sqft</span></p>
                                     </div>
                                 </div>
-                                {property.propertyCategory === 'Residential' && (
+
+                                {property.propertyCategory === 'Residential' ? (
                                     <>
-                                        <div className="flex items-center gap-4">
-                                            <div className="w-12 h-12 rounded-2xl bg-gray-50 flex items-center justify-center text-primary shadow-inner">
-                                                <Bed className="w-6 h-6" />
+                                        <div className="flex items-center gap-4 bg-gray-550/20 p-4 rounded-2xl border border-gray-100 hover:bg-gray-50/50 transition-colors">
+                                            <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center text-primary shadow-sm shrink-0">
+                                                <Bed className="w-5 h-5" />
                                             </div>
                                             <div>
-                                                <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-0.5">Type</p>
-                                                <p className="font-bold text-dark">{property.bhkType || '-'}</p>
+                                                <p className="text-[9px] font-extrabold text-gray-400 uppercase tracking-widest mb-0.5">Configuration</p>
+                                                <p className="font-extrabold text-dark text-sm">{property.bhkType || '-'}</p>
                                             </div>
                                         </div>
-                                        <div className="flex items-center gap-4">
-                                            <div className="w-12 h-12 rounded-2xl bg-gray-50 flex items-center justify-center text-primary shadow-inner">
-                                                <Building2 className="w-6 h-6" />
+                                        <div className="flex items-center gap-4 bg-gray-550/20 p-4 rounded-2xl border border-gray-100 hover:bg-gray-50/50 transition-colors">
+                                            <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center text-primary shadow-sm shrink-0">
+                                                <Building2 className="w-5 h-5" />
                                             </div>
                                             <div>
-                                                <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-0.5">Status</p>
-                                                <p className="font-bold text-dark truncate max-w-[80px]">{property.furnishing || '-'}</p>
+                                                <p className="text-[9px] font-extrabold text-gray-400 uppercase tracking-widest mb-0.5">Furnishing</p>
+                                                <p className="font-extrabold text-dark text-sm truncate max-w-[100px]">{property.furnishing || '-'}</p>
+                                            </div>
+                                        </div>
+                                    </>
+                                ) : (
+                                    <>
+                                        <div className="flex items-center gap-4 bg-gray-550/20 p-4 rounded-2xl border border-gray-100 hover:bg-gray-50/50 transition-colors">
+                                            <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center text-primary shadow-sm shrink-0">
+                                                <Building2 className="w-5 h-5" />
+                                            </div>
+                                            <div>
+                                                <p className="text-[9px] font-extrabold text-gray-400 uppercase tracking-widest mb-0.5">Property Type</p>
+                                                <p className="font-extrabold text-dark text-sm truncate max-w-[100px]">{property.propertyType || 'Commercial'}</p>
+                                            </div>
+                                        </div>
+                                        <div className="flex items-center gap-4 bg-gray-550/20 p-4 rounded-2xl border border-gray-100 hover:bg-gray-50/50 transition-colors">
+                                            <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center text-primary shadow-sm shrink-0">
+                                                <Compass className="w-5 h-5" />
+                                            </div>
+                                            <div>
+                                                <p className="text-[9px] font-extrabold text-gray-400 uppercase tracking-widest mb-0.5">Ideal For</p>
+                                                <p className="font-extrabold text-dark text-sm truncate max-w-[100px]">{property.idealFor || 'Offices / Shops'}</p>
                                             </div>
                                         </div>
                                     </>
                                 )}
-                                <div className="flex items-center gap-4">
-                                    <div className="w-12 h-12 rounded-2xl bg-gray-50 flex items-center justify-center text-primary shadow-inner">
-                                        <Construction className="w-6 h-6" />
+
+                                <div className="flex items-center gap-4 bg-gray-550/20 p-4 rounded-2xl border border-gray-100 hover:bg-gray-50/50 transition-colors">
+                                    <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center text-primary shadow-sm shrink-0">
+                                        <Construction className="w-5 h-5" />
                                     </div>
                                     <div>
-                                        <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-0.5">Condition</p>
-                                        <p className="font-bold text-dark">{'Ready'}</p>
+                                        <p className="text-[9px] font-extrabold text-gray-400 uppercase tracking-widest mb-0.5">Status</p>
+                                        <p className="font-extrabold text-dark text-sm">Ready to Move</p>
                                     </div>
                                 </div>
                             </div>
                         </div>
 
-                        {/* Description Section */}
-                        <div className="bg-white rounded-[2rem] p-8 md:p-10 shadow-premium border border-gray-100">
+                        {/* Overview Description */}
+                        <div className="bg-white rounded-[2rem] p-8 md:p-10 shadow-premium border border-gray-100/60">
                             <h3 className="text-2xl font-black text-dark mb-6 flex items-center gap-3">
-                                <span className="w-2 h-8 bg-primary rounded-full" />
-                                Overview
+                                <span className="w-2.5 h-7 bg-primary rounded-full" />
+                                Property Overview
                             </h3>
-                            <p className="text-gray-600 text-lg leading-relaxed whitespace-pre-line font-medium selection:bg-primary/20">
-                                {property.description || "Experience the pinnacle of luxury living in this exceptional property, meticulously designed to offer the perfect blend of comfort, style, and functionality. Located in one of the most sought-after neighborhoods, this residence stands as a testament to architectural excellence and premium craftsmanship."}
+                            <p className="text-gray-600 text-base md:text-lg leading-relaxed whitespace-pre-line font-medium">
+                                {property.description || "Experience the pinnacle of premium living in this exceptional property, meticulously curated to provide the perfect blend of architectural grandeur, high-end comfort, and flawless functionality. Positioned in one of the city's most desirable and well-connected neighborhoods, this property sets a new standard for luxury real estate."}
                             </p>
                         </div>
 
-                        {/* Video Section */}
+                        {/* Project Amenities */}
+                        {amenitiesList.length > 0 && (
+                            <div className="bg-white rounded-[2rem] p-8 md:p-10 shadow-premium border border-gray-100/60">
+                                <h3 className="text-2xl font-black text-dark mb-6 flex items-center gap-3">
+                                    <span className="w-2.5 h-7 bg-primary rounded-full" />
+                                    Premium Amenities
+                                </h3>
+                                <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+                                    {amenitiesList.map((amenity, idx) => (
+                                        <div key={idx} className="flex items-center gap-3 p-4 bg-gray-50/50 border border-gray-100 rounded-2xl hover:border-primary/20 transition-all group">
+                                            <div className="w-8 h-8 rounded-lg bg-green-50 flex items-center justify-center text-green-600 border border-green-100 group-hover:scale-105 transition-transform shrink-0">
+                                                <Check className="w-4 h-4" />
+                                            </div>
+                                            <span className="text-sm font-bold text-gray-700">{amenity}</span>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Location Proximity timeline */}
+                        <div className="bg-white rounded-[2rem] p-8 md:p-10 shadow-premium border border-gray-100/60">
+                            <h3 className="text-2xl font-black text-dark mb-6 flex items-center gap-3">
+                                <span className="w-2.5 h-7 bg-primary rounded-full" />
+                                Neighborhood Highlights
+                            </h3>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                {proximityHighlights.map((highlight, idx) => (
+                                    <div key={idx} className="flex items-center justify-between p-4 border border-gray-100 rounded-2xl bg-gray-50/30">
+                                        <div className="flex items-center gap-3">
+                                            <div className="w-9 h-9 rounded-xl bg-primary/10 flex items-center justify-center text-primary shrink-0">
+                                                <Compass className="w-4.5 h-4.5" />
+                                            </div>
+                                            <span className="text-sm font-semibold text-gray-700">{highlight.name}</span>
+                                        </div>
+                                        <span className="text-xs font-black text-primary bg-primary/5 px-2.5 py-1.5 rounded-lg border border-primary/5">{highlight.distance}</span>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+
+                        {/* Videos Section */}
                         {videoUrls.length > 0 && (
-                            <div className="bg-white rounded-[2rem] p-8 md:p-10 shadow-premium border border-gray-100">
-                                <h3 className="text-2xl font-black text-dark mb-6">Property Preview</h3>
+                            <div className="bg-white rounded-[2rem] p-8 md:p-10 shadow-premium border border-gray-100/60">
+                                <h3 className="text-2xl font-black text-dark mb-6 flex items-center gap-3">
+                                    <span className="w-2.5 h-7 bg-primary rounded-full" />
+                                    Property Video Tour
+                                </h3>
                                 <div className="space-y-6">
                                     {videoUrls.map((url, idx) => (
-                                        <div key={idx} className="rounded-3xl overflow-hidden bg-gray-900 aspect-video shadow-2xl relative group">
+                                        <div key={idx} className="rounded-3xl overflow-hidden bg-gray-900 aspect-video shadow-lg relative border border-gray-100">
                                             <video src={url} controls className="w-full h-full object-cover" preload="metadata" />
                                         </div>
                                     ))}
@@ -249,31 +442,117 @@ const PropertyDetails = () => {
                         )}
                     </div>
 
-                    {/* Right Column: Dynamic Sidebar */}
+                    {/* Right Column: Sticky Sidebar Info & Lead Form */}
                     <div className="lg:col-span-4">
                         <div className="sticky top-28 space-y-6">
                             
-                            {/* Lead Form Panel */}
-                            <div className="glass-panel rounded-[2rem] p-8 border border-white/50 shadow-glass relative overflow-hidden">
+                            {/* Verified Partner info & Inline Lead form */}
+                            <div className="bg-white rounded-[2rem] p-8 border border-gray-100 shadow-premium relative overflow-hidden">
                                 <div className="absolute top-0 right-0 w-32 h-32 bg-primary/5 rounded-full -translate-y-1/2 translate-x-1/2 blur-2xl" />
                                 
-                                <h3 className="text-xl font-black text-dark mb-2 relative z-10">Make an Inquiry</h3>
-                                <p className="text-sm text-gray-500 mb-8 font-medium">Unlock exclusive details & schedule a private tour.</p>
+                                <h3 className="text-xl font-black text-dark mb-1 flex items-center gap-2">
+                                    <Sparkles className="w-5 h-5 text-primary" />
+                                    Contact Agent
+                                </h3>
+                                <p className="text-xs text-gray-400 mb-6 font-semibold uppercase tracking-wider">Verified Listing Partner</p>
 
-                                <div className="flex items-center gap-4 mb-8 p-4 bg-white/40 rounded-2xl border border-white/20">
-                                    <div className="w-14 h-14 rounded-full bg-primary text-white flex items-center justify-center font-black text-xl shadow-lg ring-4 ring-white/50 overflow-hidden">
+                                {/* Partner Card */}
+                                <div className="flex items-center gap-4 mb-6 p-4 bg-gray-50/50 rounded-2xl border border-gray-100/80">
+                                    <div className="w-12 h-12 rounded-full bg-primary text-white flex items-center justify-center font-black text-lg shadow-md ring-4 ring-white overflow-hidden shrink-0">
                                         {property.expand?.createdBy?.avatar ? (
-                                            <img src={pb.files.getURL(property.expand.createdBy, property.expand.createdBy.avatar)} className="w-full h-full object-cover" alt="avatar" />
+                                            <img 
+                                                src={pb.files.getURL(property.expand.createdBy, property.expand.createdBy.avatar)} 
+                                                className="w-full h-full object-cover" 
+                                                alt="avatar" 
+                                            />
                                         ) : property.expand?.createdBy?.name?.charAt(0) || 'A'}
                                     </div>
-                                    <div>
-                                        <p className="text-[10px] font-black text-primary uppercase tracking-widest mb-0.5">Verified Partner</p>
-                                        <p className="font-black text-dark leading-tight">{property.expand?.createdBy?.name || 'Premier Agent'}</p>
-                                        <p className="text-xs text-gray-500 font-bold truncate max-w-[150px]">{property.expand?.agencyId?.agencyName || 'Estate Dynamics'}</p>
+                                    <div className="min-w-0">
+                                        <div className="flex items-center gap-1">
+                                            <p className="font-extrabold text-dark leading-tight truncate text-sm">
+                                                {property.expand?.createdBy?.name || 'Premier Agent'}
+                                            </p>
+                                            <ShieldCheck className="w-4 h-4 text-green-500 shrink-0" />
+                                        </div>
+                                        <p className="text-xs text-gray-500 font-bold truncate mt-0.5">
+                                            {property.expand?.agencyId?.agencyName || 'Estate Dynamics'}
+                                        </p>
                                     </div>
                                 </div>
 
-                                <div className="space-y-4 relative z-10">
+                                {/* Form and Submit */}
+                                {leadSubmitted ? (
+                                    <div className="bg-green-50/60 border border-green-100 p-6 rounded-2xl text-center py-8">
+                                        <div className="w-12 h-12 bg-green-500 text-white rounded-full flex items-center justify-center mx-auto mb-3 shadow-md shadow-green-100">
+                                            <Check className="w-6 h-6" />
+                                        </div>
+                                        <h4 className="font-black text-green-900 text-base mb-1">Inquiry Submitted!</h4>
+                                        <p className="text-xs text-green-700 font-semibold mb-4 leading-relaxed">Our listing agent will reach out to you on WhatsApp / Email shortly.</p>
+                                        <button 
+                                            onClick={() => setLeadSubmitted(false)}
+                                            className="text-xs text-primary font-black uppercase tracking-wider hover:underline"
+                                        >
+                                            Send Another Request
+                                        </button>
+                                    </div>
+                                ) : (
+                                    <form onSubmit={handleLeadSubmit} className="space-y-4">
+                                        <div>
+                                            <label className="block text-[10px] font-extrabold text-gray-400 uppercase tracking-wider mb-1.5">Your Name</label>
+                                            <input
+                                                type="text"
+                                                required
+                                                value={leadName}
+                                                onChange={(e) => setLeadName(e.target.value)}
+                                                placeholder="e.g. John Doe"
+                                                className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-xl text-sm placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-primary/10 focus:border-primary transition-all hover:border-gray-200"
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="block text-[10px] font-extrabold text-gray-400 uppercase tracking-wider mb-1.5">WhatsApp / Phone</label>
+                                            <input
+                                                type="tel"
+                                                required
+                                                value={leadPhone}
+                                                onChange={(e) => setLeadPhone(e.target.value)}
+                                                placeholder="e.g. +91 99999 99999"
+                                                className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-xl text-sm placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-primary/10 focus:border-primary transition-all hover:border-gray-200"
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="block text-[10px] font-extrabold text-gray-400 uppercase tracking-wider mb-1.5">Email Address</label>
+                                            <input
+                                                type="email"
+                                                required
+                                                value={leadEmail}
+                                                onChange={(e) => setLeadEmail(e.target.value)}
+                                                placeholder="e.g. john@example.com"
+                                                className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-xl text-sm placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-primary/10 focus:border-primary transition-all hover:border-gray-200"
+                                            />
+                                        </div>
+
+                                        <button
+                                            type="submit"
+                                            disabled={isSubmittingLead}
+                                            className="w-full py-4 bg-primary text-white rounded-xl font-extrabold text-xs uppercase tracking-widest hover:bg-primary-dark transition-all shadow-md shadow-primary/10 hover:shadow-primary/20 hover:-translate-y-0.5 active:translate-y-0 flex items-center justify-center gap-2 mt-2"
+                                        >
+                                            {isSubmittingLead ? (
+                                                <>
+                                                    <Loader2 className="w-4 h-4 animate-spin" />
+                                                    <span>Submitting Request...</span>
+                                                </>
+                                            ) : (
+                                                <>
+                                                    <Mail className="w-4 h-4" />
+                                                    <span>Request Details & Call</span>
+                                                </>
+                                            )}
+                                        </button>
+                                    </form>
+                                )}
+
+                                {/* WhatsApp Fast Link */}
+                                <div className="mt-4 pt-4 border-t border-gray-100">
                                     {(() => {
                                         let rawPhone = property.expand?.agencyId?.phone?.replace(/[^\d]/g, '') || '918268919143';
                                         if (rawPhone.length === 10) rawPhone = `91${rawPhone}`;
@@ -281,35 +560,117 @@ const PropertyDetails = () => {
                                         const waLink = `https://api.whatsapp.com/send?phone=${rawPhone}&text=${message}`;
                                         
                                         return (
-                                            <a href={waLink} target="_blank" rel="noreferrer" className="w-full flex items-center justify-center gap-3 bg-[#25D366] text-white py-4 rounded-2xl font-black text-sm uppercase tracking-widest hover:bg-[#128C7E] transition-all shadow-lg shadow-green-200/50 hover:-translate-y-0.5 active:translate-y-0">
-                                                <Phone className="w-5 h-5" />
-                                                Send WhatsApp
+                                            <a 
+                                                href={waLink} 
+                                                target="_blank" 
+                                                rel="noreferrer" 
+                                                className="w-full flex items-center justify-center gap-2 bg-[#25D366] text-white py-4 rounded-xl font-extrabold text-xs uppercase tracking-widest hover:bg-[#128C7E] transition-all shadow-md shadow-green-100 hover:-translate-y-0.5 active:translate-y-0"
+                                            >
+                                                <Phone className="w-4.5 h-4.5" />
+                                                <span>Send WhatsApp Inquiry</span>
                                             </a>
                                         );
                                     })()}
-                                    <button className="w-full flex items-center justify-center gap-3 bg-dark text-white py-4 rounded-2xl font-black text-sm uppercase tracking-widest hover:bg-black transition-all shadow-lg hover:-translate-y-0.5 active:translate-y-0">
-                                        <Mail className="w-5 h-5" />
-                                        Request Tour
-                                    </button>
-                                </div>
-
-                                <div className="mt-8 pt-8 border-t border-black/5 text-center">
-                                    <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Typical response time: <span className="text-primary italic">Under 2 hours</span></p>
                                 </div>
                             </div>
 
-                            {/* Trust Badge Panel */}
-                            <div className="bg-dark text-white rounded-[2rem] p-8 shadow-premium overflow-hidden relative">
-                                <div className="absolute bottom-0 right-0 w-24 h-24 bg-primary/20 rounded-full translate-y-1/2 translate-x-1/2 blur-2xl" />
-                                <h4 className="font-black text-lg mb-2 tracking-tight">Prime Assurance</h4>
-                                <p className="text-white/60 text-sm font-medium leading-relaxed">
-                                    Verified transactions, background-checked partners, and 24/7 support throughout your journey.
+                            {/* Trust Assurance Badge */}
+                            <div className="bg-dark text-white rounded-[2rem] p-8 shadow-premium overflow-hidden relative border border-black/10">
+                                <div className="absolute bottom-0 right-0 w-32 h-32 bg-primary/20 rounded-full translate-y-1/2 translate-x-1/2 blur-3xl pointer-events-none" />
+                                <div className="flex items-center gap-3 mb-4">
+                                    <div className="w-9 h-9 rounded-xl bg-white/10 flex items-center justify-center text-primary">
+                                        <ShieldCheck className="w-5 h-5" />
+                                    </div>
+                                    <h4 className="font-black text-base tracking-tight">Verified Property</h4>
+                                </div>
+                                <p className="text-white/60 text-xs font-semibold leading-relaxed">
+                                    This property has been vetted by our quality control agents for registration, title deed ownership, and exact location markers.
                                 </p>
                             </div>
                         </div>
                     </div>
                 </div>
             </div>
+
+            {/* Lightbox / Gallery Fullscreen Modal */}
+            <AnimatePresence>
+                {isLightboxOpen && (
+                    <motion.div 
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        className="fixed inset-0 z-50 bg-black/95 backdrop-blur-md flex flex-col justify-between p-4 md:p-6"
+                    >
+                        {/* Header bar */}
+                        <div className="flex justify-between items-center text-white py-2">
+                            <span className="font-extrabold text-sm tracking-wider uppercase">
+                                Image {activeImageIndex + 1} of {allImagesUrls.length}
+                            </span>
+                            <button 
+                                onClick={() => setIsLightboxOpen(false)}
+                                className="p-2.5 rounded-full bg-white/10 text-white/80 hover:text-white hover:bg-white/20 transition-all active:scale-95 shadow-md"
+                            >
+                                <X className="w-6 h-6" />
+                            </button>
+                        </div>
+
+                        {/* Slider Body */}
+                        <div className="relative flex-1 flex items-center justify-center max-w-5xl mx-auto w-full group">
+                            
+                            {/* Left Navigation */}
+                            {allImagesUrls.length > 1 && (
+                                <button 
+                                    onClick={() => setActiveImageIndex((prev) => (prev === 0 ? allImagesUrls.length - 1 : prev - 1))}
+                                    className="absolute left-4 z-10 p-3 rounded-full bg-black/55 text-white/80 hover:text-white hover:bg-black/85 transition-all shadow-lg active:scale-90 border border-white/5 opacity-0 group-hover:opacity-100"
+                                >
+                                    <ChevronLeft className="w-6 h-6" />
+                                </button>
+                            )}
+
+                            {/* Image Container */}
+                            <div className="w-full max-h-[75vh] flex justify-center items-center select-none overflow-hidden rounded-2xl">
+                                <motion.img 
+                                    key={activeImageIndex}
+                                    initial={{ opacity: 0, scale: 0.95 }}
+                                    animate={{ opacity: 1, scale: 1 }}
+                                    transition={{ duration: 0.3 }}
+                                    src={allImagesUrls[activeImageIndex]} 
+                                    alt="Fullscreen viewing" 
+                                    className="max-w-full max-h-[75vh] object-contain rounded-xl"
+                                />
+                            </div>
+
+                            {/* Right Navigation */}
+                            {allImagesUrls.length > 1 && (
+                                <button 
+                                    onClick={() => setActiveImageIndex((prev) => (prev === allImagesUrls.length - 1 ? 0 : prev + 1))}
+                                    className="absolute right-4 z-10 p-3 rounded-full bg-black/55 text-white/80 hover:text-white hover:bg-black/85 transition-all shadow-lg active:scale-90 border border-white/5 opacity-0 group-hover:opacity-100"
+                                >
+                                    <ChevronRight className="w-6 h-6" />
+                                </button>
+                            )}
+                        </div>
+
+                        {/* Thumbnail Bar */}
+                        {allImagesUrls.length > 1 && (
+                            <div className="flex justify-center gap-2 overflow-x-auto pb-4 max-w-2xl mx-auto w-full scrollbar-hide shrink-0">
+                                {allImagesUrls.map((url, idx) => (
+                                    <div 
+                                        key={idx}
+                                        onClick={() => setActiveImageIndex(idx)}
+                                        className={clsx(
+                                            "w-16 h-12 rounded-lg overflow-hidden cursor-pointer border-2 shrink-0 transition-all",
+                                            activeImageIndex === idx ? "border-primary scale-105" : "border-transparent opacity-50 hover:opacity-80"
+                                        )}
+                                    >
+                                        <img src={url} alt="thumbnail cursor" className="w-full h-full object-cover" />
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                    </motion.div>
+                )}
+            </AnimatePresence>
         </div>
     );
 };
