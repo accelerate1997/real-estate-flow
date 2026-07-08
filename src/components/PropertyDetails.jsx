@@ -305,68 +305,68 @@ const PropertyDetails = () => {
                             </div>
 
                             {/* Core Specs Grid */}
-                            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 pt-8 mt-8 border-t border-gray-100">
-                                <div className="flex items-center gap-4 bg-gray-550/20 p-4 rounded-2xl border border-gray-100 hover:bg-gray-50/50 transition-colors">
-                                    <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center text-primary shadow-sm shrink-0">
-                                        <Square className="w-5 h-5" />
+                            <div className="grid grid-cols-2 md:grid-cols-4 gap-3.5 pt-8 mt-8 border-t border-gray-100">
+                                <div className="flex items-center gap-3 bg-gray-550/20 p-3 rounded-2xl border border-gray-100 hover:bg-white hover:border-primary/20 hover:shadow-sm transition-all duration-300">
+                                    <div className="w-9 h-9 rounded-xl bg-primary/5 flex items-center justify-center text-primary shrink-0">
+                                        <Square className="w-4 h-4" />
                                     </div>
-                                    <div>
-                                        <p className="text-[9px] font-extrabold text-gray-400 uppercase tracking-widest mb-0.5">Carpet Area</p>
-                                        <p className="font-extrabold text-dark text-sm">{property.carpetArea || '-'}<span className="text-xs ml-0.5 font-semibold text-gray-500">sqft</span></p>
+                                    <div className="min-w-0">
+                                        <p className="text-[9px] font-bold text-gray-400 uppercase tracking-wider leading-none mb-1">Carpet Area</p>
+                                        <p className="font-extrabold text-dark text-xs truncate">{property.carpetArea || '-'}<span className="text-[10px] ml-0.5 font-normal text-gray-500">sqft</span></p>
                                     </div>
                                 </div>
 
                                 {property.propertyCategory === 'Residential' ? (
                                     <>
-                                        <div className="flex items-center gap-4 bg-gray-550/20 p-4 rounded-2xl border border-gray-100 hover:bg-gray-50/50 transition-colors">
-                                            <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center text-primary shadow-sm shrink-0">
-                                                <Bed className="w-5 h-5" />
+                                        <div className="flex items-center gap-3 bg-gray-550/20 p-3 rounded-2xl border border-gray-100 hover:bg-white hover:border-primary/20 hover:shadow-sm transition-all duration-300">
+                                            <div className="w-9 h-9 rounded-xl bg-primary/5 flex items-center justify-center text-primary shrink-0">
+                                                <Bed className="w-4.5 h-4.5" />
                                             </div>
-                                            <div>
-                                                <p className="text-[9px] font-extrabold text-gray-400 uppercase tracking-widest mb-0.5">Configuration</p>
-                                                <p className="font-extrabold text-dark text-sm">{property.bhkType || '-'}</p>
+                                            <div className="min-w-0">
+                                                <p className="text-[9px] font-bold text-gray-400 uppercase tracking-wider leading-none mb-1">Configuration</p>
+                                                <p className="font-extrabold text-dark text-xs truncate">{property.bhkType || '-'}</p>
                                             </div>
                                         </div>
-                                        <div className="flex items-center gap-4 bg-gray-550/20 p-4 rounded-2xl border border-gray-100 hover:bg-gray-50/50 transition-colors">
-                                            <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center text-primary shadow-sm shrink-0">
-                                                <Building2 className="w-5 h-5" />
+                                        <div className="flex items-center gap-3 bg-gray-550/20 p-3 rounded-2xl border border-gray-100 hover:bg-white hover:border-primary/20 hover:shadow-sm transition-all duration-300">
+                                            <div className="w-9 h-9 rounded-xl bg-primary/5 flex items-center justify-center text-primary shrink-0">
+                                                <Building2 className="w-4.5 h-4.5" />
                                             </div>
-                                            <div>
-                                                <p className="text-[9px] font-extrabold text-gray-400 uppercase tracking-widest mb-0.5">Furnishing</p>
-                                                <p className="font-extrabold text-dark text-sm truncate max-w-[100px]">{property.furnishing || '-'}</p>
+                                            <div className="min-w-0">
+                                                <p className="text-[9px] font-bold text-gray-400 uppercase tracking-wider leading-none mb-1">Furnishing</p>
+                                                <p className="font-extrabold text-dark text-xs truncate">{property.furnishing || '-'}</p>
                                             </div>
                                         </div>
                                     </>
                                 ) : (
                                     <>
-                                        <div className="flex items-center gap-4 bg-gray-550/20 p-4 rounded-2xl border border-gray-100 hover:bg-gray-50/50 transition-colors">
-                                            <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center text-primary shadow-sm shrink-0">
-                                                <Building2 className="w-5 h-5" />
+                                        <div className="flex items-center gap-3 bg-gray-550/20 p-3 rounded-2xl border border-gray-100 hover:bg-white hover:border-primary/20 hover:shadow-sm transition-all duration-300">
+                                            <div className="w-9 h-9 rounded-xl bg-primary/5 flex items-center justify-center text-primary shrink-0">
+                                                <Building2 className="w-4.5 h-4.5" />
                                             </div>
-                                            <div>
-                                                <p className="text-[9px] font-extrabold text-gray-400 uppercase tracking-widest mb-0.5">Property Type</p>
-                                                <p className="font-extrabold text-dark text-sm truncate max-w-[100px]">{property.propertyType || 'Commercial'}</p>
+                                            <div className="min-w-0">
+                                                <p className="text-[9px] font-bold text-gray-400 uppercase tracking-wider leading-none mb-1">Property Type</p>
+                                                <p className="font-extrabold text-dark text-xs truncate">{property.propertyType || 'Commercial'}</p>
                                             </div>
                                         </div>
-                                        <div className="flex items-center gap-4 bg-gray-550/20 p-4 rounded-2xl border border-gray-100 hover:bg-gray-50/50 transition-colors">
-                                            <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center text-primary shadow-sm shrink-0">
-                                                <Compass className="w-5 h-5" />
+                                        <div className="flex items-center gap-3 bg-gray-550/20 p-3 rounded-2xl border border-gray-100 hover:bg-white hover:border-primary/20 hover:shadow-sm transition-all duration-300">
+                                            <div className="w-9 h-9 rounded-xl bg-primary/5 flex items-center justify-center text-primary shrink-0">
+                                                <Compass className="w-4.5 h-4.5" />
                                             </div>
-                                            <div>
-                                                <p className="text-[9px] font-extrabold text-gray-400 uppercase tracking-widest mb-0.5">Ideal For</p>
-                                                <p className="font-extrabold text-dark text-sm truncate max-w-[100px]">{property.idealFor || 'Offices / Shops'}</p>
+                                            <div className="min-w-0">
+                                                <p className="text-[9px] font-bold text-gray-400 uppercase tracking-wider leading-none mb-1">Ideal For</p>
+                                                <p className="font-extrabold text-dark text-xs truncate">{property.idealFor || 'Offices / Shops'}</p>
                                             </div>
                                         </div>
                                     </>
                                 )}
 
-                                <div className="flex items-center gap-4 bg-gray-550/20 p-4 rounded-2xl border border-gray-100 hover:bg-gray-50/50 transition-colors">
-                                    <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center text-primary shadow-sm shrink-0">
-                                        <Construction className="w-5 h-5" />
+                                <div className="flex items-center gap-3 bg-gray-550/20 p-3 rounded-2xl border border-gray-100 hover:bg-white hover:border-primary/20 hover:shadow-sm transition-all duration-300">
+                                    <div className="w-9 h-9 rounded-xl bg-primary/5 flex items-center justify-center text-primary shrink-0">
+                                        <Construction className="w-4.5 h-4.5" />
                                     </div>
-                                    <div>
-                                        <p className="text-[9px] font-extrabold text-gray-400 uppercase tracking-widest mb-0.5">Status</p>
-                                        <p className="font-extrabold text-dark text-sm">Ready to Move</p>
+                                    <div className="min-w-0">
+                                        <p className="text-[9px] font-bold text-gray-400 uppercase tracking-wider leading-none mb-1">Status</p>
+                                        <p className="font-extrabold text-dark text-xs truncate">Ready to Move</p>
                                     </div>
                                 </div>
                             </div>
@@ -390,13 +390,13 @@ const PropertyDetails = () => {
                                     <span className="w-2.5 h-7 bg-primary rounded-full" />
                                     Premium Amenities
                                 </h3>
-                                <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+                                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                                     {amenitiesList.map((amenity, idx) => (
-                                        <div key={idx} className="flex items-center gap-3 p-4 bg-gray-50/50 border border-gray-100 rounded-2xl hover:border-primary/20 transition-all group">
-                                            <div className="w-8 h-8 rounded-lg bg-green-50 flex items-center justify-center text-green-600 border border-green-100 group-hover:scale-105 transition-transform shrink-0">
-                                                <Check className="w-4 h-4" />
+                                        <div key={idx} className="flex items-center gap-2.5 p-2.5 bg-gray-50/50 border border-gray-100 rounded-xl hover:border-primary/20 hover:bg-white transition-all group">
+                                            <div className="w-6 h-6 rounded-md bg-green-50 flex items-center justify-center text-green-600 shrink-0">
+                                                <Check className="w-3.5 h-3.5" />
                                             </div>
-                                            <span className="text-sm font-bold text-gray-700">{amenity}</span>
+                                            <span className="text-xs font-semibold text-gray-700 truncate">{amenity}</span>
                                         </div>
                                     ))}
                                 </div>
