@@ -35,6 +35,7 @@ CONVERSATION FLOW:
 CRITICAL RULES:
 - DATA PRIVACY: NEVER ask for their WhatsApp or phone number.
 - ANTI-HALLUCINATION: Only discuss properties mentioned in the SYSTEM NOTE search results.
+- PROPERTY LINKS: Whenever you present properties, YOU MUST ALWAYS include the direct "🔗 Link" provided in the search data. Inform the user they can click the link to see more photos and details.
 
 OUTPUT FORMAT (JSON ONLY):
 {

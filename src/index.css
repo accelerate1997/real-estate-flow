@@ -1,3 +1,5 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Outfit:wght@400;500;600;700&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -13,20 +15,133 @@
   h1, h2, h3, h4, h5, h6 {
     @apply font-display;
   }
+  ::selection {
+    @apply bg-primary/20 text-primary-dark;
+  }
 }
 
 @layer components {
   .glass-panel {
-    @apply bg-white/70 backdrop-blur-md border border-white/20 shadow-glass;
+    @apply bg-white/70 backdrop-blur-xl border border-white/20 shadow-glass;
   }
-  .glass-dark {
-    @apply bg-black/40 backdrop-blur-lg border border-white/10 shadow-xl;
+  .glass-panel-dark {
+    @apply bg-black/40 backdrop-blur-xl border border-white/10 shadow-xl;
+  }
+  .glass-card {
+    @apply bg-white/80 backdrop-blur-xl border border-white/30 shadow-premium rounded-2xl;
   }
   .section-padding {
     @apply py-16 md:py-24;
   }
   .container-custom {
     @apply max-w-7xl mx-auto px-4 sm:px-6 lg:px-8;
+  }
+  .btn-primary {
+    @apply inline-flex items-center justify-center gap-2 bg-primary text-white px-8 py-3.5 rounded-full font-semibold text-base
+           hover:bg-primary-dark transition-all duration-300 shadow-lg shadow-primary/20
+           hover:shadow-primary/30 hover:-translate-y-0.5 focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2;
+  }
+  .btn-secondary {
+    @apply inline-flex items-center justify-center gap-2 bg-white text-text px-8 py-3.5 rounded-full font-semibold text-base
+           hover:bg-gray-50 transition-all duration-300 shadow-xl hover:shadow-white/50
+           hover:-translate-y-0.5 focus:outline-none focus:ring-2 focus:ring-white focus:ring-offset-2;
+  }
+  .btn-saathi {
+    @apply inline-flex items-center justify-center gap-2 bg-primary/20 backdrop-blur-md border border-white/30 text-white px-8 py-3.5 rounded-full font-semibold text-base
+           hover:bg-primary/30 transition-all duration-300 shadow-2xl w-full sm:w-auto justify-center;
+  }
+  .btn-saathi-pulse {
+    @apply relative before:absolute before:inset-0 before:rounded-full before:bg-primary/40 before:animate-ping before:opacity-75;
+  }
+  .property-badge {
+    @apply inline-flex items-center gap-1 text-[10px] uppercase tracking-widest font-bold px-3 py-1.5 rounded-full shadow-lg;
+  }
+  .badge-residential {
+    @apply bg-primary/90 backdrop-blur-md text-white;
+  }
+  .badge-commercial {
+    @apply bg-accent-teal/90 backdrop-blur-md text-white;
+  }
+  .badge-rent {
+    @apply bg-accent-teal/80 backdrop-blur-md text-white;
+  }
+  .badge-sale {
+    @apply bg-primary/80 backdrop-blur-md text-white;
+  }
+  .property-feature {
+    @apply flex flex-col gap-1;
+  }
+  .property-feature-label {
+    @apply flex items-center gap-1.5 text-text-muted text-[10px] uppercase tracking-wider font-semibold;
+  }
+  .property-feature-value {
+    @apply text-sm font-bold text-text;
+  }
+  .property-price-label {
+    @apply text-[10px] text-text-light uppercase tracking-widest font-bold block mb-0.5;
+  }
+  .property-price-value {
+    @apply text-xl font-display font-bold text-text;
+  }
+  .lead-badge {
+    @apply inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-bold uppercase tracking-wider;
+  }
+  .lead-badge-new { @apply bg-primary/10 text-primary; }
+  .lead-badge-contacted { @apply bg-accent-teal/10 text-accent-teal; }
+  .lead-badge-qualified { @apply bg-green-500/10 text-green-600; }
+  .lead-badge-negotiating { @apply bg-amber-500/10 text-amber-600; }
+  .lead-badge-closed { @apply bg-gray-500/10 text-gray-600; }
+  .lead-badge-lost { @apply bg-red-500/10 text-red-600; }
+  .input-field {
+    @apply w-full px-4 py-3.5 bg-white border border-gray-200 rounded-xl text-text placeholder:text-text-light
+           focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all duration-200;
+  }
+  .label-field {
+    @apply block text-label-bold text-text-muted mb-1.5;
+  }
+  .card-hover {
+    @apply transition-all duration-500 hover:-translate-y-2 hover:shadow-premium;
+  }
+  .text-gradient-primary {
+    @apply bg-gradient-to-r from-primary to-primary-dark bg-clip-text text-transparent;
+  }
+  .text-gradient-teal {
+    @apply bg-gradient-to-r from-accent-teal to-accent-teal-dark bg-clip-text text-transparent;
+  }
+  .hero-gradient {
+    @apply bg-gradient-to-br from-primary via-primary-dark to-accent-teal;
+  }
+}
+
+@layer utilities {
+  .text-balance {
+    text-wrap: balance;
+  }
+  .animate-in {
+    animation: animateIn 0.6s ease-out forwards;
+  }
+  @keyframes animateIn {
+    from { opacity: 0; transform: translateY(20px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  .animate-in-delay-1 { animation-delay: 100ms; }
+  .animate-in-delay-2 { animation-delay: 200ms; }
+  .animate-in-delay-3 { animation-delay: 300ms; }
+  .animate-in-delay-4 { animation-delay: 400ms; }
+  .animate-in-delay-5 { animation-delay: 500ms; }
+
+  /* Marquee animation for partners */
+  @keyframes marquee {
+    0% { transform: translateX(0); }
+    100% { transform: translateX(-50%); }
+  }
+  .animate-marquee {
+    animation: marquee 30s linear infinite;
+    width: max-content;
+    display: flex;
+  }
+  .animate-marquee:hover {
+    animation-play-state: paused;
   }
 }
 
@@ -43,4 +158,42 @@
 }
 ::-webkit-scrollbar-thumb:hover {
   background: #94a3b8;
+}
+
+/* Framer motion reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* Glassmorphism utilities */
+.glass-morphism {
+  background: rgba(255, 255, 255, 0.7);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+.glass-morphism-dark {
+  background: rgba(10, 10, 10, 0.4);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+/* Marquee Animation */
+@keyframes marquee {
+  0% { transform: translateX(0); }
+  100% { transform: translateX(-50%); }
+}
+.animate-marquee {
+  animation: marquee 30s linear infinite;
+  width: max-content;
+  display: flex;
+}
+.animate-marquee:hover {
+  animation-play-state: paused;
 }

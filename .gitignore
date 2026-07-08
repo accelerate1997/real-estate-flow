@@ -31,3 +31,8 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Hardcoded test/fix scripts containing secrets
+test-users.js
+whatsapp-agent/fix_lead_seq.js
+
