@@ -17,6 +17,8 @@ services:
       context: ./whatsapp-agent
       dockerfile: Dockerfile
     restart: always
+    volumes:
+      - whatsapp_uploads:/app/uploads
     environment:
       - OPENAI_API_KEY=${OPENAI_API_KEY}
       - POCKETBASE_URL=${POCKETBASE_URL}
@@ -28,5 +30,9 @@ services:
       - VITE_APP_URL=${VITE_APP_URL}
       - PORT=${PORT}
       - DATABASE_URL=${DATABASE_URL}
+
+volumes:
+  whatsapp_uploads:
+
 
 
