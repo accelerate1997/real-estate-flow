@@ -12,6 +12,7 @@ const { pool, initDB, autoMigrateIfEmpty } = require('./database/db');
 const { processMessage } = require('./openai_service');
 const { sendMessage } = require('./evolution');
 const followupEngine = require('./followup_engine');
+const { uploadToR2 } = require('./database/r2');
 
 // Start Follow-up Engine
 followupEngine.startEngine();
@@ -36,6 +37,12 @@ app.get('/api/files/:collection/:id/:filename', (req, res) => {
     
     if (fs.existsSync(filePath)) {
         return res.sendFile(filePath);
+    }
+    
+    const r2PublicUrl = process.env.R2_PUBLIC_URL;
+    if (r2PublicUrl) {
+        const cleanUrl = r2PublicUrl.replace(/\/$/, '');
+        return res.redirect(`${cleanUrl}/${collection}/${id}/${filename}`);
     }
     
     const pbUrl = (process.env.POCKETBASE_URL || 'http://pocketbase-eos80oss0css04wow848wssg.31.97.231.139.sslip.io/').replace(/\/$/, '');
@@ -384,11 +391,19 @@ app.post('/api/collections/:collection', upload.fields([{ name: 'images' }, { na
                 const destPath = path.join(recordUploadDir, file.filename);
                 fs.renameSync(file.path, destPath);
                 imageNames.push(file.filename);
+                
+                // Upload to Cloudflare R2
+                const r2Key = `${collection}/${newId}/${file.filename}`;
+                await uploadToR2(destPath, r2Key);
             }
             for (const file of videoFiles) {
                 const destPath = path.join(recordUploadDir, file.filename);
                 fs.renameSync(file.path, destPath);
                 videoNames.push(file.filename);
+                
+                // Upload to Cloudflare R2
+                const r2Key = `${collection}/${newId}/${file.filename}`;
+                await uploadToR2(destPath, r2Key);
             }
         }
 
