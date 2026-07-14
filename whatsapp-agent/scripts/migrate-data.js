@@ -39,16 +39,38 @@ async function runMigration(shouldEndPool = true) {
     for (const u of pbUsers) {
         try {
             await pgQuery(
-                `INSERT INTO users (id, email, password_hash, name, role, "agentEnabled", "isActive", created_at, updated_at)
-                 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+                `INSERT INTO users (id, email, password_hash, name, role, "agencyId", "agencyName", phone, "geminiKey", metadata, verified, "agentEnabled", "isActive", created_at, updated_at)
+                 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
                  ON CONFLICT (id) DO UPDATE SET 
                     email = EXCLUDED.email, 
                     name = EXCLUDED.name, 
                     role = EXCLUDED.role, 
+                    "agencyId" = EXCLUDED."agencyId",
+                    "agencyName" = EXCLUDED."agencyName",
+                    phone = EXCLUDED.phone,
+                    "geminiKey" = EXCLUDED."geminiKey",
+                    metadata = EXCLUDED.metadata,
+                    verified = EXCLUDED.verified,
                     "agentEnabled" = EXCLUDED."agentEnabled", 
                     "isActive" = EXCLUDED."isActive", 
                     updated_at = EXCLUDED.updated_at`,
-                [u.id, u.email, defaultPasswordHash, u.name || null, u.role || 'agent', u.agentEnabled !== false, u.isActive !== false, u.created, u.updated]
+                [
+                    u.id, 
+                    u.email, 
+                    defaultPasswordHash, 
+                    u.name || null, 
+                    u.role || 'agent', 
+                    u.agencyId || null,
+                    u.agencyName || null,
+                    u.phone || null,
+                    u.geminiKey || null,
+                    JSON.stringify(u.metadata || {}),
+                    u.verified === true,
+                    u.agentEnabled !== false, 
+                    u.isActive !== false, 
+                    u.created, 
+                    u.updated
+                ]
             );
         } catch (e) {
             console.error(`Error migrating user ${u.id}:`, e.message);

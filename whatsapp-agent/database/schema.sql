@@ -7,6 +7,12 @@ CREATE TABLE IF NOT EXISTS users (
     password_hash VARCHAR(255) NOT NULL,
     name VARCHAR(255),
     role VARCHAR(50) DEFAULT 'agent',
+    "agencyId" VARCHAR(15) REFERENCES users(id) ON DELETE SET NULL,
+    "agencyName" VARCHAR(255),
+    phone VARCHAR(50),
+    "geminiKey" TEXT,
+    metadata JSONB DEFAULT '{}'::jsonb,
+    verified BOOLEAN DEFAULT FALSE,
     "agentEnabled" BOOLEAN DEFAULT TRUE,
     "isActive" BOOLEAN DEFAULT TRUE,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
@@ -132,3 +138,19 @@ CREATE TABLE IF NOT EXISTS lead_followups (
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
+
+-- Portal Integrations
+CREATE TABLE IF NOT EXISTS portal_integrations (
+    id VARCHAR(15) PRIMARY KEY,
+    agency_id VARCHAR(15) REFERENCES users(id) ON DELETE CASCADE,
+    portal VARCHAR(50) NOT NULL,
+    api_key TEXT,
+    agent_id VARCHAR(100),
+    username VARCHAR(100),
+    password VARCHAR(100),
+    is_active BOOLEAN DEFAULT TRUE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(agency_id, portal)
+);
+

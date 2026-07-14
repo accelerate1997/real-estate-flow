@@ -17,6 +17,38 @@ const { uploadToR2 } = require('./database/r2');
 // Start Follow-up Engine
 followupEngine.startEngine();
 
+// Listen for brand-new lead creations to trigger Instant WhatsApp Outreach
+const { dbEvents } = db;
+dbEvents.on('lead_created', async (lead) => {
+    try {
+        console.log(`📡 [Instant Outreach] Triggered for lead ID: ${lead.id} (${lead.phone})`);
+        
+        // 1. Check if AI Agent is enabled for the agency
+        const isEnabled = await db.isAgentEnabled(lead.agencyId);
+        if (!isEnabled) {
+            console.log(`ℹ️ [Instant Outreach] AI agent is disabled for agency ${lead.agencyId}, skipping outreach.`);
+            return;
+        }
+
+        // 2. Fetch agency info (to see if they have connected WhatsApp session instance)
+        const instanceName = `Agency_${lead.agencyId}`;
+
+        // 3. Draft personalized greeting message
+        const cleanPhone = lead.phone.replace(/[^\d]/g, '');
+        let greeting = `Hi ${lead.name && lead.name !== 'WhatsApp Contact' ? lead.name : 'there'}! I'm Aria, your dedicated real estate AI assistant at Rajesh Realty. \n\nI saw you just requested info about properties. Are you looking to buy or rent? I can show you our top matches immediately!`;
+
+        // 5. Send message via Evolution API
+        console.log(`📡 Sending instant WhatsApp outreach to ${cleanPhone} via instance ${instanceName}...`);
+        await sendMessage(cleanPhone, greeting, instanceName);
+
+        // 6. Log outreach message in Chat History
+        await db.logChat(cleanPhone, 'assistant', greeting, lead.agencyId, lead.id);
+
+    } catch (e) {
+        console.error('❌ [Instant Outreach] Error:', e.message);
+    }
+});
+
 const app = express();
 app.use(cors());
 
@@ -300,10 +332,12 @@ app.get('/api/collections/:collection', async (req, res) => {
         let orderSql = '';
         if (sort) {
             const isDesc = sort.startsWith('-');
-            const field = isDesc ? sort.substring(1) : sort;
-            orderSql = `ORDER BY "${field}" ${isDesc ? 'DESC' : 'ASC'}`;
+            let field = isDesc ? sort.substring(1) : sort;
+            if (field === 'created') field = 'created_at';
+            if (field === 'updated') field = 'updated_at';
+            orderSql = `ORDER BY "${field}" ${isDesc ? 'DESC NULLS LAST' : 'ASC NULLS FIRST'}`;
         } else {
-            orderSql = 'ORDER BY created_at DESC';
+            orderSql = 'ORDER BY created_at DESC NULLS LAST';
         }
 
         // Count total items
@@ -463,6 +497,11 @@ app.post('/api/collections/:collection', upload.fields([{ name: 'images' }, { na
         const insertRes = await pool.query(insertQuery, values);
         
         const expanded = await expandRecords(collection, insertRes.rows);
+        
+        if (collection === 'leads' && insertRes.rows.length > 0) {
+            dbEvents.emit('lead_created', insertRes.rows[0]);
+        }
+
         res.json(expanded[0]);
     } catch (err) {
         console.error(`Error creating record in ${req.params.collection}:`, err);
@@ -700,6 +739,449 @@ app.post('/api/visits/schedule', async (req, res) => {
     } catch(err) { res.status(500).json({ error: "Failed to schedule visit" }); }
 });
 
+
+// --- Portal Integrations API & Webhooks ---
+
+// Get active integrations for an agency
+app.get('/api/integrations/:agencyId', async (req, res) => {
+    try {
+        const { agencyId } = req.params;
+        const result = await pool.query(
+            'SELECT id, portal, api_key, agent_id, username, is_active, created_at FROM portal_integrations WHERE agency_id = $1',
+            [agencyId]
+        );
+        res.json({ success: true, items: result.rows });
+    } catch (err) {
+        console.error("Fetch integrations error:", err);
+        res.status(500).json({ error: "Failed to fetch integrations" });
+    }
+});
+
+// Save or update an integration
+app.post('/api/integrations', async (req, res) => {
+    try {
+        const { agencyId, portal, apiKey, agentId, username, password } = req.body;
+        if (!agencyId || !portal) {
+            return res.status(400).json({ error: "agencyId and portal are required" });
+        }
+
+        const id = generateId();
+        const result = await pool.query(
+            `INSERT INTO portal_integrations (id, agency_id, portal, api_key, agent_id, username, password, is_active, updated_at)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, TRUE, NOW())
+             ON CONFLICT (agency_id, portal) DO UPDATE SET
+                api_key = EXCLUDED.api_key,
+                agent_id = EXCLUDED.agent_id,
+                username = EXCLUDED.username,
+                password = EXCLUDED.password,
+                is_active = TRUE,
+                updated_at = NOW()
+             RETURNING *`,
+            [id, agencyId, portal, apiKey || null, agentId || null, username || null, password || null]
+        );
+
+        // Auto-subscribe Meta webhook if portal is meta
+        if (portal === 'meta' && agentId && apiKey) {
+            console.log(`📡 [Meta Integration] Attempting to auto-subscribe app webhook to page ID: ${agentId}`);
+            try {
+                const subUrl = `https://graph.facebook.com/v18.0/${agentId}/subscribed_apps?subscribed_fields=leadgen&access_token=${apiKey}`;
+                const subRes = await fetch(subUrl, { method: 'POST' });
+                const subData = await subRes.json();
+                if (subRes.ok && subData.success) {
+                    console.log(`✅ [Meta Integration] Successfully subscribed CRM app to Page ${agentId} leadgen webhook topic.`);
+                } else {
+                    console.warn(`⚠️ [Meta Integration] Subscribed apps API returned non-success response:`, JSON.stringify(subData));
+                }
+            } catch (e) {
+                console.error(`❌ [Meta Integration] Failed to call Meta subscribed_apps Graph API:`, e.message);
+            }
+        }
+
+        res.json({ success: true, record: result.rows[0] });
+    } catch (err) {
+        console.error("Save integration error:", err);
+        res.status(500).json({ error: "Failed to save integration" });
+    }
+});
+
+// Disconnect/Delete an integration
+app.delete('/api/integrations/:agencyId/:portal', async (req, res) => {
+    try {
+        const { agencyId, portal } = req.params;
+        await pool.query(
+            'DELETE FROM portal_integrations WHERE agency_id = $1 AND portal = $2',
+            [agencyId, portal]
+        );
+        res.json({ success: true });
+    } catch (err) {
+        console.error("Delete integration error:", err);
+        res.status(500).json({ error: "Failed to disconnect integration" });
+    }
+});
+
+// Public Webhook Endpoint for Portal Ingestion
+// URL: /api/integrations/webhook/:portal/:agencyId
+app.post('/api/integrations/webhook/:portal/:agencyId', async (req, res) => {
+    try {
+        const { portal, agencyId } = req.params;
+        const payload = req.body;
+
+        console.log(`📡 [Webhook Ingestion] Received ${portal} lead for agency ${agencyId}:`, JSON.stringify(payload));
+
+        // 1. Check if integration is configured and active
+        const integrationCheck = await pool.query(
+            'SELECT is_active FROM portal_integrations WHERE agency_id = $1 AND portal = $2 LIMIT 1',
+            [agencyId, portal]
+        );
+        if (integrationCheck.rows.length === 0 || !integrationCheck.rows[0].is_active) {
+            console.warn(`⚠️ [Webhook] Received lead for inactive or non-configured portal ${portal} (Agency: ${agencyId})`);
+            return res.status(400).json({ error: "Integration is inactive or not configured" });
+        }
+
+        // 2. Map portal fields to our database format
+        let name = 'Portal Lead';
+        let phone = '';
+        let requirement = '';
+        let budget = 0;
+        let location = '';
+        let bhk = '';
+
+        if (portal === 'magicbricks') {
+            name = payload.Name || payload.name || 'Magicbricks Lead';
+            phone = payload.Mobile || payload.phone || payload.mobile || '';
+            requirement = payload.Query || payload.query || payload.Requirement || 'Inquiry from Magicbricks';
+            location = payload.Location || payload.locality || '';
+            budget = payload.Budget || payload.price || 0;
+        } else if (portal === '99acres') {
+            name = payload.leadName || payload.name || '99acres Lead';
+            phone = payload.leadPhone || payload.phone || '';
+            requirement = payload.requirement || payload.query || 'Inquiry from 99acres';
+            location = payload.projectLocation || payload.locality || '';
+            budget = payload.budget || payload.price || 0;
+        } else if (portal === 'housing') {
+            name = payload.name || 'Housing.com Lead';
+            phone = payload.phone || '';
+            requirement = payload.message || payload.requirement || 'Inquiry from Housing.com';
+            location = payload.locality || payload.location || '';
+            budget = payload.price || payload.budget || 0;
+        } else if (portal === 'nobroker') {
+            name = payload.name || 'NoBroker Lead';
+            phone = payload.phone || '';
+            requirement = payload.requirement || 'Inquiry from NoBroker';
+            location = payload.location || '';
+            budget = payload.budget || 0;
+        } else if (portal === 'google') {
+            // Check Google Key verification
+            const configuredKey = integrationCheck.rows[0].api_key;
+            if (configuredKey && payload.google_key !== configuredKey) {
+                console.warn("⚠️ [Google Webhook] Invalid google_key received");
+                return res.status(401).json({ error: "Unauthorized google_key" });
+            }
+            name = 'Google Ads Lead';
+            let detailParts = [];
+            if (Array.isArray(payload.user_column_data)) {
+                payload.user_column_data.forEach(col => {
+                    const colName = (col.column_name || '').toLowerCase();
+                    const val = col.string_value;
+                    if (colName.includes('name') || colName.includes('full')) name = val;
+                    else if (colName.includes('phone') || colName.includes('mobile')) phone = val;
+                    else detailParts.push(`${col.column_name}: ${val}`);
+                });
+            }
+            requirement = detailParts.length > 0 ? `Google Form details: ${detailParts.join(' | ')}` : 'Inquiry from Google Ads Form';
+        } else if (portal === 'generic') {
+            name = payload.name || 'Generic / Zapier Lead';
+            phone = payload.phone || payload.mobile || '';
+            requirement = payload.requirement || payload.message || 'Inquiry from custom webhook';
+            location = payload.location || payload.locality || '';
+            budget = payload.budget || payload.price || 0;
+        } else {
+            return res.status(400).json({ error: "Unknown portal" });
+        }
+
+        if (!phone) {
+            return res.status(400).json({ error: "Phone number is required" });
+        }
+
+        const cleanPhone = phone.replace(/[^\d]/g, '');
+
+        // 3. Upsert Lead
+        const lead = await db.upsertLead(cleanPhone, agencyId, {
+            name,
+            requirement: `[${portal.toUpperCase()}] ${requirement}`,
+            location,
+            budget_in_rupees: parseFloat(budget) || 0,
+            purpose: 'Buy'
+        });
+
+        // 4. Run matching engine
+        if (lead) {
+            console.log(`🎯 [Webhook] Lead upserted successfully: ${lead.id}. Running match engine...`);
+            // Run matching engine for all properties against this lead
+            const propRes = await pool.query('SELECT id FROM properties WHERE "agencyId" = $1', [agencyId]);
+            let totalMatches = 0;
+            for (const prop of propRes.rows) {
+                const matchCheck = await pool.query(
+                    'SELECT * FROM matches WHERE lead_id = $1 AND property_id = $2 LIMIT 1',
+                    [lead.id, prop.id]
+                );
+                if (matchCheck.rows.length === 0) {
+                    const newMatchId = generateId();
+                    await pool.query(
+                        `INSERT INTO matches (id, lead_id, property_id, agency_id, status, created_at, updated_at)
+                         VALUES ($1, $2, $3, $4, $5, NOW(), NOW())`,
+                        [newMatchId, lead.id, prop.id, agencyId, 'Pending Review']
+                    );
+                    totalMatches++;
+                }
+            }
+            console.log(`🎯 [Webhook] Generated ${totalMatches} property matches for new lead`);
+        }
+
+        res.json({ success: true, message: "Lead ingested successfully", leadId: lead?.id });
+    } catch (err) {
+        console.error("Webhook ingestion error:", err);
+        res.status(500).json({ error: err.message });
+    }
+});
+
+
+// --- Meta Ads Direct Webhooks ---
+
+// Simulation cache for local testing without calling Meta Graph API
+const metaSimulations = new Map();
+
+// Meta Webhook Challenge verification (GET)
+app.get('/api/integrations/webhook/meta', (req, res) => {
+    const mode = req.query['hub.mode'];
+    const token = req.query['hub.verify_token'];
+    const challenge = req.query['hub.challenge'];
+
+    const verifyToken = process.env.META_VERIFY_TOKEN || 'meta_leads_verify_pass_123';
+
+    if (mode && token) {
+        if (mode === 'subscribe' && token === verifyToken) {
+            console.log('✅ [Meta Webhook] Verification successful!');
+            return res.status(200).send(challenge);
+        } else {
+            console.warn('❌ [Meta Webhook] Verification failed: Tokens mismatch');
+            return res.sendStatus(403);
+        }
+    }
+    res.sendStatus(400);
+});
+
+// Meta Webhook Lead Ingestion (POST)
+app.post('/api/integrations/webhook/meta', async (req, res) => {
+    try {
+        const payload = req.body;
+        console.log('📡 [Meta Webhook] Inbound Leadgen webhook received:', JSON.stringify(payload));
+
+        if (payload.object !== 'page') {
+            return res.status(400).json({ error: "Unsupported object type" });
+        }
+
+        const entries = payload.entry || [];
+        for (const entry of entries) {
+            const pageId = entry.id;
+            const changes = entry.changes || [];
+            
+            for (const change of changes) {
+                if (change.field === 'leadgen') {
+                    const leadgenId = change.value?.leadgen_id;
+                    if (!leadgenId) continue;
+
+                    // 1. Lookup Meta integration using pageId (agent_id)
+                    const integrationQuery = await pool.query(
+                        "SELECT agency_id, api_key FROM portal_integrations WHERE portal = 'meta' AND agent_id = $1 LIMIT 1",
+                        [pageId]
+                    );
+
+                    if (integrationQuery.rows.length === 0) {
+                        console.warn(`⚠️ [Meta Webhook] No active CRM integration found for pageId: ${pageId}`);
+                        continue;
+                    }
+
+                    const { agency_id: agencyId, api_key: pageAccessToken } = integrationQuery.rows[0];
+
+                    let name = 'Meta Ads Lead';
+                    let phone = '';
+                    let requirement = 'Inquiry from Instagram/Facebook Ads';
+
+                    // 2. Fetch Lead Details (use simulation cache or call Meta Graph API)
+                    if (leadgenId.startsWith('LGEN_') && metaSimulations.has(leadgenId)) {
+                        const sim = metaSimulations.get(leadgenId);
+                        name = sim.name;
+                        phone = sim.phone;
+                        requirement = `${sim.requirement} | Locality: ${sim.location} | Budget: ${sim.budget}`;
+                        console.log(`🧪 [Meta Webhook] Used simulation cache for simulated lead: ${leadgenId}`);
+                    } else {
+                        console.log(`📡 Fetching Meta lead details for ID: ${leadgenId}...`);
+                        const fetchUrl = `https://graph.facebook.com/v18.0/${leadgenId}?access_token=${pageAccessToken}`;
+                        try {
+                            const fbRes = await fetch(fetchUrl);
+                            if (!fbRes.ok) {
+                                throw new Error(`Graph API returned HTTP ${fbRes.status}`);
+                            }
+                            const fbData = await fbRes.json();
+                            const fields = fbData.field_data || [];
+                            
+                            let detailParts = [];
+                            fields.forEach(f => {
+                                const fName = (f.name || '').toLowerCase();
+                                const val = f.values?.[0] || '';
+                                if (fName.includes('full_name') || fName === 'name') {
+                                    name = val;
+                                } else if (fName.includes('phone') || fName.includes('mobile')) {
+                                    phone = val;
+                                } else {
+                                    detailParts.push(`${f.name}: ${val}`);
+                                }
+                            });
+                            if (detailParts.length > 0) {
+                                requirement = `Meta Form Details: ${detailParts.join(' | ')}`;
+                            }
+                        } catch (e) {
+                            console.error(`❌ Meta Graph API fetch failed for lead ${leadgenId}:`, e.message);
+                            phone = '9999999999';
+                            requirement += ` (Lead ID: ${leadgenId} - Failed to download details: ${e.message})`;
+                        }
+                    }
+
+                    const cleanPhone = phone.replace(/[^\d]/g, '');
+                    if (!cleanPhone) continue;
+
+                    // 3. Upsert Lead into CRM
+                    const lead = await db.upsertLead(cleanPhone, agencyId, {
+                        name,
+                        requirement: `[META] ${requirement}`,
+                        purpose: 'Buy'
+                    });
+
+                    // 4. Run matching engine
+                    if (lead) {
+                        const propRes = await pool.query('SELECT id FROM properties WHERE "agencyId" = $1', [agencyId]);
+                        for (const prop of propRes.rows) {
+                            const matchCheck = await pool.query(
+                                'SELECT * FROM matches WHERE lead_id = $1 AND property_id = $2 LIMIT 1',
+                                [lead.id, prop.id]
+                            );
+                            if (matchCheck.rows.length === 0) {
+                                const newMatchId = generateId();
+                                await pool.query(
+                                    `INSERT INTO matches (id, lead_id, property_id, agency_id, status, created_at, updated_at)
+                                     VALUES ($1, $2, $3, $4, $5, NOW(), NOW())`,
+                                    [newMatchId, lead.id, prop.id, agencyId, 'Pending Review']
+                                );
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        res.json({ success: true });
+    } catch (err) {
+        console.error("Meta webhook error:", err);
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// Simulation API to mock portal webhooks
+app.post('/api/integrations/simulate', async (req, res) => {
+    try {
+        const { portal, agencyId, name, phone, requirement, location, budget } = req.body;
+        if (!portal || !agencyId || !phone) {
+            return res.status(400).json({ error: "Missing portal, agencyId, or phone" });
+        }
+
+        console.log(`🧪 [Simulation] Simulating portal webhook for ${portal} (Agency: ${agencyId})`);
+
+        // Structure payload based on portal format
+        let payload = {};
+        let targetUrl = `http://localhost:${process.env.PORT || 3000}/api/integrations/webhook/${portal}/${agencyId}`;
+
+        if (portal === 'magicbricks') {
+            payload = { Name: name, Mobile: phone, Query: requirement, Location: location, Budget: budget };
+        } else if (portal === '99acres') {
+            payload = { leadName: name, leadPhone: phone, requirement, projectLocation: location, budget };
+        } else if (portal === 'housing') {
+            payload = { name, phone, message: requirement, locality: location, price: budget };
+        } else if (portal === 'nobroker') {
+            payload = { name, phone, requirement, location, budget };
+        } else if (portal === 'google') {
+            const integrationCheck = await pool.query(
+                'SELECT api_key FROM portal_integrations WHERE agency_id = $1 AND portal = $2 LIMIT 1',
+                [agencyId, 'google']
+            );
+            const googleKey = integrationCheck.rows[0]?.api_key || 'test_sim_google_key';
+            payload = {
+                lead_id: 'G' + Math.random().toString(36).substring(2, 10),
+                google_key: googleKey,
+                user_column_data: [
+                    { column_name: 'Full Name', string_value: name },
+                    { column_name: 'Phone Number', string_value: phone },
+                    { column_name: 'Requirement', string_value: requirement },
+                    { column_name: 'Locality', string_value: location },
+                    { column_name: 'Budget', string_value: budget }
+                ]
+            };
+        } else if (portal === 'generic') {
+            payload = { name, phone, requirement, location, budget };
+        } else if (portal === 'meta') {
+            const integrationCheck = await pool.query(
+                "SELECT agent_id FROM portal_integrations WHERE agency_id = $1 AND portal = $2 LIMIT 1",
+                [agencyId, 'meta']
+            );
+            const pageId = integrationCheck.rows[0]?.agent_id || 'sim_page_123';
+            const leadgenId = 'LGEN_' + Math.random().toString(36).substring(2, 10);
+            
+            // Populate simulation cache
+            metaSimulations.set(leadgenId, { name, phone, requirement, location, budget });
+            setTimeout(() => metaSimulations.delete(leadgenId), 5 * 60 * 1000); // 5 min TTL
+            
+            payload = {
+                object: 'page',
+                entry: [
+                    {
+                        id: pageId,
+                        time: Math.floor(Date.now() / 1000),
+                        changes: [
+                            {
+                                field: 'leadgen',
+                                value: {
+                                    leadgen_id: leadgenId,
+                                    page_id: pageId,
+                                    form_id: 'FORM_123',
+                                    created_time: Math.floor(Date.now() / 1000)
+                                }
+                            }
+                        ]
+                    }
+                ]
+            };
+            targetUrl = `http://localhost:${process.env.PORT || 3000}/api/integrations/webhook/meta`;
+        }
+
+        // Call the webhook handler directly
+        const response = await fetch(targetUrl, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+
+        const data = await response.json();
+        if (response.ok) {
+            res.json(data);
+        } else {
+            res.status(response.status).json(data);
+        }
+    } catch (err) {
+        console.error("Simulation error:", err);
+        res.status(500).json({ error: err.message });
+    }
+});
+
 app.get('/api/visits/:agencyId', async (req, res) => {
     try {
         const { agencyId } = req.params;
@@ -707,6 +1189,7 @@ app.get('/api/visits/:agencyId', async (req, res) => {
         res.json({ success: true, visits });
     } catch(err) { res.status(500).json({ error: "Failed to fetch visits" }); }
 });
+
 
 // Start Server
 const PORT = process.env.PORT || 3000;

@@ -1,5 +1,7 @@
 require('dotenv').config();
 const { pool } = require('./database/db');
+const EventEmitter = require('events');
+const dbEvents = new EventEmitter();
 
 // Helper to generate 15-char string IDs matching PocketBase's ID format
 function generateId() {
@@ -12,7 +14,7 @@ function generateId() {
 }
 
 module.exports = {
-    // Expose pool directly if needed
+    dbEvents,
     pool,
     
     // No-op authenticate to keep interface signature compatible
@@ -180,6 +182,7 @@ module.exports = {
                 ]);
                 const newLead = insertRes.rows[0];
                 console.log(`[DB] Created new Lead: ${newLead.id}`);
+                dbEvents.emit('lead_created', newLead);
 
                 // Enroll in sequence
                 try {

@@ -68,7 +68,7 @@ async function processMessage(userInput, phone, agencyId) {
             const history = await db.getChatLogs(cleanPhone);
             sessions[cleanPhone] = history.map(log => ({
                 role: log.role === 'user' ? 'user' : 'assistant',
-                content: log.message
+                content: log.content
             }));
             
             if (sessions[cleanPhone].length === 0) {

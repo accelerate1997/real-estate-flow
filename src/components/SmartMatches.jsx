@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Target, MessageCircle, RefreshCw, CheckCircle2 } from 'lucide-react';
+import { Target, MessageCircle, RefreshCw, CheckCircle2, Sparkles, User } from 'lucide-react';
 import { pb } from '../services/pocketbase';
 
 const SmartMatches = () => {
@@ -14,10 +14,9 @@ const SmartMatches = () => {
         const agencyId = currentUser?.role === 'agent' ? currentUser.agencyId : currentUser.id;
         if (!agencyId) return;
 
-        // Show spinner either on full screen (initial) or on the button (manual refresh)
         if (isManual) setIsRefreshing(true);
         else if (matches.length === 0) setIsLoading(true);
-        
+
         try {
             const records = await pb.collection('matches').getFullList({
                 filter: `agency_id = "${agencyId}"`,
@@ -34,7 +33,7 @@ const SmartMatches = () => {
 
     useEffect(() => {
         fetchMatches();
-    }, [currentUser?.id]); // Use stable ID dependency instead of object reference
+    }, [currentUser?.id]);
 
     const handleSendAlert = async (matchId) => {
         setSendingAlert(matchId);
@@ -46,7 +45,6 @@ const SmartMatches = () => {
             });
             const data = await res.json();
             if (data.success) {
-                // Update match status locally
                 setMatches(prev => prev.map(m => m.id === matchId ? { ...m, status: 'Alert Sent' } : m));
             } else {
                 alert("Failed to send alert.");
@@ -60,88 +58,129 @@ const SmartMatches = () => {
     };
 
     if (isLoading) {
-        return <div className="p-10 flex justify-center"><RefreshCw className="w-8 h-8 animate-spin text-primary" /></div>;
+        return (
+            <div className="flex flex-col items-center justify-center py-24 gap-3">
+                <div className="w-10 h-10 rounded-full border-2 border-primary/20 border-t-primary animate-spin" />
+                <p className="text-sm text-gray-400 font-medium">Finding smart matches...</p>
+            </div>
+        );
     }
+
+    // Group matches by lead
+    const grouped = matches.reduce((acc, m) => {
+        const leadId = m.lead_id;
+        if (!acc[leadId]) acc[leadId] = { lead: m.expand?.lead_id, matchGroup: [] };
+        acc[leadId].matchGroup.push(m);
+        return acc;
+    }, {});
 
     return (
         <div className="space-y-6">
-            <div className="flex justify-between items-center">
-                <h2 className="text-2xl font-bold text-gray-900">Smart AI Matches</h2>
-                <button 
-                    onClick={() => fetchMatches(true)} 
+            {/* Header */}
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                <div>
+                    <h2 className="section-title">Smart AI Matches</h2>
+                    <p className="section-subtitle">AI-powered lead-to-property pairings</p>
+                </div>
+                <button
+                    onClick={() => fetchMatches(true)}
                     disabled={isRefreshing}
-                    className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 rounded-lg text-sm font-medium text-gray-600 hover:bg-gray-50 disabled:opacity-50"
+                    className="btn-dash-secondary disabled:opacity-60"
                 >
-                    <RefreshCw className={`w-4 h-4 ${isRefreshing ? 'animate-spin text-primary' : ''}`} /> 
+                    <RefreshCw className={`w-4 h-4 ${isRefreshing ? 'animate-spin text-primary' : ''}`} />
                     {isRefreshing ? 'Refreshing...' : 'Refresh'}
                 </button>
             </div>
 
             {matches.length === 0 ? (
-                <div className="text-center bg-white p-12 rounded-xl border border-gray-100 shadow-sm text-gray-500">
-                    <Target className="w-12 h-12 mx-auto mb-4 text-gray-300" />
-                    <h3 className="text-lg font-medium text-gray-900 mb-1">No matches found</h3>
-                    <p>When you add a new property, our AI will automatically pair it with your past leads here.</p>
+                <div className="empty-state">
+                    <div className="empty-state-icon">
+                        <Sparkles className="w-8 h-8 text-gray-300" />
+                    </div>
+                    <h3 className="text-base font-bold text-gray-900 mb-1">No matches yet</h3>
+                    <p className="text-sm text-gray-500 max-w-xs mx-auto">
+                        When you add a new property, our AI will automatically pair it with your past leads here.
+                    </p>
                 </div>
             ) : (
-                <div className="grid gap-6">
-                    {Object.entries(
-                        matches.reduce((acc, m) => {
-                            const leadId = m.lead_id;
-                            if (!acc[leadId]) acc[leadId] = { lead: m.expand?.lead_id, matchGroup: [] };
-                            acc[leadId].matchGroup.push(m);
-                            return acc;
-                        }, {})
-                    ).map(([leadId, { lead, matchGroup }]) => (
-                        <div key={leadId} className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
+                <div className="flex flex-col gap-5">
+                    {Object.entries(grouped).map(([leadId, { lead, matchGroup }]) => (
+                        <div key={leadId} className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
                             {/* Lead Header */}
-                            <div className="p-6 border-b border-gray-50 bg-gray-50/50">
-                                <div className="flex justify-between items-start mb-2">
-                                    <h3 className="text-xl font-bold text-gray-900">
-                                        Lead: {lead?.name || lead?.phone || 'Unknown Lead'}
-                                    </h3>
-                                    <span className="px-3 py-1 bg-primary/10 text-primary text-xs font-bold rounded-full uppercase">
+                            <div className="px-6 py-4 bg-gradient-to-r from-gray-50 to-white border-b border-gray-100">
+                                <div className="flex items-center justify-between">
+                                    <div className="flex items-center gap-3">
+                                        <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
+                                            <User className="w-5 h-5 text-primary" />
+                                        </div>
+                                        <div>
+                                            <h3 className="font-bold text-gray-900">
+                                                {lead?.name || lead?.phone || 'Unknown Lead'}
+                                            </h3>
+                                            <p className="text-xs text-gray-500">{lead?.phone}</p>
+                                        </div>
+                                    </div>
+                                    <span className="dash-badge dash-badge-new">
                                         {matchGroup.length} {matchGroup.length === 1 ? 'Match' : 'Matches'}
                                     </span>
                                 </div>
-                                <p className="text-sm text-gray-600 mb-1 font-medium">{lead?.phone}</p>
-                                <p className="text-sm text-gray-500 line-clamp-2 italic">"{lead?.requirement}"</p>
+                                {lead?.requirement && (
+                                    <p className="mt-3 text-sm text-gray-500 italic line-clamp-2 pl-13">
+                                        "{lead.requirement}"
+                                    </p>
+                                )}
                             </div>
 
-                            {/* Matched Properties List */}
+                            {/* Matched Properties */}
                             <div className="divide-y divide-gray-50">
                                 {matchGroup.map(match => (
-                                    <div key={match.id} className="p-6 flex flex-col md:flex-row gap-6 items-start md:items-center justify-between hover:bg-gray-50 transition-colors">
-                                        <div className="flex-1">
-                                            <div className="flex items-center gap-3 mb-2">
-                                                <span className={`px-2 py-1 text-[10px] font-bold rounded uppercase tracking-wider ${match.status === 'Pending Review' ? 'bg-orange-100 text-orange-700' : 'bg-green-100 text-green-700'}`}>
+                                    <div
+                                        key={match.id}
+                                        className="px-6 py-4 flex flex-col md:flex-row gap-4 items-start md:items-center justify-between hover:bg-gray-50/50 transition-colors"
+                                    >
+                                        <div className="flex-1 flex items-start gap-4">
+                                            {/* Status + timestamp */}
+                                            <div className="flex flex-col gap-1.5 shrink-0">
+                                                <span className={`dash-badge ${match.status === 'Pending Review' ? 'dash-badge-visit' : 'dash-badge-completed'}`}>
                                                     {match.status}
                                                 </span>
-                                                <span className="text-[10px] text-gray-400">Matched on {new Date(match.created).toLocaleDateString()}</span>
+                                                <span className="text-[10px] text-gray-400">
+                                                    {new Date(match.created).toLocaleDateString()}
+                                                </span>
                                             </div>
-                                            <div className="flex items-start gap-4">
-                                                <div className="p-2 bg-red-50 rounded-lg">
-                                                    <Target className="w-5 h-5 text-primary" />
+
+                                            {/* Property */}
+                                            <div className="flex items-start gap-3 min-w-0">
+                                                <div className="w-9 h-9 bg-primary/10 rounded-xl flex items-center justify-center shrink-0">
+                                                    <Target className="w-4 h-4 text-primary" />
                                                 </div>
-                                                <div>
-                                                    <p className="text-sm font-bold text-gray-900 mb-0.5">{match.expand?.property_id?.title}</p>
-                                                    <p className="text-xs text-gray-500">₹{match.expand?.property_id?.price?.toLocaleString()} • {match.expand?.property_id?.location}</p>
+                                                <div className="min-w-0">
+                                                    <p className="font-bold text-gray-900 text-sm truncate mb-0.5">
+                                                        {match.expand?.property_id?.title}
+                                                    </p>
+                                                    <p className="text-xs text-gray-500">
+                                                        ₹{match.expand?.property_id?.price?.toLocaleString()}
+                                                        {match.expand?.property_id?.location && ` • ${match.expand.property_id.location}`}
+                                                    </p>
                                                 </div>
                                             </div>
                                         </div>
-                                        
-                                        <div className="w-full md:w-auto">
+
+                                        {/* Alert CTA */}
+                                        <div className="shrink-0 w-full md:w-auto">
                                             {match.status === 'Alert Sent' ? (
-                                                <div className="flex items-center gap-2 px-4 py-2 text-green-700 bg-green-50 rounded-lg justify-center w-full md:min-w-[160px] text-sm font-bold border border-green-200">
+                                                <div className="flex items-center gap-2 px-4 py-2.5 text-green-700 bg-green-50 rounded-xl border border-green-200 text-sm font-bold">
                                                     <CheckCircle2 className="w-4 h-4" /> Alert Sent
                                                 </div>
                                             ) : (
-                                                <button 
+                                                <button
                                                     onClick={() => handleSendAlert(match.id)}
                                                     disabled={sendingAlert === match.id}
-                                                    className="w-full md:w-auto flex items-center justify-center gap-2 px-5 py-2.5 bg-green-600 text-white rounded-lg text-sm font-bold hover:bg-green-700 transition shadow-sm disabled:opacity-75 whitespace-nowrap"
+                                                    className="btn-dash-teal w-full md:w-auto disabled:opacity-70"
                                                 >
-                                                    {sendingAlert === match.id ? <RefreshCw className="w-4 h-4 animate-spin" /> : <MessageCircle className="w-4 h-4" />}
+                                                    {sendingAlert === match.id
+                                                        ? <RefreshCw className="w-4 h-4 animate-spin" />
+                                                        : <MessageCircle className="w-4 h-4" />}
                                                     Send Alert
                                                 </button>
                                             )}

@@ -1,20 +1,106 @@
-import React, { useState } from 'react';
-import { Save, Building, Bell, Shield, CreditCard, ChevronRight, MessageSquare, Check, Loader2, BrainCircuit, Key, Plus, Trash2, Clock, Edit2 } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import {
+    Save, Building, Bell, Shield, CreditCard, ChevronRight, MessageSquare,
+    Check, Loader2, BrainCircuit, Key, Plus, Trash2, Clock, Edit2, Lock, Globe
+} from 'lucide-react';
 import { pb } from '../services/pocketbase';
 
 const AgencySettings = () => {
     const [activeSection, setActiveSection] = useState('profile');
     const [isSaving, setIsSaving] = useState(false);
+
+    // Facebook SDK State
+    const [fbSdkInitialized, setFbSdkInitialized] = useState(false);
+    const [fbPages, setFbPages] = useState([]);
+    const [fbIsLoadingPages, setFbIsLoadingPages] = useState(false);
+    const [fbError, setFbError] = useState('');
+
+    useEffect(() => {
+        // Initialize Facebook SDK asynchronously
+        window.fbAsyncInit = function() {
+            window.FB.init({
+                appId      : import.meta.env.VITE_FACEBOOK_APP_ID || '123456789012345',
+                cookie     : true,
+                xfbml      : true,
+                version    : 'v18.0'
+            });
+            setFbSdkInitialized(true);
+        };
+
+        // Load Facebook SDK script tag if not present
+        if (!document.getElementById('facebook-jssdk')) {
+            (function(d, s, id) {
+                var js, fjs = d.getElementsByTagName(s)[0];
+                if (d.getElementById(id)) return;
+                js = d.createElement(s); js.id = id;
+                js.src = "https://connect.facebook.net/en_US/sdk.js";
+                fjs.parentNode.insertBefore(js, fjs);
+            }(document, 'script', 'facebook-jssdk'));
+        } else {
+            if (window.FB) setFbSdkInitialized(true);
+        }
+    }, []);
+
+    const handleFacebookLogin = () => {
+        setFbError('');
+        if (!window.FB) {
+            setFbError('Facebook SDK not loaded. Please try disabling your adblocker.');
+            return;
+        }
+        setFbIsLoadingPages(true);
+        window.FB.login((response) => {
+            if (response.authResponse) {
+                const userToken = response.authResponse.accessToken;
+                // Get page access tokens and lists
+                window.FB.api('/me/accounts', { access_token: userToken }, (res) => {
+                    setFbIsLoadingPages(false);
+                    if (res && !res.error) {
+                        setFbPages(res.data || []);
+                        if (res.data?.length === 0) {
+                            setFbError('No Facebook Pages were returned. Make sure your account manages at least one Page.');
+                        }
+                    } else {
+                        console.error('FB Accounts API error:', res.error);
+                        setFbError(res.error?.message || 'Failed to fetch Facebook Pages.');
+                    }
+                });
+            } else {
+                setFbIsLoadingPages(false);
+                setFbError('Facebook Login cancelled or permissions rejected.');
+            }
+        }, {
+            scope: 'pages_show_list,leads_retrieval,pages_read_engagement,pages_manage_ads',
+            return_scopes: true
+        });
+    };
     const [qrCode, setQrCode] = useState(null);
-    const [waConnectionStatus, setWaConnectionStatus] = useState('idle'); // idle, loading, ready, connected
+    const [waConnectionStatus, setWaConnectionStatus] = useState('idle');
     const [sequences, setSequences] = useState([]);
     const [isSequencesLoading, setIsSequencesLoading] = useState(false);
     const [editingSequence, setEditingSequence] = useState(null);
 
-    // Get current user details to pre-fill basic info
+    // Integrations State
+    const [integrations, setIntegrations] = useState([]);
+    const [isIntegrationsLoading, setIsIntegrationsLoading] = useState(false);
+    const [showConfigPortal, setShowConfigPortal] = useState(null); // 'magicbricks' | '99acres' | 'housing' | 'nobroker' | null
+    const [integrationFormData, setIntegrationFormData] = useState({
+        apiKey: '',
+        agentId: '',
+        username: '',
+        password: ''
+    });
+    const [isSavingIntegration, setIsSavingIntegration] = useState(false);
+    const [simulatingPortal, setSimulatingPortal] = useState(null);
+    const [simulationData, setSimulationData] = useState({
+        name: 'John Doe',
+        phone: '9876543210',
+        requirement: 'Looking for 3BHK flat',
+        location: 'Bandra West',
+        budget: '25000000'
+    });
+
     const currentUser = pb.authStore.model;
 
-    // Mock Agency Data
     const [agencyData, setAgencyData] = useState({
         agencyName: currentUser?.agencyName || 'RR Real Estate',
         email: currentUser?.email || '',
@@ -41,32 +127,123 @@ const AgencySettings = () => {
         }
     };
 
+    // Fetch portal integrations
+    const fetchIntegrations = async () => {
+        if (!currentUser?.id) return;
+        setIsIntegrationsLoading(true);
+        try {
+            const res = await fetch(`/api/integrations/${currentUser.id}`);
+            const data = await res.json();
+            if (data.success) {
+                setIntegrations(data.items || []);
+            }
+        } catch (error) {
+            console.error("Error fetching integrations:", error);
+        } finally {
+            setIsIntegrationsLoading(false);
+        }
+    };
+
+    const handleSaveIntegration = async (e) => {
+        e.preventDefault();
+        if (!showConfigPortal) return;
+        setIsSavingIntegration(true);
+        try {
+            const res = await fetch('/api/integrations', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    agencyId: currentUser.id,
+                    portal: showConfigPortal,
+                    apiKey: integrationFormData.apiKey,
+                    agentId: integrationFormData.agentId,
+                    username: integrationFormData.username,
+                    password: integrationFormData.password
+                })
+            });
+            const data = await res.json();
+            if (data.success) {
+                alert(`${showConfigPortal.toUpperCase()} integration updated successfully!`);
+                setShowConfigPortal(null);
+                fetchIntegrations();
+            } else {
+                alert("Failed to save integration: " + (data.error || "Unknown error"));
+            }
+        } catch (error) {
+            console.error(error);
+            alert("Error communicating with integration server.");
+        } finally {
+            setIsSavingIntegration(false);
+        }
+    };
+
+    const handleDisconnectIntegration = async (portal) => {
+        if (!window.confirm(`Are you sure you want to disconnect ${portal.toUpperCase()} integration?`)) return;
+        try {
+            const res = await fetch(`/api/integrations/${currentUser.id}/${portal}`, {
+                method: 'DELETE'
+            });
+            const data = await res.json();
+            if (data.success) {
+                alert(`${portal.toUpperCase()} integration disconnected.`);
+                fetchIntegrations();
+            } else {
+                alert("Failed to disconnect: " + (data.error || "Unknown error"));
+            }
+        } catch (error) {
+            console.error(error);
+            alert("Error disconnecting integration.");
+        }
+    };
+
+    const handleSimulateLead = async (portal) => {
+        if (!currentUser?.id) return;
+        try {
+            const res = await fetch('/api/integrations/simulate', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    portal,
+                    agencyId: currentUser.id,
+                    name: simulationData.name,
+                    phone: simulationData.phone,
+                    requirement: simulationData.requirement,
+                    location: simulationData.location,
+                    budget: simulationData.budget
+                })
+            });
+            const data = await res.json();
+            if (data.success) {
+                alert(`🎉 Webhook test successful!\nLead: ${simulationData.name}\nRequirement: ${simulationData.requirement}\nMatched Properties will update in Matches tab.`);
+                setSimulatingPortal(null);
+            } else {
+                alert("Webhook test failed: " + (data.error || "Unknown error"));
+            }
+        } catch (error) {
+            console.error(error);
+            alert("Error simulating webhook lead.");
+        }
+    };
+
     React.useEffect(() => {
         if (activeSection === 'sequences') {
             fetchSequences();
+        } else if (activeSection === 'integrations') {
+            fetchIntegrations();
         }
     }, [activeSection]);
 
     const handleSaveSequence = async (e) => {
         e.preventDefault();
-        if (!editingSequence.name) {
-            alert("Sequence name is required");
-            return;
-        }
-        
+        if (!editingSequence.name) { alert("Sequence name is required"); return; }
         setIsSaving(true);
         try {
-            const data = {
-                ...editingSequence,
-                agency_id: currentUser.id
-            };
-            
+            const data = { ...editingSequence, agency_id: currentUser.id };
             if (editingSequence.id) {
                 await pb.collection('sequences').update(editingSequence.id, data);
             } else {
                 await pb.collection('sequences').create(data);
             }
-            
             setEditingSequence(null);
             fetchSequences();
             alert("Sequence saved!");
@@ -97,13 +274,8 @@ const AgencySettings = () => {
                     phone: agencyData.phone,
                     geminiKey: agencyData.geminiKey,
                     agentEnabled: agencyData.agentEnabled
-                    // Note: 'email' is usually protected in PocketBase PB auth components
-                    // 'address' and 'notificationsEnabled' would need respective DB fields
                 });
-
-                // Refresh local auth store model
                 await pb.collection('users').authRefresh();
-
                 alert("Settings saved successfully!");
             }
         } catch (error) {
@@ -115,32 +287,20 @@ const AgencySettings = () => {
     };
 
     const handleConnectWhatsApp = async () => {
-        if (!agencyData.phone) {
-            alert("Please enter a WhatsApp number first.");
-            return;
-        }
-
+        if (!agencyData.phone) { alert("Please enter a WhatsApp number first."); return; }
         setWaConnectionStatus('loading');
         setQrCode(null);
-
         try {
             const res = await fetch('/api/whatsapp/connect', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    agencyId: currentUser?.id,
-                    phoneNumber: agencyData.phone
-                })
+                body: JSON.stringify({ agencyId: currentUser?.id, phoneNumber: agencyData.phone })
             });
-
             if (!res.ok) {
                 const errorText = await res.text();
                 throw new Error(`HTTP Error ${res.status}: ${errorText || res.statusText}`);
             }
-
             const data = await res.json();
-            console.log("WA Connect Data:", data);
-
             if (data.connected || data.instance?.state === 'open') {
                 setWaConnectionStatus('connected');
             } else if (data.qr) {
@@ -161,107 +321,109 @@ const AgencySettings = () => {
     };
 
     const sections = [
-        { id: 'profile', name: 'Agency Profile', icon: Building, description: 'Manage your agency details and public information.' },
-        { id: 'whatsapp', name: 'Connect WhatsApp', icon: MessageSquare, description: 'Connect your agency WhatsApp number to assign the AI Agent.' },
-        { id: 'brain', name: 'Brain Keys', icon: BrainCircuit, description: 'Configure your custom LLM API keys to power your AI Agent.' },
-        { id: 'security', name: 'Security & Access', icon: Shield, description: 'Manage passwords and two-factor authentication.' },
-        { id: 'billing', name: 'Billing & Plan', icon: CreditCard, description: 'Manage your subscription and payment methods.' },
-        { id: 'sequences', name: 'Follow-up Sequences', icon: MessageSquare, description: 'Design automated WhatsApp follow-up messages for your leads.' },
-        { id: 'notifications', name: 'Notifications', icon: Bell, description: 'Configure how you receive alerts and lead updates.' },
+        { id: 'profile',       name: 'Agency Profile',       icon: Building,      description: 'Manage your agency details and public information.' },
+        { id: 'whatsapp',      name: 'Connect WhatsApp',     icon: MessageSquare, description: 'Connect your agency WhatsApp number to assign the AI Agent.' },
+        { id: 'brain',         name: 'Brain Keys',           icon: BrainCircuit,  description: 'Configure your custom LLM API keys to power your AI Agent.' },
+        { id: 'integrations',  name: 'Portal Integrations',  icon: Globe,         description: 'Connect third-party real estate portals like Magicbricks, 99acres, etc.' },
+        { id: 'security',      name: 'Security & Access',    icon: Shield,        description: 'Manage passwords and two-factor authentication.' },
+        { id: 'billing',       name: 'Billing & Plan',       icon: CreditCard,    description: 'Manage your subscription and payment methods.' },
+        { id: 'sequences',     name: 'Follow-up Sequences',  icon: MessageSquare, description: 'Design automated WhatsApp follow-up messages for your leads.' },
+        { id: 'notifications', name: 'Notifications',        icon: Bell,          description: 'Configure how you receive alerts and lead updates.' },
     ];
 
+    const activeSection_ = sections.find(s => s.id === activeSection);
+
     return (
-        <div className="flex flex-col lg:flex-row gap-8">
-            {/* Settings Navigation Sidebar */}
-            <div className="w-full lg:w-64 shrink-0">
-                <nav className="space-y-1">
+        <div className="flex flex-col lg:flex-row gap-6">
+            {/* Settings Sidebar Nav */}
+            <div className="w-full lg:w-60 shrink-0">
+                <nav className="bg-white rounded-2xl shadow-sm border border-gray-100 p-2 flex flex-col gap-0.5">
                     {sections.map((section) => (
                         <button
                             key={section.id}
                             onClick={() => setActiveSection(section.id)}
-                            className={`w-full flex items-center justify-between p-4 rounded-xl transition-all duration-200 ${activeSection === section.id
-                                ? 'bg-white shadow-sm border border-primary/20 text-primary font-bold'
-                                : 'text-gray-600 hover:bg-gray-50 border border-transparent font-medium text-left'
-                                }`}
+                            className={`settings-nav-item ${activeSection === section.id ? 'settings-nav-item-active' : ''}`}
                         >
-                            <div className="flex items-center gap-3">
-                                <section.icon className={`w-5 h-5 ${activeSection === section.id ? 'text-primary' : 'text-gray-400'}`} />
-                                {section.name}
-                            </div>
-                            <ChevronRight className={`w-4 h-4 transition-transform ${activeSection === section.id ? 'opacity-100 translate-x-1' : 'opacity-0'}`} />
+                            <section.icon className={`w-4 h-4 shrink-0 ${activeSection === section.id ? 'text-primary' : 'text-gray-400'}`} />
+                            <span className="flex-1 text-left">{section.name}</span>
+                            <ChevronRight className={`w-3.5 h-3.5 transition-all ${activeSection === section.id ? 'text-primary opacity-100 translate-x-0.5' : 'opacity-0'}`} />
                         </button>
                     ))}
                 </nav>
             </div>
 
-            {/* Settings Content Area */}
-            <div className="flex-1">
-                <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 sm:p-8">
-                    {/* Header */}
-                    <div className="mb-8 border-b border-gray-100 pb-6">
-                        <h2 className="text-2xl font-bold text-gray-900">
-                            {sections.find(s => s.id === activeSection)?.name}
-                        </h2>
-                        <p className="text-gray-500 mt-1">
-                            {sections.find(s => s.id === activeSection)?.description}
-                        </p>
+            {/* Settings Content */}
+            <div className="flex-1 min-w-0">
+                <div className="dash-panel">
+                    {/* Section Header */}
+                    <div className="mb-7 pb-5 border-b border-gray-100 flex items-start gap-4">
+                        <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
+                            {activeSection_ && <activeSection_.icon className="w-5 h-5 text-primary" />}
+                        </div>
+                        <div>
+                            <h2 className="text-xl font-display font-bold text-gray-900">{activeSection_?.name}</h2>
+                            <p className="text-sm text-gray-500 mt-0.5">{activeSection_?.description}</p>
+                        </div>
                     </div>
 
-                    {/* Content specific to section */}
+                    {/* Profile */}
                     {activeSection === 'profile' && (
-                        <div className="space-y-6">
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div className="space-y-5">
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                                 <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-2">Agency Name</label>
+                                    <label className="dash-label">Agency Name</label>
                                     <input
                                         type="text"
                                         value={agencyData.agencyName}
                                         onChange={(e) => setAgencyData({ ...agencyData, agencyName: e.target.value })}
-                                        className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-lg focus:bg-white focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all"
+                                        className="dash-input"
+                                        placeholder="Your Agency Name"
                                     />
                                 </div>
                                 <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-2">Contact Email</label>
+                                    <label className="dash-label">Contact Email</label>
                                     <input
                                         type="email"
                                         value={agencyData.email}
                                         onChange={(e) => setAgencyData({ ...agencyData, email: e.target.value })}
-                                        className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-lg focus:bg-white focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all"
+                                        className="dash-input"
+                                        placeholder="you@agency.com"
                                     />
                                 </div>
                                 <div className="md:col-span-2">
-                                    <label className="block text-sm font-medium text-gray-700 mb-2">Registered Address</label>
+                                    <label className="dash-label">Registered Address</label>
                                     <input
                                         type="text"
                                         value={agencyData.address}
                                         onChange={(e) => setAgencyData({ ...agencyData, address: e.target.value })}
-                                        className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-lg focus:bg-white focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all"
+                                        className="dash-input"
+                                        placeholder="123 Street, City"
                                     />
                                 </div>
                             </div>
                         </div>
                     )}
 
+                    {/* WhatsApp */}
                     {activeSection === 'whatsapp' && (
-                        <div className="space-y-6">
-                            <div className="bg-green-50 p-6 rounded-xl border border-green-200">
-                                <div className="flex items-start gap-4 mb-4">
-                                    <div className="bg-green-100 p-3 rounded-full shrink-0">
-                                        <MessageSquare className="w-6 h-6 text-green-600" />
+                        <div className="space-y-5">
+                            <div className="bg-green-50 border border-green-200 rounded-2xl p-5">
+                                <div className="flex items-start gap-4 mb-5">
+                                    <div className="w-10 h-10 bg-green-100 rounded-xl flex items-center justify-center shrink-0">
+                                        <MessageSquare className="w-5 h-5 text-green-600" />
                                     </div>
                                     <div>
-                                        <h3 className="text-lg font-bold text-gray-900 mb-1">WA Saathi Integration</h3>
+                                        <h3 className="font-bold text-gray-900 mb-0.5">WA Saathi Integration</h3>
                                         <p className="text-sm text-gray-600">Connect your WhatsApp Business number to automatically handle leads using our AI property agent.</p>
                                     </div>
                                 </div>
 
                                 <div className="space-y-4">
+                                    {/* Toggle */}
                                     <div className="flex flex-col sm:flex-row sm:items-center justify-between bg-white p-4 rounded-xl border border-gray-200 gap-4">
                                         <div>
-                                            <h4 className="font-bold text-gray-900">Enable AI Agent</h4>
-                                            <p className="text-sm text-gray-500 flex items-center gap-1">
-                                                Allow the AI to automatically respond to new leads on WhatsApp
-                                            </p>
+                                            <h4 className="font-bold text-gray-900 text-sm">Enable AI Agent</h4>
+                                            <p className="text-xs text-gray-500 mt-0.5">Allow the AI to automatically respond to new leads on WhatsApp</p>
                                         </div>
                                         <label className="relative inline-flex items-center cursor-pointer shrink-0">
                                             <input
@@ -270,61 +432,65 @@ const AgencySettings = () => {
                                                 checked={agencyData.agentEnabled}
                                                 onChange={(e) => setAgencyData({ ...agencyData, agentEnabled: e.target.checked })}
                                             />
-                                            <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-green-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-green-600"></div>
+                                            <div className="w-11 h-6 bg-gray-200 rounded-full peer-checked:bg-accent-teal
+                                                            after:content-[''] after:absolute after:top-[2px] after:left-[2px]
+                                                            after:bg-white after:border-gray-300 after:border after:rounded-full
+                                                            after:h-5 after:w-5 after:transition-all
+                                                            peer-checked:after:translate-x-full peer-checked:after:border-white" />
                                         </label>
                                     </div>
 
+                                    {/* Phone input */}
                                     <div>
-                                        <label className="block text-sm font-medium text-gray-700 mb-2">WhatsApp Number (with Country Code)</label>
+                                        <label className="dash-label">WhatsApp Number (with Country Code)</label>
                                         <input
                                             type="text"
                                             value={agencyData.phone || ''}
                                             onChange={(e) => setAgencyData({ ...agencyData, phone: e.target.value })}
                                             placeholder="e.g. +91 9876543210"
-                                            className="w-full md:w-2/3 px-4 py-3 bg-white border border-gray-200 rounded-lg focus:outline-none focus:border-green-500 focus:ring-1 focus:ring-green-500 transition-all font-medium text-gray-900"
+                                            className="dash-input max-w-sm"
                                         />
                                     </div>
 
+                                    {/* Connection status */}
                                     {waConnectionStatus === 'connected' ? (
-                                        <div className="flex flex-col items-start gap-3 mt-4">
-                                            <div className="bg-green-100 text-green-800 px-4 py-2 rounded-lg font-bold flex items-center gap-2">
-                                                <Check className="w-5 h-5" /> Successfully Connected!
+                                        <div className="flex flex-col items-start gap-2">
+                                            <div className="flex items-center gap-2 bg-green-100 text-green-800 px-4 py-2.5 rounded-xl font-bold text-sm">
+                                                <Check className="w-4 h-4" /> Successfully Connected!
                                             </div>
-                                            <p className="text-sm text-green-700">Your agent is actively listening to messages.</p>
+                                            <p className="text-xs text-green-700">Your agent is actively listening to messages.</p>
                                         </div>
                                     ) : (
-                                        <div className="flex flex-col items-start gap-4 pt-2">
+                                        <div className="flex flex-col items-start gap-4">
                                             <div className="flex items-center gap-3">
                                                 <button
                                                     onClick={handleConnectWhatsApp}
                                                     disabled={waConnectionStatus === 'loading'}
-                                                    className="bg-green-600 hover:bg-green-700 text-white font-bold py-2.5 px-6 rounded-lg transition-colors shadow-sm flex items-center gap-2 disabled:opacity-70"
+                                                    className="btn-dash-teal disabled:opacity-70"
                                                 >
-                                                    {waConnectionStatus === 'loading' ? (
-                                                        <><Loader2 className="w-5 h-5 animate-spin" /> Initializing...</>
-                                                    ) : "Generate QR Code"}
+                                                    {waConnectionStatus === 'loading'
+                                                        ? <><Loader2 className="w-4 h-4 animate-spin" /> Initializing...</>
+                                                        : 'Generate QR Code'}
                                                 </button>
-                                                <span className="text-sm text-gray-500 flex items-center gap-1">
-                                                    <Shield className="w-4 h-4 text-green-500" /> Secure Connection
+                                                <span className="text-xs text-gray-500 flex items-center gap-1">
+                                                    <Shield className="w-3.5 h-3.5 text-green-500" /> Secure Connection
                                                 </span>
                                             </div>
 
-                                            {/* QR Code Container */}
                                             {waConnectionStatus === 'ready' && qrCode && (
-                                                <div className="mt-4 p-4 bg-white rounded-xl shadow border border-green-200 inline-block text-center">
+                                                <div className="p-5 bg-white rounded-2xl shadow-sm border border-green-200 inline-block text-center">
                                                     <p className="mb-3 font-bold text-gray-900 text-sm">Scan with WhatsApp</p>
                                                     <img
                                                         src={qrCode.startsWith('data:image') ? qrCode : `data:image/png;base64,${qrCode}`}
                                                         alt="WhatsApp Connection QR Code"
-                                                        className="w-48 h-48 sm:w-64 sm:h-64 mx-auto rounded-lg border border-gray-100 shadow-sm"
+                                                        className="w-48 h-48 sm:w-56 sm:h-56 mx-auto rounded-xl border border-gray-100 shadow-sm"
                                                     />
                                                     <p className="mt-3 text-xs text-gray-500 max-w-[200px] mx-auto">
                                                         Go to Settings &gt; Linked Devices to scan this code.
                                                     </p>
-
                                                     <button
                                                         onClick={() => setWaConnectionStatus('connected')}
-                                                        className="mt-4 text-xs font-bold text-green-600 hover:text-green-800"
+                                                        className="mt-3 text-xs font-bold text-green-600 hover:text-green-800"
                                                     >
                                                         [Demo Only] Simulate Scan
                                                     </button>
@@ -335,74 +501,92 @@ const AgencySettings = () => {
                                 </div>
                             </div>
 
-                            <div className="mt-6 border-t border-gray-100 pt-6">
-                                <h4 className="font-bold text-gray-900 mb-4">Setup Instructions</h4>
-                                <ol className="list-decimal list-inside space-y-2 text-sm text-gray-600">
-                                    <li>Enter your official agency WhatsApp number above.</li>
-                                    <li>Click <strong>Connect Number</strong>. A QR code will be generated.</li>
-                                    <li>Open WhatsApp on your phone, go to Linked Devices, and scan the QR code to grant agent access.</li>
-                                    <li>Once connected, the WA Saathi AI will automatically greet new incoming messages.</li>
+                            {/* Instructions */}
+                            <div className="border-t border-gray-100 pt-5">
+                                <h4 className="font-bold text-gray-900 mb-3 text-sm">Setup Instructions</h4>
+                                <ol className="space-y-2">
+                                    {[
+                                        'Enter your official agency WhatsApp number above.',
+                                        'Click Connect Number. A QR code will be generated.',
+                                        'Open WhatsApp on your phone, go to Linked Devices, and scan the QR code.',
+                                        'Once connected, the WA Saathi AI will automatically greet new incoming messages.'
+                                    ].map((step, i) => (
+                                        <li key={i} className="flex items-start gap-3 text-sm text-gray-600">
+                                            <span className="w-5 h-5 rounded-full bg-accent-teal/10 text-accent-teal font-bold text-[11px] flex items-center justify-center shrink-0 mt-0.5">
+                                                {i + 1}
+                                            </span>
+                                            {step}
+                                        </li>
+                                    ))}
                                 </ol>
                             </div>
                         </div>
                     )}
 
+                    {/* Brain Keys */}
                     {activeSection === 'brain' && (
-                        <div className="space-y-6">
-                            <div className="bg-purple-50 p-6 rounded-xl border border-purple-200">
-                                <div className="flex items-start gap-4 mb-4">
-                                    <div className="bg-purple-100 p-3 rounded-full shrink-0">
-                                        <BrainCircuit className="w-6 h-6 text-purple-600" />
+                        <div className="space-y-5">
+                            <div className="bg-purple-50 border border-purple-200 rounded-2xl p-5">
+                                <div className="flex items-start gap-4 mb-5">
+                                    <div className="w-10 h-10 bg-purple-100 rounded-xl flex items-center justify-center shrink-0">
+                                        <BrainCircuit className="w-5 h-5 text-purple-600" />
                                     </div>
                                     <div>
-                                        <h3 className="text-lg font-bold text-gray-900 mb-1">AI Brain Configuration</h3>
-                                        <p className="text-sm text-gray-600">Bring your own Google Gemini API key to power your AI Agent and manage your own usage limits and billing.</p>
+                                        <h3 className="font-bold text-gray-900 mb-0.5">AI Brain Configuration</h3>
+                                        <p className="text-sm text-gray-600">Bring your own Google Gemini API key to power your AI Agent and manage your own usage limits.</p>
                                     </div>
                                 </div>
 
-                                <div className="space-y-4">
-                                    <div>
-                                        <label className="block text-sm font-medium text-gray-700 mb-2">Google Gemini API Key</label>
-                                        <div className="relative w-full md:w-2/3">
-                                            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                                                <Key className="h-5 w-5 text-gray-400" />
-                                            </div>
-                                            <input
-                                                type="password"
-                                                value={agencyData.geminiKey}
-                                                onChange={(e) => setAgencyData({ ...agencyData, geminiKey: e.target.value })}
-                                                placeholder="e.g. AIzaSyB..."
-                                                className="w-full pl-10 pr-4 py-3 bg-white border border-gray-200 rounded-lg focus:outline-none focus:border-purple-500 focus:ring-1 focus:ring-purple-500 transition-all font-medium text-gray-900"
-                                            />
-                                        </div>
+                                <div>
+                                    <label className="dash-label">Google Gemini API Key</label>
+                                    <div className="relative max-w-sm">
+                                        <Key className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
+                                        <input
+                                            type="password"
+                                            value={agencyData.geminiKey}
+                                            onChange={(e) => setAgencyData({ ...agencyData, geminiKey: e.target.value })}
+                                            placeholder="AIzaSyB..."
+                                            className="dash-input pl-10"
+                                        />
                                     </div>
-
-                                    <div className="pt-2">
-                                        <p className="text-xs text-gray-500">
-                                            Don't have an API key? Get one from the <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noreferrer" className="text-purple-600 hover:text-purple-800 font-bold underline">Google AI Studio</a>.
-                                        </p>
-                                    </div>
+                                    <p className="text-xs text-gray-500 mt-2">
+                                        Don't have one? Get it from{' '}
+                                        <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noreferrer"
+                                           className="text-purple-600 hover:text-purple-800 font-bold underline">
+                                            Google AI Studio
+                                        </a>.
+                                    </p>
                                 </div>
                             </div>
                         </div>
                     )}
 
+                    {/* Security */}
                     {activeSection === 'security' && (
-                        <div className="space-y-6 text-gray-600">
-                            <p>Here you can update your password and manage active sessions.</p>
-                            <button className="text-primary font-bold hover:underline">Change Password</button>
+                        <div className="space-y-5">
+                            <div className="flex items-start gap-4 p-5 bg-gray-50 rounded-2xl border border-gray-200">
+                                <div className="w-10 h-10 bg-gray-100 rounded-xl flex items-center justify-center shrink-0">
+                                    <Lock className="w-5 h-5 text-gray-500" />
+                                </div>
+                                <div>
+                                    <h3 className="font-bold text-gray-900 mb-1">Password & Authentication</h3>
+                                    <p className="text-sm text-gray-600 mb-3">Here you can update your password and manage active sessions.</p>
+                                    <button className="btn-dash-primary">Change Password</button>
+                                </div>
+                            </div>
                         </div>
                     )}
 
+                    {/* Follow-up Sequences */}
                     {activeSection === 'sequences' && (
-                        <div className="space-y-6">
+                        <div className="space-y-5">
                             {!editingSequence ? (
-                                <div className="space-y-6">
+                                <div className="space-y-5">
                                     <div className="flex justify-between items-center">
-                                        <h3 className="text-lg font-bold text-gray-900">Your Sequences</h3>
-                                        <button 
+                                        <h3 className="font-bold text-gray-900">Your Sequences</h3>
+                                        <button
                                             onClick={() => setEditingSequence({ name: '', description: '', steps: [{ delay_hours: 0, message_template: '' }] })}
-                                            className="flex items-center gap-2 bg-primary/10 text-primary hover:bg-primary hover:text-white px-4 py-2 rounded-lg font-bold transition-all text-sm"
+                                            className="btn-dash-primary"
                                         >
                                             <Plus className="w-4 h-4" /> New Sequence
                                         </button>
@@ -410,36 +594,35 @@ const AgencySettings = () => {
 
                                     {isSequencesLoading ? (
                                         <div className="flex justify-center py-12">
-                                            <Loader2 className="w-8 h-8 animate-spin text-primary/40" />
+                                            <div className="w-8 h-8 rounded-full border-2 border-primary/20 border-t-primary animate-spin" />
                                         </div>
                                     ) : sequences.length === 0 ? (
-                                        <div className="text-center py-12 bg-gray-50 rounded-2xl border border-dashed border-gray-200">
-                                            <p className="text-gray-500">No follow-up sequences found. Create one to get started!</p>
+                                        <div className="empty-state py-12">
+                                            <div className="empty-state-icon">
+                                                <MessageSquare className="w-7 h-7 text-gray-300" />
+                                            </div>
+                                            <p className="text-sm text-gray-500">No sequences yet. Create one to get started!</p>
                                         </div>
                                     ) : (
-                                        <div className="grid grid-cols-1 gap-4">
+                                        <div className="flex flex-col gap-3">
                                             {sequences.map((seq) => (
-                                                <div key={seq.id} className="bg-white p-5 rounded-xl border border-gray-100 shadow-sm flex items-center justify-between group hover:border-primary/30 transition-all">
+                                                <div
+                                                    key={seq.id}
+                                                    className="bg-white p-4 rounded-xl border border-gray-100 shadow-sm
+                                                               flex items-center justify-between group hover:border-primary/20 transition-all"
+                                                >
                                                     <div>
-                                                        <h4 className="font-bold text-gray-900">{seq.name}</h4>
-                                                        <p className="text-sm text-gray-500">{seq.description || 'No description'}</p>
-                                                        <div className="flex items-center gap-3 mt-2">
-                                                            <span className="text-xs bg-gray-100 text-gray-600 px-2 py-1 rounded-md font-medium">
-                                                                {seq.steps?.length || 0} Steps
-                                                            </span>
-                                                        </div>
+                                                        <h4 className="font-bold text-gray-900 text-sm">{seq.name}</h4>
+                                                        <p className="text-xs text-gray-500 mt-0.5">{seq.description || 'No description'}</p>
+                                                        <span className="inline-flex items-center gap-1 mt-2 text-xs bg-gray-100 text-gray-600 px-2 py-1 rounded-lg font-medium">
+                                                            <Clock className="w-3 h-3" /> {seq.steps?.length || 0} Steps
+                                                        </span>
                                                     </div>
-                                                    <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                                                        <button 
-                                                            onClick={() => setEditingSequence(seq)}
-                                                            className="p-2 text-gray-400 hover:text-primary hover:bg-primary/5 rounded-lg transition-all"
-                                                        >
+                                                    <div className="flex items-center gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                        <button onClick={() => setEditingSequence(seq)} className="p-2 text-gray-400 hover:text-primary hover:bg-primary/5 rounded-lg transition-all">
                                                             <Edit2 className="w-4 h-4" />
                                                         </button>
-                                                        <button 
-                                                            onClick={() => handleDeleteSequence(seq.id)}
-                                                            className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all"
-                                                        >
+                                                        <button onClick={() => handleDeleteSequence(seq.id)} className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all">
                                                             <Trash2 className="w-4 h-4" />
                                                         </button>
                                                     </div>
@@ -449,124 +632,109 @@ const AgencySettings = () => {
                                     )}
                                 </div>
                             ) : (
-                                <form onSubmit={handleSaveSequence} className="space-y-6">
-                                    <div className="flex items-center justify-between mb-4">
-                                        <button 
-                                            type="button"
-                                            onClick={() => setEditingSequence(null)}
-                                            className="text-sm text-gray-500 hover:text-gray-900 font-medium"
-                                        >
-                                            &larr; Back to list
+                                <form onSubmit={handleSaveSequence} className="space-y-5">
+                                    <div className="flex items-center justify-between">
+                                        <button type="button" onClick={() => setEditingSequence(null)} className="text-sm text-gray-500 hover:text-gray-900 font-medium flex items-center gap-1">
+                                            ← Back to list
                                         </button>
-                                        <h3 className="text-lg font-bold text-gray-900">
-                                            {editingSequence.id ? 'Edit Sequence' : 'Create New Sequence'}
-                                        </h3>
+                                        <h3 className="font-bold text-gray-900">{editingSequence.id ? 'Edit Sequence' : 'New Sequence'}</h3>
                                     </div>
 
-                                    <div className="space-y-4">
-                                        <div>
-                                            <label className="block text-sm font-medium text-gray-700 mb-1">Sequence Name</label>
-                                            <input 
-                                                type="text"
-                                                value={editingSequence.name}
-                                                onChange={(e) => setEditingSequence({ ...editingSequence, name: e.target.value })}
-                                                placeholder="e.g. Welcome Sequence"
-                                                className="w-full px-4 py-2 bg-gray-50 border border-gray-200 rounded-lg focus:bg-white focus:outline-none focus:border-primary"
-                                                required
-                                            />
-                                        </div>
-                                        <div>
-                                            <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
-                                            <input 
-                                                type="text"
-                                                value={editingSequence.description}
-                                                onChange={(e) => setEditingSequence({ ...editingSequence, description: e.target.value })}
-                                                placeholder="Short description of this sequence"
-                                                className="w-full px-4 py-2 bg-gray-50 border border-gray-200 rounded-lg focus:bg-white focus:outline-none focus:border-primary"
-                                            />
+                                    <div>
+                                        <label className="dash-label">Sequence Name <span className="text-primary">*</span></label>
+                                        <input
+                                            type="text"
+                                            value={editingSequence.name}
+                                            onChange={(e) => setEditingSequence({ ...editingSequence, name: e.target.value })}
+                                            placeholder="e.g. Welcome Sequence"
+                                            className="dash-input"
+                                            required
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="dash-label">Description</label>
+                                        <input
+                                            type="text"
+                                            value={editingSequence.description}
+                                            onChange={(e) => setEditingSequence({ ...editingSequence, description: e.target.value })}
+                                            placeholder="Short description"
+                                            className="dash-input"
+                                        />
+                                    </div>
+
+                                    <div>
+                                        <div className="flex items-center justify-between mb-3">
+                                            <label className="dash-label mb-0">Sequence Steps</label>
+                                            <button
+                                                type="button"
+                                                onClick={() => {
+                                                    const newSteps = [...(editingSequence.steps || [])];
+                                                    newSteps.push({ delay_hours: 24, message_template: '' });
+                                                    setEditingSequence({ ...editingSequence, steps: newSteps });
+                                                }}
+                                                className="text-xs text-primary font-bold hover:underline flex items-center gap-1"
+                                            >
+                                                <Plus className="w-3.5 h-3.5" /> Add Step
+                                            </button>
                                         </div>
 
-                                        <div className="pt-4">
-                                            <div className="flex justify-between items-center mb-3">
-                                                <label className="block text-sm font-bold text-gray-900">Sequence Steps</label>
-                                                <button 
-                                                    type="button"
-                                                    onClick={() => {
-                                                        const newSteps = [...(editingSequence.steps || [])];
-                                                        newSteps.push({ delay_hours: 24, message_template: '' });
-                                                        setEditingSequence({ ...editingSequence, steps: newSteps });
-                                                    }}
-                                                    className="text-xs text-primary font-bold hover:underline flex items-center gap-1"
-                                                >
-                                                    <Plus className="w-3 h-3" /> Add Step
-                                                </button>
-                                            </div>
-
-                                            <div className="space-y-4">
-                                                {(editingSequence.steps || []).map((step, idx) => (
-                                                    <div key={idx} className="bg-gray-50 p-4 rounded-xl border border-gray-200 relative group">
-                                                        <div className="flex items-center gap-4 mb-3">
-                                                            <div className="flex items-center gap-2 bg-white px-3 py-1.5 rounded-lg border border-gray-100 shadow-sm text-sm">
-                                                                <Clock className="w-4 h-4 text-gray-400" />
-                                                                <span className="text-gray-500">Delay (Hours):</span>
-                                                                <input 
-                                                                    type="number"
-                                                                    value={step.delay_hours}
-                                                                    onChange={(e) => {
-                                                                        const newSteps = [...editingSequence.steps];
-                                                                        newSteps[idx].delay_hours = parseInt(e.target.value);
-                                                                        setEditingSequence({ ...editingSequence, steps: newSteps });
-                                                                    }}
-                                                                    className="w-16 font-bold text-gray-900 focus:outline-none"
-                                                                />
-                                                            </div>
-                                                            <div className="text-xs text-gray-400">
-                                                                {idx === 0 ? '(0 = Immediate)' : `Wait ${step.delay_hours}h after step ${idx}`}
-                                                            </div>
-                                                        </div>
-                                                        <textarea 
-                                                            value={step.message_template}
-                                                            onChange={(e) => {
-                                                                const newSteps = [...editingSequence.steps];
-                                                                newSteps[idx].message_template = e.target.value;
-                                                                setEditingSequence({ ...editingSequence, steps: newSteps });
-                                                            }}
-                                                            placeholder="Enter message template..."
-                                                            rows={3}
-                                                            className="w-full px-4 py-3 bg-white border border-gray-100 rounded-lg focus:outline-none focus:border-primary transition-all text-sm"
-                                                            required
-                                                        />
-                                                        {editingSequence.steps.length > 1 && (
-                                                            <button 
-                                                                type="button"
-                                                                onClick={() => {
-                                                                    const newSteps = editingSequence.steps.filter((_, i) => i !== idx);
+                                        <div className="space-y-3">
+                                            {(editingSequence.steps || []).map((step, idx) => (
+                                                <div key={idx} className="bg-gray-50 p-4 rounded-xl border border-gray-200 relative group">
+                                                    <div className="flex items-center gap-3 mb-3">
+                                                        <div className="flex items-center gap-2 bg-white px-3 py-1.5 rounded-lg border border-gray-100 shadow-sm text-xs">
+                                                            <Clock className="w-3.5 h-3.5 text-gray-400" />
+                                                            <span className="text-gray-500">Delay (Hours):</span>
+                                                            <input
+                                                                type="number"
+                                                                value={step.delay_hours}
+                                                                onChange={(e) => {
+                                                                    const newSteps = [...editingSequence.steps];
+                                                                    newSteps[idx].delay_hours = parseInt(e.target.value);
                                                                     setEditingSequence({ ...editingSequence, steps: newSteps });
                                                                 }}
-                                                                className="absolute -top-2 -right-2 bg-white text-red-500 p-1.5 rounded-full shadow-sm border border-red-50 opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-50"
-                                                            >
-                                                                <Trash2 className="w-4 h-4" />
-                                                            </button>
-                                                        )}
+                                                                className="w-14 font-bold text-gray-900 focus:outline-none bg-transparent"
+                                                            />
+                                                        </div>
+                                                        <span className="text-xs text-gray-400">
+                                                            {idx === 0 ? '(0 = Immediate)' : `Wait ${step.delay_hours}h after step ${idx}`}
+                                                        </span>
                                                     </div>
-                                                ))}
-                                            </div>
+                                                    <textarea
+                                                        value={step.message_template}
+                                                        onChange={(e) => {
+                                                            const newSteps = [...editingSequence.steps];
+                                                            newSteps[idx].message_template = e.target.value;
+                                                            setEditingSequence({ ...editingSequence, steps: newSteps });
+                                                        }}
+                                                        placeholder="Enter message template..."
+                                                        rows={3}
+                                                        className="dash-input resize-none"
+                                                        required
+                                                    />
+                                                    {editingSequence.steps.length > 1 && (
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => {
+                                                                const newSteps = editingSequence.steps.filter((_, i) => i !== idx);
+                                                                setEditingSequence({ ...editingSequence, steps: newSteps });
+                                                            }}
+                                                            className="absolute -top-2 -right-2 bg-white text-red-500 p-1 rounded-full shadow-sm border border-red-100
+                                                                       opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-50"
+                                                        >
+                                                            <Trash2 className="w-3.5 h-3.5" />
+                                                        </button>
+                                                    )}
+                                                </div>
+                                            ))}
                                         </div>
                                     </div>
 
-                                    <div className="pt-6 flex justify-end gap-3">
-                                        <button 
-                                            type="button"
-                                            onClick={() => setEditingSequence(null)}
-                                            className="px-6 py-2.5 rounded-xl font-bold bg-gray-100 text-gray-600 hover:bg-gray-200"
-                                        >
+                                    <div className="flex justify-end gap-3 pt-2">
+                                        <button type="button" onClick={() => setEditingSequence(null)} className="btn-dash-secondary">
                                             Cancel
                                         </button>
-                                        <button 
-                                            type="submit"
-                                            disabled={isSaving}
-                                            className="bg-primary text-white px-8 py-2.5 rounded-xl font-bold hover:bg-red-800 transition-all shadow-md flex items-center gap-2"
-                                        >
+                                        <button type="submit" disabled={isSaving} className="btn-dash-primary disabled:opacity-70">
                                             {isSaving && <Loader2 className="w-4 h-4 animate-spin" />}
                                             Save Sequence
                                         </button>
@@ -576,41 +744,475 @@ const AgencySettings = () => {
                         </div>
                     )}
 
-                    {activeSection === 'billing' && (
+
+                    {/* Portal Integrations */}
+                    {activeSection === 'integrations' && (
                         <div className="space-y-6">
-                            <div className="bg-gray-50 p-6 rounded-xl border border-gray-200">
-                                <h3 className="font-bold text-gray-900 mb-2">Current Plan: Premium Agency</h3>
-                                <p className="text-sm text-gray-600 mb-4">You are currently billed ₹5,000/month. Next billing date is April 1st.</p>
-                                <button className="text-primary font-bold hover:underline">Manage Subscription</button>
+                            {isIntegrationsLoading ? (
+                                <div className="flex items-center justify-center py-12">
+                                    <Loader2 className="w-8 h-8 animate-spin text-primary" />
+                                </div>
+                            ) : showConfigPortal ? (
+                                <form onSubmit={handleSaveIntegration} className="space-y-5 bg-white p-5 rounded-2xl border border-gray-100">
+                                    <div className="flex items-center justify-between border-b border-gray-100 pb-3">
+                                        <button
+                                            type="button"
+                                            onClick={() => { setShowConfigPortal(null); }}
+                                            className="text-sm text-gray-500 hover:text-gray-900 font-medium"
+                                        >
+                                            ← Back to Portals
+                                        </button>
+                                        <h3 className="font-bold text-gray-900 capitalize">Configure {showConfigPortal}</h3>
+                                    </div>
+
+                                    {/* Magicbricks Config Fields */}
+                                    {showConfigPortal === 'magicbricks' && (
+                                        <div className="space-y-4">
+                                            <div>
+                                                <label className="dash-label">Magicbricks API Key</label>
+                                                <input
+                                                    type="password"
+                                                    value={integrationFormData.apiKey}
+                                                    onChange={e => setIntegrationFormData({...integrationFormData, apiKey: e.target.value})}
+                                                    className="dash-input"
+                                                    placeholder="Enter Magicbricks Developer API Key"
+                                                    required
+                                                />
+                                            </div>
+                                            <div>
+                                                <label className="dash-label">Agent ID / Registered Mobile</label>
+                                                <input
+                                                    type="text"
+                                                    value={integrationFormData.agentId}
+                                                    onChange={e => setIntegrationFormData({...integrationFormData, agentId: e.target.value})}
+                                                    className="dash-input"
+                                                    placeholder="e.g. AG123456"
+                                                    required
+                                                />
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {/* 99acres Config Fields */}
+                                    {showConfigPortal === '99acres' && (
+                                        <div className="space-y-4">
+                                            <div>
+                                                <label className="dash-label">99acres XML Feed / API Key</label>
+                                                <input
+                                                    type="password"
+                                                    value={integrationFormData.apiKey}
+                                                    onChange={e => setIntegrationFormData({...integrationFormData, apiKey: e.target.value})}
+                                                    className="dash-input"
+                                                    placeholder="Enter 99acres API Key"
+                                                />
+                                            </div>
+                                            <div>
+                                                <label className="dash-label">Username</label>
+                                                <input
+                                                    type="text"
+                                                    value={integrationFormData.username}
+                                                    onChange={e => setIntegrationFormData({...integrationFormData, username: e.target.value})}
+                                                    className="dash-input"
+                                                    placeholder="99acres Username"
+                                                    required
+                                                />
+                                            </div>
+                                            <div>
+                                                <label className="dash-label">Password</label>
+                                                <input
+                                                    type="password"
+                                                    value={integrationFormData.password}
+                                                    onChange={e => setIntegrationFormData({...integrationFormData, password: e.target.value})}
+                                                    className="dash-input"
+                                                    placeholder="99acres Password"
+                                                    required
+                                                />
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {/* Housing.com Config Fields */}
+                                    {showConfigPortal === 'housing' && (
+                                        <div className="space-y-4">
+                                            <div>
+                                                <label className="dash-label">Housing.com Partner API Key</label>
+                                                <input
+                                                    type="password"
+                                                    value={integrationFormData.apiKey}
+                                                    onChange={e => setIntegrationFormData({...integrationFormData, apiKey: e.target.value})}
+                                                    className="dash-input"
+                                                    placeholder="Enter Housing.com Partner Key"
+                                                    required
+                                                />
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {/* NoBroker Config Fields */}
+                                    {showConfigPortal === 'nobroker' && (
+                                        <div className="space-y-4">
+                                            <div>
+                                                <label className="dash-label">NoBroker Agent API Token</label>
+                                                <input
+                                                    type="password"
+                                                    value={integrationFormData.apiKey}
+                                                    onChange={e => setIntegrationFormData({...integrationFormData, apiKey: e.target.value})}
+                                                    className="dash-input"
+                                                    placeholder="Enter NoBroker API Token"
+                                                    required
+                                                />
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {/* Meta Ads Direct Config Fields */}
+                                    {showConfigPortal === 'meta' && (
+                                        <div className="space-y-4 py-2">
+                                            <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 flex items-center gap-3">
+                                                <div className="w-10 h-10 bg-[#1877F2] rounded-xl flex items-center justify-center shrink-0">
+                                                    <svg className="w-5 h-5 text-white fill-current" viewBox="0 0 24 24">
+                                                        <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z" />
+                                                    </svg>
+                                                </div>
+                                                <div className="min-w-0">
+                                                    <h4 className="font-bold text-gray-800 text-sm">Official Meta Ads Lead Sync</h4>
+                                                    <p className="text-xs text-gray-600">Connect your Facebook business account directly to retrieve lead forms.</p>
+                                                </div>
+                                            </div>
+
+                                            {fbError && (
+                                                <div className="p-3 bg-red-50 border border-red-200 text-red-700 rounded-xl text-xs font-semibold">
+                                                    ⚠️ {fbError}
+                                                </div>
+                                            )}
+
+                                            {fbPages.length === 0 ? (
+                                                <div className="flex flex-col items-center justify-center py-6 bg-gray-50 border border-dashed border-gray-250 rounded-2xl gap-3">
+                                                    <p className="text-xs text-gray-500 text-center px-6">
+                                                        Click the button below to log in and authorize Rajesh Realty CRM to retrieve your Page Lead Forms.
+                                                    </p>
+                                                    <button
+                                                        type="button"
+                                                        onClick={handleFacebookLogin}
+                                                        disabled={fbIsLoadingPages}
+                                                        className="px-5 py-2.5 bg-[#1877F2] hover:bg-[#165fc2] disabled:bg-gray-400 text-white rounded-xl text-xs font-bold transition-all flex items-center gap-2 shadow-sm"
+                                                    >
+                                                        {fbIsLoadingPages ? (
+                                                            <>
+                                                                <Loader2 className="w-4 h-4 animate-spin" />
+                                                                Connecting Facebook...
+                                                            </>
+                                                        ) : (
+                                                            'Login with Facebook'
+                                                        )}
+                                                    </button>
+                                                </div>
+                                            ) : (
+                                                <div className="space-y-4">
+                                                    <div>
+                                                        <label className="dash-label font-bold text-gray-750">Select Facebook Page to Sync</label>
+                                                        <select
+                                                            className="dash-input mt-1.5"
+                                                            required
+                                                            onChange={(e) => {
+                                                                if (!e.target.value) {
+                                                                    setIntegrationFormData({ apiKey: '', agentId: '', username: '', password: '' });
+                                                                    return;
+                                                                }
+                                                                const page = JSON.parse(e.target.value);
+                                                                setIntegrationFormData({
+                                                                    apiKey: page.access_token,
+                                                                    agentId: page.id,
+                                                                    username: page.name,
+                                                                    password: ''
+                                                                });
+                                                            }}
+                                                        >
+                                                            <option value="">-- Choose a Page --</option>
+                                                            {fbPages.map(page => (
+                                                                <option key={page.id} value={JSON.stringify(page)}>
+                                                                    {page.name} (ID: {page.id})
+                                                                </option>
+                                                            ))}
+                                                        </select>
+                                                    </div>
+                                                    <div className="flex justify-between items-center">
+                                                        <p className="text-[10px] text-gray-400">
+                                                            Select a page to unlock Page Webhook Subscription.
+                                                        </p>
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => setFbPages([])}
+                                                            className="text-xs text-[#1877F2] font-semibold hover:underline"
+                                                        >
+                                                            Switch Account
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            )}
+                                        </div>
+                                    )}
+
+                                    <div className="flex justify-end gap-3 pt-3 border-t border-gray-100">
+                                        <button
+                                            type="button"
+                                            onClick={() => { setShowConfigPortal(null); setFbPages([]); }}
+                                            className="btn-dash-secondary"
+                                        >
+                                            Cancel
+                                        </button>
+                                        {(showConfigPortal !== 'meta' || fbPages.length > 0) && (
+                                            <button
+                                                type="submit"
+                                                disabled={isSavingIntegration || (showConfigPortal === 'meta' && !integrationFormData.agentId)}
+                                                className="btn-dash-primary disabled:opacity-75"
+                                            >
+                                                {isSavingIntegration && <Loader2 className="w-4 h-4 animate-spin" />}
+                                                Save Credentials
+                                            </button>
+                                        )}
+                                    </div>
+                                </form>
+                            ) : simulatingPortal ? (
+                                <div className="space-y-5 bg-white p-5 rounded-2xl border border-gray-100">
+                                    <div className="flex items-center justify-between border-b border-gray-100 pb-3">
+                                        <button
+                                            type="button"
+                                            onClick={() => setSimulatingPortal(null)}
+                                            className="text-sm text-gray-500 hover:text-gray-900 font-medium"
+                                        >
+                                            ← Back to Portals
+                                        </button>
+                                        <h3 className="font-bold text-gray-900 capitalize">Simulate {simulatingPortal} Lead</h3>
+                                    </div>
+
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                        <div>
+                                            <label className="dash-label">Lead Name</label>
+                                            <input
+                                                type="text"
+                                                value={simulationData.name}
+                                                onChange={e => setSimulationData({...simulationData, name: e.target.value})}
+                                                className="dash-input"
+                                                required
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="dash-label">Phone Number</label>
+                                            <input
+                                                type="text"
+                                                value={simulationData.phone}
+                                                onChange={e => setSimulationData({...simulationData, phone: e.target.value})}
+                                                className="dash-input"
+                                                required
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="dash-label">Location Preference</label>
+                                            <input
+                                                type="text"
+                                                value={simulationData.location}
+                                                onChange={e => setSimulationData({...simulationData, location: e.target.value})}
+                                                className="dash-input"
+                                                required
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="dash-label">Budget (in Rupees)</label>
+                                            <input
+                                                type="number"
+                                                value={simulationData.budget}
+                                                onChange={e => setSimulationData({...simulationData, budget: e.target.value})}
+                                                className="dash-input"
+                                                required
+                                            />
+                                        </div>
+                                        <div className="md:col-span-2">
+                                            <label className="dash-label">Requirement details</label>
+                                            <textarea
+                                                value={simulationData.requirement}
+                                                onChange={e => setSimulationData({...simulationData, requirement: e.target.value})}
+                                                className="dash-input h-20 resize-none"
+                                                required
+                                            />
+                                        </div>
+                                    </div>
+
+                                    <div className="flex justify-end gap-3 pt-3 border-t border-gray-100">
+                                        <button
+                                            type="button"
+                                            onClick={() => setSimulatingPortal(null)}
+                                            className="btn-dash-secondary"
+                                        >
+                                            Cancel
+                                        </button>
+                                        <button
+                                            onClick={() => handleSimulateLead(simulatingPortal)}
+                                            className="btn-dash-primary"
+                                        >
+                                            🚀 Trigger Inbound Webhook
+                                        </button>
+                                    </div>
+                                </div>
+                            ) : (
+                                <div className="grid grid-cols-1 gap-5">
+                                    {['magicbricks', '99acres', 'housing', 'nobroker', 'google', 'meta'].map(portalName => {
+                                        const config = integrations.find(i => i.portal === portalName);
+                                        const isConnected = !!config;
+                                        const webhookUrl = portalName === 'meta'
+                                            ? `${window.location.origin.replace(':5173', ':3000')}/api/integrations/webhook/meta`
+                                            : `${window.location.origin.replace(':5173', ':3000')}/api/integrations/webhook/${portalName}/${currentUser?.id}`;
+
+                                        let displayName = portalName;
+                                        if (portalName === 'housing') displayName = 'Housing.com';
+                                        else if (portalName === 'nobroker') displayName = 'NoBroker';
+                                        else if (portalName === 'google') displayName = 'Google Ads Forms';
+                                        else if (portalName === 'meta') displayName = 'Meta Ads (Facebook/Instagram)';
+
+                                        return (
+                                            <div key={portalName} className="bg-white border border-gray-150 rounded-2xl p-5 hover:shadow-md transition-all duration-300">
+                                                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                                                    <div className="flex items-start gap-4">
+                                                        <div className="w-12 h-12 bg-gray-50 border border-gray-100 rounded-xl flex items-center justify-center shrink-0 uppercase font-black text-xs text-gray-700 tracking-wider">
+                                                            {portalName === 'google' ? 'GO' : portalName === 'meta' ? 'ME' : portalName.substring(0, 2)}
+                                                        </div>
+                                                        <div>
+                                                            <div className="flex items-center gap-2">
+                                                                <h3 className="font-bold text-gray-900 capitalize text-base">{displayName}</h3>
+                                                                <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold ${
+                                                                    isConnected ? 'bg-green-50 text-green-700 border border-green-200' : 'bg-gray-50 text-gray-500 border border-gray-200'
+                                                                }`}>
+                                                                    {isConnected ? 'Connected' : 'Not Connected'}
+                                                                </span>
+                                                            </div>
+                                                            <p className="text-sm text-gray-500 mt-1">
+                                                                {portalName === 'magicbricks' && 'Sync inbound leads and property search logs from Magicbricks Developer API.'}
+                                                                {portalName === '99acres' && 'Automatically import real-time inquiries using the 99acres lead portal API.'}
+                                                                {portalName === 'housing' && 'Connect Housing.com partner webhook to assign leads to agents.'}
+                                                                {portalName === 'nobroker' && 'Pull leads and inquiries from NoBroker platform.'}
+                                                                {portalName === 'google' && 'Sync leads in real time from Google Search and YouTube Lead Form extensions.'}
+                                                                {portalName === 'meta' && 'Directly connect Facebook Page Leads to CRM database without third party tools.'}
+                                                            </p>
+                                                        </div>
+                                                    </div>
+
+                                                    <div className="flex items-center gap-2 shrink-0 self-end sm:self-center">
+                                                        {isConnected ? (
+                                                            <>
+                                                                <button
+                                                                    onClick={() => setSimulatingPortal(portalName)}
+                                                                    className="px-3 py-1.5 bg-primary/10 hover:bg-primary/20 text-primary rounded-xl text-xs font-bold transition-all"
+                                                                >
+                                                                    Test Simulation
+                                                                </button>
+                                                                <button
+                                                                    onClick={() => handleDisconnectIntegration(portalName)}
+                                                                    className="px-3 py-1.5 bg-red-50 hover:bg-red-100 text-red-600 rounded-xl text-xs font-bold transition-all"
+                                                                >
+                                                                    Disconnect
+                                                                </button>
+                                                            </>
+                                                        ) : (
+                                                            <button
+                                                                onClick={() => {
+                                                                    setIntegrationFormData({ apiKey: '', agentId: '', username: '', password: '' });
+                                                                    setShowConfigPortal(portalName);
+                                                                }}
+                                                                className="btn-dash-primary px-4 py-1.5 text-xs font-bold"
+                                                            >
+                                                                Configure
+                                                            </button>
+                                                        )}
+                                                    </div>
+                                                </div>
+
+                                                {/* Webhook block */}
+                                                {isConnected && (
+                                                    <div className="mt-4 pt-4 border-t border-gray-100">
+                                                        <label className="text-xs font-bold text-gray-450 uppercase tracking-wider">Your Unique Webhook URL</label>
+                                                        <div className="flex items-center gap-2 mt-1.5 bg-gray-50 border border-gray-200 rounded-xl p-2 min-w-0">
+                                                            <input
+                                                                type="text"
+                                                                readOnly
+                                                                value={webhookUrl}
+                                                                className="flex-1 bg-transparent text-xs text-gray-650 font-mono select-all outline-none border-none overflow-x-auto min-w-0"
+                                                            />
+                                                            <button
+                                                                onClick={() => {
+                                                                    navigator.clipboard.writeText(webhookUrl);
+                                                                    alert('Webhook URL copied!');
+                                                                }}
+                                                                className="px-2.5 py-1 bg-white hover:bg-gray-100 text-gray-700 border border-gray-250 rounded-lg text-[10px] font-bold shrink-0 transition-colors"
+                                                            >
+                                                                Copy
+                                                            </button>
+                                                        </div>
+                                                        <p className="text-[11px] text-gray-400 mt-1">
+                                                            {portalName === 'google' && 'Provide this Webhook URL inside your Google Ads Lead Form extension configuration, and set the Google Key to the API key configured here.'}
+                                                            {portalName === 'meta' && 'Provide this Webhook URL inside your Facebook Developer App webhooks subscription setup under Messenger or Webhooks product (Page leadgen topic), and set the verification token to "meta_leads_verify_pass_123".'}
+                                                            {portalName !== 'google' && portalName !== 'meta' && `Provide this Webhook URL inside your ${portalName} portal developer dashboard to enable instant lead syncing.`}
+                                                        </p>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            )}
+                        </div>
+                    )}
+
+                    {/* Billing */}
+                    {activeSection === 'billing' && (
+                        <div className="space-y-5">
+                            <div className="bg-gradient-to-r from-primary/5 to-accent-teal/5 border border-gray-200 rounded-2xl p-5">
+                                <div className="flex items-start gap-4">
+                                    <div className="w-10 h-10 bg-primary/10 rounded-xl flex items-center justify-center shrink-0">
+                                        <CreditCard className="w-5 h-5 text-primary" />
+                                    </div>
+                                    <div>
+                                        <h3 className="font-bold text-gray-900 mb-1">Current Plan: <span className="text-primary">Premium Agency</span></h3>
+                                        <p className="text-sm text-gray-600 mb-3">You are currently billed ₹5,000/month. Next billing date is April 1st.</p>
+                                        <button className="btn-dash-primary">Manage Subscription</button>
+                                    </div>
+                                </div>
                             </div>
                         </div>
                     )}
 
+                    {/* Notifications */}
                     {activeSection === 'notifications' && (
                         <div className="space-y-4">
-                            <label className="flex items-center gap-3 cursor-pointer">
+                            <label className="flex items-center gap-4 cursor-pointer p-4 bg-gray-50 rounded-xl border border-gray-200 hover:bg-gray-100 transition-colors">
                                 <input
                                     type="checkbox"
                                     checked={agencyData.notificationsEnabled}
                                     onChange={(e) => setAgencyData({ ...agencyData, notificationsEnabled: e.target.checked })}
-                                    className="w-5 h-5 rounded text-primary focus:ring-primary accent-primary"
+                                    className="w-4 h-4 rounded text-primary focus:ring-primary accent-primary"
                                 />
-                                <span className="font-medium text-gray-700">Receive email alerts for new leads</span>
+                                <div>
+                                    <span className="font-semibold text-gray-900 text-sm">Email alerts for new leads</span>
+                                    <p className="text-xs text-gray-500 mt-0.5">Receive an email whenever a new lead is added to your pipeline.</p>
+                                </div>
                             </label>
                         </div>
                     )}
 
-                    {/* Action Bar */}
-                    <div className="mt-10 pt-6 border-t border-gray-100 flex justify-end">
-                        <button
-                            onClick={handleSave}
-                            disabled={isSaving}
-                            className="flex items-center gap-2 bg-primary text-white px-6 py-3 rounded-xl font-bold hover:bg-red-800 transition-all shadow-md disabled:opacity-70"
-                        >
-                            {isSaving ? <span className="animate-spin w-5 h-5 border-2 border-white/30 border-t-white rounded-full"></span> : <Save className="w-5 h-5" />}
-                            {isSaving ? 'Saving...' : 'Save Changes'}
-                        </button>
-                    </div>
+                    {/* Save Button (not shown in sequences/integrations edit mode) */}
+                    {activeSection !== 'sequences' && activeSection !== 'integrations' && (
+                        <div className="mt-8 pt-5 border-t border-gray-105 flex justify-end">
+                            <button
+                                onClick={handleSave}
+                                disabled={isSaving}
+                                className="btn-dash-primary disabled:opacity-60"
+                            >
+                                {isSaving
+                                    ? <><Loader2 className="w-4 h-4 animate-spin" /> Saving...</>
+                                    : <><Save className="w-4 h-4" /> Save Changes</>
+                                }
+                            </button>
+                        </div>
+                    )}
                 </div>
             </div>
         </div>
