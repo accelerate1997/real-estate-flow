@@ -33,9 +33,21 @@ dbEvents.on('lead_created', async (lead) => {
         // 2. Fetch agency info (to see if they have connected WhatsApp session instance)
         const instanceName = `Agency_${lead.agencyId}`;
 
-        // 3. Draft personalized greeting message
+        // 3. Draft localized greeting message based on preferred language
         const cleanPhone = lead.phone.replace(/[^\d]/g, '');
-        let greeting = `Hi ${lead.name && lead.name !== 'WhatsApp Contact' ? lead.name : 'there'}! I'm Aria, your dedicated real estate AI assistant at Rajesh Realty. \n\nI saw you just requested info about properties. Are you looking to buy or rent? I can show you our top matches immediately!`;
+        const lang = (lead.preferredLanguage || 'English').toLowerCase();
+        let greeting = '';
+        if (lang === 'hindi') {
+            greeting = `नमस्ते ${lead.name && lead.name !== 'WhatsApp Contact' ? lead.name : ''}! मैं आर्या हूँ, राजेश रियल्टी में आपकी समर्पित रियल एस्टेट एआई असिस्टेंट।\n\nमैंने देखा कि आपने अभी प्रॉपर्टीज के बारे में जानकारी का अनुरोध किया है। क्या आप खरीदना चाहते हैं या किराए पर लेना चाहते हैं? मैं तुरंत आपको बेहतरीन विकल्प दिखा सकती हूँ!`;
+        } else if (lang === 'marathi') {
+            greeting = `नमस्कार ${lead.name && lead.name !== 'WhatsApp Contact' ? lead.name : ''}! मी आर्या, राजेश रियल्टी येथे तुमची समर्पित रिअल इस्टेट एआय असिस्टंट.\n\nमला दिसले की तुम्ही नुकतीच मालमत्तेबद्दल चौकशी केली आहे. तुम्ही खरेदी करू इच्छिता की भाड्याने घेऊ इच्छिता? मी तुम्हाला लगेच आमच्या सर्वोत्तम मॅचेस दाखवू शकते!`;
+        } else if (lang === 'gujarati') {
+            greeting = `નમસ્તે ${lead.name && lead.name !== 'WhatsApp Contact' ? lead.name : ''}! હું આર્યા, રાજેશ રિયાલ્ટીમાં તમારી સમર્પિત રિયલ એસ્ટેટ એઆઈ આસિસ્ટન્ટ.\n\nમેં જોયું કે તમે હમણાં જ પ્રોપર્ટી વિશે પૂછપરછ કરી છે. શું તમે ખરીદવા માંગો છો કે ભાડે રાખવા માંગો છો? હું તમને તરત જ અમારી શ્રેષ્ઠ મેળ ખાતી પ્રોપર્ટીઝ બતાવી શકું છું!`;
+        } else if (lang === 'spanish') {
+            greeting = `¡Hola ${lead.name && lead.name !== 'WhatsApp Contact' ? lead.name : ''}! Soy Aria, tu asistente de inteligencia artificial de bienes raíces en Rajesh Realty.\n\n¡Vi que solicitaste información sobre propiedades! ¿Estás buscando comprar o alquilar? ¡Puedo mostrarte nuestras mejores opciones de inmediato!`;
+        } else {
+            greeting = `Hi ${lead.name && lead.name !== 'WhatsApp Contact' ? lead.name : 'there'}! I'm Aria, your dedicated real estate AI assistant at Rajesh Realty. \n\nI saw you just requested info about properties. Are you looking to buy or rent? I can show you our top matches immediately!`;
+        }
 
         // 5. Send message via Evolution API
         console.log(`📡 Sending instant WhatsApp outreach to ${cleanPhone} via instance ${instanceName}...`);
@@ -605,6 +617,100 @@ app.post('/api/chats/log', (req, res) => {
     }
     logMessage(phone, role, content);
     res.json({ success: true });
+});
+
+// 1. Send OTP via WhatsApp
+app.post('/api/leads/send-otp', async (req, res) => {
+    try {
+        const { phone, agencyId } = req.body;
+        if (!phone || !agencyId) {
+            return res.status(400).json({ success: false, message: 'Phone number and Agency ID are required' });
+        }
+
+        const cleanPhone = phone.replace(/[^\d]/g, '');
+        const otp = Math.floor(100000 + Math.random() * 900000).toString();
+        const expiresAt = new Date(Date.now() + 5 * 60 * 1000); // 5 mins expiry
+        
+        // Save OTP verification record
+        const chars = 'abcdefghijklmnopqrstuvwxyz0123456789';
+        let verifyId = '';
+        for (let i = 0; i < 15; i++) {
+            verifyId += chars.charAt(Math.floor(Math.random() * chars.length));
+        }
+
+        await pool.query(
+            'INSERT INTO otp_verifications (id, phone, otp, expires_at) VALUES ($1, $2, $3, $4)',
+            [verifyId, cleanPhone, otp, expiresAt]
+        );
+
+        // Send OTP via Evolution API
+        const instanceName = `Agency_${agencyId}`;
+        const messageText = `Your verification OTP for Rajesh Realty is: *${otp}*.\n\nThis code is valid for 5 minutes. Please do not share this OTP with anyone.`;
+        
+        console.log(`📡 Sending WhatsApp OTP to ${cleanPhone} via instance ${instanceName}...`);
+        await sendMessage(cleanPhone, messageText, instanceName);
+
+        res.json({ success: true, message: 'Verification OTP sent successfully via WhatsApp!' });
+    } catch (err) {
+        console.error('❌ Error sending OTP:', err.message);
+        res.status(500).json({ success: false, message: err.message });
+    }
+});
+
+// 2. Verify OTP & Submit Enquiry
+app.post('/api/leads/verify-otp', async (req, res) => {
+    try {
+        const {
+            phone,
+            otp,
+            agencyId,
+            name,
+            email,
+            requirement,
+            targetBhk,
+            targetLocation,
+            maxBudget,
+            preferredLanguage
+        } = req.body;
+
+        if (!phone || !otp || !agencyId) {
+            return res.status(400).json({ success: false, message: 'Phone number, OTP, and Agency ID are required' });
+        }
+
+        const cleanPhone = phone.replace(/[^\d]/g, '');
+
+        // Check if OTP matches and is not expired
+        const otpRes = await pool.query(
+            'SELECT * FROM otp_verifications WHERE phone = $1 AND otp = $2 AND expires_at > NOW() ORDER BY created_at DESC LIMIT 1',
+            [cleanPhone, otp]
+        );
+
+        if (otpRes.rows.length === 0) {
+            return res.status(400).json({ success: false, message: 'Invalid or expired OTP code' });
+        }
+
+        // Delete the verified OTP record
+        await pool.query('DELETE FROM otp_verifications WHERE phone = $1', [cleanPhone]);
+
+        // Upsert Lead as verified
+        const leadParams = {
+            name,
+            email,
+            requirement,
+            bhk: targetBhk,
+            location: targetLocation,
+            budget_in_rupees: maxBudget,
+            verified: true,
+            preferredLanguage: preferredLanguage || 'English'
+        };
+
+        const newLead = await db.upsertLead(cleanPhone, agencyId, leadParams);
+
+        res.json({ success: true, message: 'OTP verified successfully!', lead: newLead });
+    } catch (err) {
+        console.error('❌ Error verifying OTP:', err.message);
+        res.status(500).json({ success: false, message: err.message });
+    }
 });
 
 // Health Check for Render/Docker/Coolify

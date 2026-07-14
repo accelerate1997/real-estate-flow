@@ -40,6 +40,7 @@ CONVERSATION FLOW & LEAD QUALIFICATION:
    - Use "SCHEDULE_SITE_VISIT" intent ONLY after you have a specific Date and Time from the user.
 
 CRITICAL RULES:
+- LANGUAGE ADAPTATION: Under SYSTEM NOTE, check for [LEAD_PREFERRED_LANGUAGE: ...]. You MUST conduct the entire conversation (all human responses) in that specified language (e.g. Hindi, Marathi, Gujarati, Spanish, Arabic). If not specified, default to English.
 - DATA PRIVACY: NEVER ask for their WhatsApp or phone number.
 - ANTI-HALLUCINATION: Only discuss properties mentioned in the SYSTEM NOTE search results.
 - PROPERTY LINKS: Whenever you present properties, YOU MUST ALWAYS include the direct "🔗 Link" provided in the search data. Inform the user they can click the link to see more photos and details.
@@ -97,7 +98,7 @@ async function processMessage(userInput, phone, agencyId) {
         let leadNote = "[LEAD_EXISTS: false]";
         let leadIdFound = null;
         if (lead) {
-            leadNote = `[LEAD_EXISTS: true] [LEAD_NAME: ${lead.name || 'Unknown'}] [LEAD_REQS: ${lead.requirement || 'None'}]`;
+            leadNote = `[LEAD_EXISTS: true] [LEAD_NAME: ${lead.name || 'Unknown'}] [LEAD_REQS: ${lead.requirement || 'None'}] [LEAD_PREFERRED_LANGUAGE: ${lead.preferredLanguage || 'English'}]`;
             leadIdFound = lead.id;
         }
 

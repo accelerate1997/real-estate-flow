@@ -23,6 +23,13 @@ const PropertyDetails = () => {
     const [leadEmail, setLeadEmail] = useState('');
     const [isSubmittingLead, setIsSubmittingLead] = useState(false);
     const [leadSubmitted, setLeadSubmitted] = useState(false);
+    
+    // OTP & Language state
+    const [preferredLanguage, setPreferredLanguage] = useState('English');
+    const [otpStep, setOtpStep] = useState(1);
+    const [otpCode, setOtpCode] = useState('');
+    const [otpError, setOtpError] = useState('');
+    const [isSendingOtp, setIsSendingOtp] = useState(false);
 
     useEffect(() => {
         const fetchProperty = async () => {
@@ -61,29 +68,66 @@ const PropertyDetails = () => {
         }
     };
 
-    const handleLeadSubmit = async (e) => {
-        e.preventDefault();
-        setIsSubmittingLead(true);
+    const handleSendOtp = async (e) => {
+        if (e) e.preventDefault();
+        if (!leadPhone) { alert("Please enter your phone number."); return; }
+        setIsSendingOtp(true);
+        setOtpError('');
         try {
-            // Determine target agency ID from property info
             const agencyId = property?.agencyId || property?.expand?.agencyId?.id || property?.expand?.createdBy?.agencyId;
-            
-            await pb.collection('leads').create({
-                name: leadName,
-                phone: leadPhone,
-                email: leadEmail,
-                requirement: `Interested in property: "${property?.title}" (ID: ${property?.id})`,
-                status: 'New Lead',
-                agencyId: agencyId
+            const res = await fetch('/api/leads/send-otp', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ phone: leadPhone, agencyId })
             });
-            
-            setLeadSubmitted(true);
-            setLeadName('');
-            setLeadPhone('');
-            setLeadEmail('');
+            const data = await res.json();
+            if (data.success) {
+                setOtpStep(2);
+            } else {
+                setOtpError(data.message || "Failed to send WhatsApp verification code.");
+            }
         } catch (err) {
-            console.error("Failed to create lead:", err);
-            alert("Failed to submit inquiry. Please try again or contact via WhatsApp.");
+            console.error("Failed to send OTP:", err);
+            setOtpError("Network error. Please try again.");
+        } finally {
+            setIsSendingOtp(false);
+        }
+    };
+
+    const handleVerifyOtp = async (e) => {
+        e.preventDefault();
+        if (!otpCode) { setOtpError("Please enter the verification code."); return; }
+        setIsSubmittingLead(true);
+        setOtpError('');
+        try {
+            const agencyId = property?.agencyId || property?.expand?.agencyId?.id || property?.expand?.createdBy?.agencyId;
+            const res = await fetch('/api/leads/verify-otp', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    phone: leadPhone,
+                    otp: otpCode,
+                    agencyId,
+                    name: leadName,
+                    email: leadEmail,
+                    requirement: `Interested in property: "${property?.title}" (ID: ${property?.id})`,
+                    preferredLanguage
+                })
+            });
+            const data = await res.json();
+            if (data.success) {
+                setLeadSubmitted(true);
+                setLeadName('');
+                setLeadPhone('');
+                setLeadEmail('');
+                setOtpCode('');
+                setOtpStep(1);
+            } else {
+                setOtpError(data.message || "Invalid verification code.");
+            }
+        } catch (err) {
+            console.error("Failed to verify OTP:", err);
+            setOtpError("Network error. Please try again.");
         } finally {
             setIsSubmittingLead(false);
         }
@@ -496,74 +540,139 @@ const PropertyDetails = () => {
                                 </div>
 
                                 {/* Form and Submit */}
-                                {leadSubmitted ? (
-                                    <div className="bg-green-50/60 border border-green-100 p-6 rounded-2xl text-center py-8">
-                                        <div className="w-12 h-12 bg-green-500 text-white rounded-full flex items-center justify-center mx-auto mb-3 shadow-md shadow-green-100">
-                                            <Check className="w-6 h-6" />
-                                        </div>
-                                        <h4 className="font-black text-green-900 text-base mb-1">Inquiry Submitted!</h4>
-                                        <p className="text-xs text-green-700 font-semibold mb-4 leading-relaxed">Our listing agent will reach out to you on WhatsApp / Email shortly.</p>
-                                        <button 
-                                            onClick={() => setLeadSubmitted(false)}
-                                            className="text-xs text-primary font-black uppercase tracking-wider hover:underline"
-                                        >
-                                            Send Another Request
-                                        </button>
-                                    </div>
                                 ) : (
-                                    <form onSubmit={handleLeadSubmit} className="space-y-4">
-                                        <div>
-                                            <label className="block text-[10px] font-extrabold text-gray-400 uppercase tracking-wider mb-1.5">Your Name</label>
-                                            <input
-                                                type="text"
-                                                required
-                                                value={leadName}
-                                                onChange={(e) => setLeadName(e.target.value)}
-                                                placeholder="e.g. John Doe"
-                                                className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-xl text-sm placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-primary/10 focus:border-primary transition-all hover:border-gray-200"
-                                            />
-                                        </div>
-                                        <div>
-                                            <label className="block text-[10px] font-extrabold text-gray-400 uppercase tracking-wider mb-1.5">WhatsApp / Phone</label>
-                                            <input
-                                                type="tel"
-                                                required
-                                                value={leadPhone}
-                                                onChange={(e) => setLeadPhone(e.target.value)}
-                                                placeholder="e.g. +91 99999 99999"
-                                                className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-xl text-sm placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-primary/10 focus:border-primary transition-all hover:border-gray-200"
-                                            />
-                                        </div>
-                                        <div>
-                                            <label className="block text-[10px] font-extrabold text-gray-400 uppercase tracking-wider mb-1.5">Email Address</label>
-                                            <input
-                                                type="email"
-                                                required
-                                                value={leadEmail}
-                                                onChange={(e) => setLeadEmail(e.target.value)}
-                                                placeholder="e.g. john@example.com"
-                                                className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-xl text-sm placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-primary/10 focus:border-primary transition-all hover:border-gray-200"
-                                            />
-                                        </div>
+                                    <div className="space-y-4">
+                                        {otpError && (
+                                            <div className="p-3 bg-red-50 border border-red-100 rounded-xl text-xs text-red-600 font-bold text-center">
+                                                {otpError}
+                                            </div>
+                                        )}
 
-                                        <button
-                                            type="submit"
-                                            disabled={isSubmittingLead}
-                                            className="w-full py-4 bg-primary text-white rounded-xl font-extrabold text-xs uppercase tracking-widest hover:bg-primary-dark transition-all shadow-md shadow-primary/10 hover:shadow-primary/20 hover:-translate-y-0.5 active:translate-y-0 flex items-center justify-center gap-2 mt-2"
-                                        >
-                                            {isSubmittingLead ? (
-                                                <>
-                                                    <Loader2 className="w-4 h-4 animate-spin" />
-                                                    <span>Submitting Request...</span>
-                                                </>
-                                            ) : (
-                                                <>
-                                                    <Mail className="w-4 h-4" />
-                                                    <span>Request Details & Call</span>
-                                                </>
-                                            )}
-                                        </button>
-                                    </form>
+                                        {otpStep === 1 ? (
+                                            <form onSubmit={handleSendOtp} className="space-y-4">
+                                                <div>
+                                                    <label className="block text-[10px] font-extrabold text-gray-400 uppercase tracking-wider mb-1.5">Your Name</label>
+                                                    <input
+                                                        type="text"
+                                                        required
+                                                        value={leadName}
+                                                        onChange={(e) => setLeadName(e.target.value)}
+                                                        placeholder="e.g. John Doe"
+                                                        className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-xl text-sm placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-primary/10 focus:border-primary transition-all hover:border-gray-200"
+                                                    />
+                                                </div>
+                                                <div>
+                                                    <label className="block text-[10px] font-extrabold text-gray-400 uppercase tracking-wider mb-1.5">WhatsApp / Phone</label>
+                                                    <input
+                                                        type="tel"
+                                                        required
+                                                        value={leadPhone}
+                                                        onChange={(e) => setLeadPhone(e.target.value)}
+                                                        placeholder="e.g. +91 99999 99999"
+                                                        className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-xl text-sm placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-primary/10 focus:border-primary transition-all hover:border-gray-200"
+                                                    />
+                                                </div>
+                                                <div>
+                                                    <label className="block text-[10px] font-extrabold text-gray-400 uppercase tracking-wider mb-1.5">Email Address</label>
+                                                    <input
+                                                        type="email"
+                                                        required
+                                                        value={leadEmail}
+                                                        onChange={(e) => setLeadEmail(e.target.value)}
+                                                        placeholder="e.g. john@example.com"
+                                                        className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-xl text-sm placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-primary/10 focus:border-primary transition-all hover:border-gray-200"
+                                                    />
+                                                </div>
+                                                <div>
+                                                    <label className="block text-[10px] font-extrabold text-gray-400 uppercase tracking-wider mb-1.5">Preferred Language to Speak</label>
+                                                    <select
+                                                        value={preferredLanguage}
+                                                        onChange={(e) => setPreferredLanguage(e.target.value)}
+                                                        className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary/10 focus:border-primary transition-all hover:border-gray-200"
+                                                    >
+                                                        <option value="English">English</option>
+                                                        <option value="Hindi">Hindi (हिंदी)</option>
+                                                        <option value="Marathi">Marathi (मराठी)</option>
+                                                        <option value="Gujarati">Gujarati (ગુજરાતી)</option>
+                                                        <option value="Spanish">Spanish (Español)</option>
+                                                    </select>
+                                                </div>
+
+                                                <button
+                                                    type="submit"
+                                                    disabled={isSendingOtp}
+                                                    className="w-full py-4 bg-primary text-white rounded-xl font-extrabold text-xs uppercase tracking-widest hover:bg-primary-dark transition-all shadow-md shadow-primary/10 hover:shadow-primary/20 hover:-translate-y-0.5 active:translate-y-0 flex items-center justify-center gap-2 mt-2"
+                                                >
+                                                    {isSendingOtp ? (
+                                                        <>
+                                                            <Loader2 className="w-4 h-4 animate-spin" />
+                                                            <span>Sending WhatsApp OTP...</span>
+                                                        </>
+                                                    ) : (
+                                                        <>
+                                                            <Phone className="w-4 h-4" />
+                                                            <span>Verify Phone via WhatsApp</span>
+                                                        </>
+                                                    )}
+                                                </button>
+                                            </form>
+                                        ) : (
+                                            <form onSubmit={handleVerifyOtp} className="space-y-4">
+                                                <div className="text-center py-2">
+                                                    <h5 className="font-extrabold text-gray-800 text-sm mb-1">Enter Verification Code</h5>
+                                                    <p className="text-xs text-gray-500">We sent a 6-digit OTP code to <strong className="text-gray-700">{leadPhone}</strong> via WhatsApp.</p>
+                                                </div>
+                                                <div>
+                                                    <input
+                                                        type="text"
+                                                        required
+                                                        maxLength={6}
+                                                        value={otpCode}
+                                                        onChange={(e) => setOtpCode(e.target.value.replace(/[^\d]/g, ''))}
+                                                        placeholder="Enter OTP Code"
+                                                        className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-xl text-center text-lg font-black tracking-widest focus:outline-none focus:ring-2 focus:ring-primary/10 focus:border-primary transition-all"
+                                                    />
+                                                </div>
+
+                                                <div className="flex gap-3 mt-4">
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => setOtpStep(1)}
+                                                        className="flex-1 py-3.5 bg-gray-100 text-gray-700 rounded-xl font-extrabold text-xs uppercase tracking-wider hover:bg-gray-200 transition-all text-center"
+                                                    >
+                                                        Back
+                                                    </button>
+                                                    <button
+                                                        type="submit"
+                                                        disabled={isSubmittingLead}
+                                                        className="flex-[2] py-3.5 bg-primary text-white rounded-xl font-extrabold text-xs uppercase tracking-widest hover:bg-primary-dark transition-all shadow-md shadow-primary/10 flex items-center justify-center gap-2"
+                                                    >
+                                                        {isSubmittingLead ? (
+                                                            <>
+                                                                <Loader2 className="w-4 h-4 animate-spin" />
+                                                                <span>Verifying...</span>
+                                                            </>
+                                                        ) : (
+                                                            <>
+                                                                <Check className="w-4 h-4" />
+                                                                <span>Confirm & Submit</span>
+                                                            </>
+                                                        )}
+                                                    </button>
+                                                </div>
+                                                <div className="text-center">
+                                                    <button
+                                                        type="button"
+                                                        onClick={handleSendOtp}
+                                                        disabled={isSendingOtp}
+                                                        className="text-[10px] text-primary font-black uppercase tracking-wider hover:underline mt-2 disabled:text-gray-400"
+                                                    >
+                                                        {isSendingOtp ? "Sending..." : "Resend OTP Code"}
+                                                    </button>
+                                                </div>
+                                            </form>
+                                        )}
+                                    </div>
                                 )}
 
                                 {/* WhatsApp Fast Link */}

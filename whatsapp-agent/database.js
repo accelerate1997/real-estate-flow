@@ -158,13 +158,18 @@ module.exports = {
                         target_location = COALESCE($4, target_location), 
                         max_budget = COALESCE($5, max_budget),
                         date = COALESCE($6, date),
+                        verified = COALESCE($7, verified),
+                        "preferredLanguage" = COALESCE($8, "preferredLanguage"),
                         updated_at = NOW()
-                    WHERE id = $7
+                    WHERE id = $9
                     RETURNING *
                 `;
                 const updateRes = await pool.query(updateQuery, [
                     finalName, finalRequirement, targetBhk || null, targetLocation || null, 
-                    maxBudget || null, followUpDate, leadId
+                    maxBudget || null, followUpDate,
+                    params.verified !== undefined ? params.verified : null,
+                    params.preferredLanguage || null,
+                    leadId
                 ]);
                 console.log(`[DB] Updated Lead ${leadId}`);
                 return updateRes.rows[0];
@@ -172,13 +177,14 @@ module.exports = {
                 // Insert new lead
                 const newId = generateId();
                 const insertQuery = `
-                    INSERT INTO leads (id, "agencyId", name, phone, requirement, target_bhk, target_location, max_budget, status, date, created_at, updated_at)
-                    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, NOW(), NOW())
+                    INSERT INTO leads (id, "agencyId", name, phone, requirement, target_bhk, target_location, max_budget, status, date, verified, "preferredLanguage", created_at, updated_at)
+                    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, NOW(), NOW())
                     RETURNING *
                 `;
                 const insertRes = await pool.query(insertQuery, [
                     newId, agencyId, name || 'WhatsApp Contact', cleanPhone, requirementText,
-                    targetBhk, targetLocation, maxBudget, 'New Lead', followUpDate
+                    targetBhk, targetLocation, maxBudget, 'New Lead', followUpDate,
+                    params.verified === true, params.preferredLanguage || 'English'
                 ]);
                 const newLead = insertRes.rows[0];
                 console.log(`[DB] Created new Lead: ${newLead.id}`);
