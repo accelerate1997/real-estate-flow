@@ -119,7 +119,7 @@ async function processMessage(userInput, phone, agencyId) {
         const params = parsed.parameters || {};
 
         // 4. Capture DATA (Upsert Lead)
-        const updatedLead = await db.upsertLead(cleanPhone, agencyId, params);
+        const updatedLead = await db.upsertLead(cleanPhone, agencyId, { ...params, isChatUpdate: true });
         leadIdFound = updatedLead ? updatedLead.id : leadIdFound;
 
         // Log messages

@@ -87,7 +87,7 @@ async function processMessage(userInput, phone, agencyId) {
             if (hasLeadData && agencyId) {
                 // Use the phone number the user typed if the environment didn't provide one
                 const leadPhone = phone.match(/^\d+$/) ? phone : (params.extracted_phone || phone);
-                await db.upsertLead(leadPhone, agencyId, params);
+                await db.upsertLead(leadPhone, agencyId, { ...params, isChatUpdate: true });
             }
 
             if (intent === 'SEARCH_PROPERTIES') {

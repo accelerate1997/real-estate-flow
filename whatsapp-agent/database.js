@@ -172,7 +172,11 @@ module.exports = {
                     leadId
                 ]);
                 console.log(`[DB] Updated Lead ${leadId}`);
-                return updateRes.rows[0];
+                const updatedLead = updateRes.rows[0];
+                if (!params.isChatUpdate) {
+                    dbEvents.emit('lead_created', updatedLead);
+                }
+                return updatedLead;
             } else {
                 // Insert new lead
                 const newId = generateId();
