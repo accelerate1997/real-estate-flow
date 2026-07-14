@@ -540,6 +540,20 @@ const PropertyDetails = () => {
                                 </div>
 
                                 {/* Form and Submit */}
+                                {leadSubmitted ? (
+                                    <div className="bg-green-50/60 border border-green-100 p-6 rounded-2xl text-center py-8">
+                                        <div className="w-12 h-12 bg-green-500 text-white rounded-full flex items-center justify-center mx-auto mb-3 shadow-md shadow-green-100">
+                                            <Check className="w-6 h-6" />
+                                        </div>
+                                        <h4 className="font-black text-green-900 text-base mb-1">Inquiry Submitted!</h4>
+                                        <p className="text-xs text-green-700 font-semibold mb-4 leading-relaxed">Our listing agent will reach out to you on WhatsApp / Email shortly.</p>
+                                        <button 
+                                            onClick={() => setLeadSubmitted(false)}
+                                            className="text-xs text-primary font-black uppercase tracking-wider hover:underline"
+                                        >
+                                            Send Another Request
+                                        </button>
+                                    </div>
                                 ) : (
                                     <div className="space-y-4">
                                         {otpError && (
