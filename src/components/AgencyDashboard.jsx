@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
     LayoutDashboard, Users, Settings, LogOut,
     Menu, X, Home, Loader2, Bell, TrendingUp, Target, Calendar,
-    ChevronRight, Sparkles
+    ChevronRight, Sparkles, Send
 } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { useNavigate } from 'react-router-dom';
@@ -14,6 +14,7 @@ import AgencySettings from './AgencySettings';
 import LeadManagement from './LeadManagement';
 import SmartMatches from './SmartMatches';
 import SiteVisits from './SiteVisits';
+import BulkMarketing from './BulkMarketing';
 
 // ─── Sidebar ──────────────────────────────────────────────────────────────────
 const Sidebar = ({ activeTab, setActiveTab, isOpen, setIsOpen, onLogout, isOwner }) => {
@@ -27,6 +28,7 @@ const Sidebar = ({ activeTab, setActiveTab, isOpen, setIsOpen, onLogout, isOwner
     ];
 
     if (isOwner) {
+        links.push({ name: 'Bulk Marketing', icon: Send, id: 'marketing' });
         links.push({ name: 'Agency Settings', icon: Settings, id: 'settings' });
     }
 
@@ -402,6 +404,7 @@ const AgencyDashboard = () => {
             matches: 'Smart Matches',
             visits: 'Site Visits',
             agents: isOwner ? 'Manage Agents' : 'Agency Directory',
+            marketing: 'Bulk Marketing Campaigns',
             settings: 'Agency Settings',
         };
         return titles[activeTab] || 'Dashboard';
@@ -415,6 +418,17 @@ const AgencyDashboard = () => {
             case 'matches': return <SmartMatches />;
             case 'visits': return <SiteVisits />;
             case 'agents': return <AgentManagement />;
+            case 'marketing': return isOwner
+                ? <BulkMarketing />
+                : (
+                    <div className="flex flex-col items-center justify-center py-24 text-center">
+                        <div className="w-16 h-16 bg-red-50 rounded-2xl flex items-center justify-center mb-4">
+                            <Send className="w-8 h-8 text-primary" />
+                        </div>
+                        <h3 className="text-xl font-bold text-gray-900 mb-2">Access Denied</h3>
+                        <p className="text-gray-500">Owner privileges are required to view Bulk Marketing.</p>
+                    </div>
+                );
             case 'settings': return isOwner
                 ? <AgencySettings />
                 : (
