@@ -1421,6 +1421,25 @@ async function runCampaignProcessor(campaignId) {
         const { template_name, template_language, variables, agency_id } = campaign;
         const mappedVars = Array.isArray(variables) ? variables : JSON.parse(variables || '[]');
 
+        // Fetch property details if a property was selected in campaign filters
+        let property = null;
+        let filtersObj = {};
+        try {
+            filtersObj = typeof campaign.filters === 'string' ? JSON.parse(campaign.filters) : (campaign.filters || {});
+        } catch (e) {
+            console.error("Error parsing campaign filters:", e.message);
+        }
+        if (filtersObj.propertyId) {
+            try {
+                const propRes = await pool.query('SELECT * FROM properties WHERE id = $1', [filtersObj.propertyId]);
+                if (propRes.rows.length > 0) {
+                    property = propRes.rows[0];
+                }
+            } catch (dbErr) {
+                console.error("❌ Error fetching property details for campaign runner:", dbErr.message);
+            }
+        }
+
         // Fetch pending recipients
         const recipientsRes = await pool.query(
             'SELECT l.*, ld.name, ld.target_location, ld.target_bhk FROM campaign_logs l JOIN leads ld ON l.lead_id = ld.id WHERE l.campaign_id = $1 AND l.status = $2',
@@ -1448,6 +1467,20 @@ async function runCampaignProcessor(campaignId) {
                     if (v === 'name') return { type: 'text', text: recipient.name || 'Customer' };
                     if (v === 'target_location') return { type: 'text', text: recipient.target_location || 'Any' };
                     if (v === 'target_bhk') return { type: 'text', text: recipient.target_bhk || 'Any' };
+                    
+                    // Property-specific dynamic variables
+                    if (v === 'property_title') return { type: 'text', text: property ? property.title : 'Featured Property' };
+                    if (v === 'property_location') return { type: 'text', text: property ? property.location : 'Prime Location' };
+                    if (v === 'property_bhk') return { type: 'text', text: property ? property.bhk : '2BHK/3BHK' };
+                    if (v === 'property_price') return { type: 'text', text: property ? `₹${Number(property.price).toLocaleString()}` : 'Ask for Price' };
+                    if (v === 'property_type') return { type: 'text', text: property ? property.type : 'Apartment' };
+                    if (v === 'property_listing_type') return { type: 'text', text: property ? property.listing_type : 'Sale' };
+                    if (v === 'property_link') {
+                        const appUrl = process.env.VITE_APP_URL || 'https://realestateflow.elevetoai.com';
+                        const propId = property ? property.id : '';
+                        return { type: 'text', text: propId ? `${appUrl}/properties/${propId}` : appUrl };
+                    }
+                    
                     return { type: 'text', text: v }; // Literal fallback
                 });
 

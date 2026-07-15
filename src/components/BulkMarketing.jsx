@@ -580,7 +580,8 @@ const BulkMarketing = () => {
                                                         ...creatingCampaign.filters,
                                                         location: prop.location || '',
                                                         bhk: prop.bhk || '',
-                                                        maxBudget: prop.price || ''
+                                                        maxBudget: prop.price || '',
+                                                        propertyId: prop.id
                                                     };
                                                     setCreatingCampaign(prev => ({
                                                         ...prev,
@@ -725,7 +726,7 @@ const BulkMarketing = () => {
                                     />
                                     <div className="flex gap-2 mt-2 flex-wrap">
                                         <span className="text-[10px] text-gray-500">Suggested tags:</span>
-                                        {['name', 'target_location', 'target_bhk'].map(tag => (
+                                        {['name', 'target_location', 'target_bhk', 'property_title', 'property_location', 'property_bhk', 'property_price', 'property_type', 'property_listing_type', 'property_link'].map(tag => (
                                             <button
                                                 key={tag}
                                                 type="button"
