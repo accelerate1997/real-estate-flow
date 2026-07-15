@@ -1,5 +1,5 @@
 const db = require('./database');
-const { sendMessage } = require('./evolution');
+const { sendMessage } = require('./whatsapp');
 
 /**
  * Periodically checks for due follow-up messages and sends them.

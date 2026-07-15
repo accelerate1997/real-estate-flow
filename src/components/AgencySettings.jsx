@@ -75,6 +75,8 @@ const AgencySettings = () => {
     };
     const [qrCode, setQrCode] = useState(null);
     const [waConnectionStatus, setWaConnectionStatus] = useState('idle');
+    const [waError, setWaError] = useState('');
+    const [waVerifiedName, setWaVerifiedName] = useState('');
     const [sequences, setSequences] = useState([]);
     const [isSequencesLoading, setIsSequencesLoading] = useState(false);
     const [editingSequence, setEditingSequence] = useState(null);
@@ -108,8 +110,31 @@ const AgencySettings = () => {
         address: '123 Business Avenue, Andheri West, Mumbai',
         notificationsEnabled: true,
         geminiKey: currentUser?.geminiKey || '',
-        agentEnabled: currentUser?.agentEnabled ?? true
+        agentEnabled: currentUser?.agentEnabled ?? true,
+        whatsappToken: currentUser?.metadata?.whatsappToken || '',
+        whatsappPhoneNumberId: currentUser?.metadata?.whatsappPhoneNumberId || '',
+        whatsappBusinessAccountId: currentUser?.metadata?.whatsappBusinessAccountId || ''
     });
+
+    const fetchWhatsAppStatus = async () => {
+        if (!currentUser?.id) return;
+        setWaConnectionStatus('loading');
+        try {
+            const res = await fetch(`/api/whatsapp/status?agencyId=${currentUser.id}`);
+            const data = await res.json();
+            if (data.success && data.connected) {
+                setWaConnectionStatus('connected');
+                setWaVerifiedName(data.verifiedName || '');
+                setWaError('');
+            } else {
+                setWaConnectionStatus('idle');
+                if (data.error) setWaError(data.error);
+            }
+        } catch (error) {
+            console.error("Error fetching WhatsApp status:", error);
+            setWaConnectionStatus('idle');
+        }
+    };
 
     const fetchSequences = async () => {
         if (!currentUser?.id) return;
@@ -230,6 +255,8 @@ const AgencySettings = () => {
             fetchSequences();
         } else if (activeSection === 'integrations') {
             fetchIntegrations();
+        } else if (activeSection === 'whatsapp') {
+            fetchWhatsAppStatus();
         }
     }, [activeSection]);
 
@@ -273,7 +300,13 @@ const AgencySettings = () => {
                     agencyName: agencyData.agencyName,
                     phone: agencyData.phone,
                     geminiKey: agencyData.geminiKey,
-                    agentEnabled: agencyData.agentEnabled
+                    agentEnabled: agencyData.agentEnabled,
+                    metadata: {
+                        ...currentUser.metadata,
+                        whatsappToken: agencyData.whatsappToken,
+                        whatsappPhoneNumberId: agencyData.whatsappPhoneNumberId,
+                        whatsappBusinessAccountId: agencyData.whatsappBusinessAccountId
+                    }
                 });
                 await pb.collection('users').authRefresh();
                 alert("Settings saved successfully!");
@@ -288,34 +321,56 @@ const AgencySettings = () => {
 
     const handleConnectWhatsApp = async () => {
         if (!agencyData.phone) { alert("Please enter a WhatsApp number first."); return; }
+        if (!agencyData.whatsappToken) { alert("Please enter a Meta Access Token first."); return; }
+        if (!agencyData.whatsappPhoneNumberId) { alert("Please enter a WhatsApp Phone Number ID first."); return; }
+        
         setWaConnectionStatus('loading');
-        setQrCode(null);
+        setWaError('');
+        setWaVerifiedName('');
         try {
             const res = await fetch('/api/whatsapp/connect', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ agencyId: currentUser?.id, phoneNumber: agencyData.phone })
+                body: JSON.stringify({ 
+                    agencyId: currentUser?.id, 
+                    phoneNumber: agencyData.phone,
+                    whatsappToken: agencyData.whatsappToken,
+                    whatsappPhoneNumberId: agencyData.whatsappPhoneNumberId,
+                    whatsappBusinessAccountId: agencyData.whatsappBusinessAccountId
+                })
             });
             if (!res.ok) {
                 const errorText = await res.text();
-                throw new Error(`HTTP Error ${res.status}: ${errorText || res.statusText}`);
+                throw new Error(errorText || `HTTP Error ${res.status}`);
             }
             const data = await res.json();
-            if (data.connected || data.instance?.state === 'open') {
+            if (data.success && data.connected) {
                 setWaConnectionStatus('connected');
-            } else if (data.qr) {
-                setQrCode(data.qr);
-                setWaConnectionStatus('ready');
-            } else if (data.mock) {
-                setWaConnectionStatus('idle');
-                alert("WhatsApp integration is in DEMO mode (missing API keys). Check your .env config.");
+                setWaVerifiedName(data.verifiedName || '');
+                // Save settings in PocketBase as well!
+                if (currentUser?.id) {
+                    await pb.collection('users').update(currentUser.id, {
+                        phone: agencyData.phone,
+                        metadata: {
+                            ...currentUser.metadata,
+                            whatsappToken: agencyData.whatsappToken,
+                            whatsappPhoneNumberId: agencyData.whatsappPhoneNumberId,
+                            whatsappBusinessAccountId: agencyData.whatsappBusinessAccountId
+                        }
+                    });
+                    await pb.collection('users').authRefresh();
+                }
+                alert("WhatsApp API connected and saved successfully!");
             } else {
-                alert("Failed to initialize WhatsApp connection. " + (data.error || "Check console."));
+                const errMsg = data.error || "Verification failed";
+                setWaError(errMsg);
+                alert("Failed to connect WhatsApp: " + errMsg);
                 setWaConnectionStatus('idle');
             }
         } catch (error) {
             console.error(error);
-            alert("Error connecting to server. Is whatsapp-agent running?");
+            setWaError(error.message);
+            alert("Error connecting to server: " + error.message);
             setWaConnectionStatus('idle');
         }
     };
@@ -413,8 +468,8 @@ const AgencySettings = () => {
                                         <MessageSquare className="w-5 h-5 text-green-600" />
                                     </div>
                                     <div>
-                                        <h3 className="font-bold text-gray-900 mb-0.5">WA Saathi Integration</h3>
-                                        <p className="text-sm text-gray-600">Connect your WhatsApp Business number to automatically handle leads using our AI property agent.</p>
+                                        <h3 className="font-bold text-gray-900 mb-0.5">WhatsApp Cloud API (Official)</h3>
+                                        <p className="text-sm text-gray-600">Connect your official Meta WhatsApp Business Platform account for reliable, automated AI chat outreach.</p>
                                     </div>
                                 </div>
 
@@ -440,60 +495,118 @@ const AgencySettings = () => {
                                         </label>
                                     </div>
 
-                                    {/* Phone input */}
-                                    <div>
-                                        <label className="dash-label">WhatsApp Number (with Country Code)</label>
-                                        <input
-                                            type="text"
-                                            value={agencyData.phone || ''}
-                                            onChange={(e) => setAgencyData({ ...agencyData, phone: e.target.value })}
-                                            placeholder="e.g. +91 9876543210"
-                                            className="dash-input max-w-sm"
-                                        />
+                                    {/* Webhook Info Card */}
+                                    <div className="bg-blue-50 border border-blue-100 rounded-xl p-4 space-y-3">
+                                        <h4 className="text-xs font-extrabold text-blue-800 uppercase tracking-wider">Meta Developer Webhook Configuration</h4>
+                                        <p className="text-xs text-blue-700 leading-relaxed">
+                                            Configure these values under the <strong>WhatsApp &gt; Configuration</strong> tab in your Meta Developer App dashboard:
+                                        </p>
+                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-1">
+                                            <div>
+                                                <span className="text-[10px] font-bold text-blue-600 block mb-1">CALLBACK URL</span>
+                                                <div className="bg-white px-3 py-2 rounded-lg border border-blue-200 text-xs font-mono break-all select-all flex items-center justify-between">
+                                                    <span>{`${window.location.origin}/webhook`}</span>
+                                                </div>
+                                            </div>
+                                            <div>
+                                                <span className="text-[10px] font-bold text-blue-600 block mb-1">VERIFY TOKEN</span>
+                                                <div className="bg-white px-3 py-2 rounded-lg border border-blue-200 text-xs font-mono break-all select-all flex items-center justify-between">
+                                                    <span>{import.meta.env.VITE_WA_VERIFY_TOKEN || 'rajesh_real_estate'}</span>
+                                                </div>
+                                            </div>
+                                        </div>
                                     </div>
 
-                                    {/* Connection status */}
-                                    {waConnectionStatus === 'connected' ? (
-                                        <div className="flex flex-col items-start gap-2">
-                                            <div className="flex items-center gap-2 bg-green-100 text-green-800 px-4 py-2.5 rounded-xl font-bold text-sm">
-                                                <Check className="w-4 h-4" /> Successfully Connected!
+                                    {/* Credentials Form */}
+                                    <div className="space-y-4 pt-2">
+                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                            <div>
+                                                <label className="dash-label">WhatsApp Phone Number</label>
+                                                <input
+                                                    type="text"
+                                                    value={agencyData.phone || ''}
+                                                    onChange={(e) => setAgencyData({ ...agencyData, phone: e.target.value })}
+                                                    placeholder="e.g. +91 9876543210"
+                                                    className="dash-input"
+                                                />
+                                                <span className="text-[10px] text-gray-500 mt-1 block">Registered WhatsApp Business number</span>
                                             </div>
-                                            <p className="text-xs text-green-700">Your agent is actively listening to messages.</p>
+                                            <div>
+                                                <label className="dash-label">WhatsApp Phone Number ID</label>
+                                                <input
+                                                    type="text"
+                                                    value={agencyData.whatsappPhoneNumberId || ''}
+                                                    onChange={(e) => setAgencyData({ ...agencyData, whatsappPhoneNumberId: e.target.value })}
+                                                    placeholder="e.g. 104857209384729"
+                                                    className="dash-input"
+                                                />
+                                                <span className="text-[10px] text-gray-500 mt-1 block">From WhatsApp Getting Started / API settings tab</span>
+                                            </div>
+                                        </div>
+
+                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                            <div>
+                                                <label className="dash-label">WhatsApp Business Account ID (WABA ID)</label>
+                                                <input
+                                                    type="text"
+                                                    value={agencyData.whatsappBusinessAccountId || ''}
+                                                    onChange={(e) => setAgencyData({ ...agencyData, whatsappBusinessAccountId: e.target.value })}
+                                                    placeholder="e.g. 209384729304857"
+                                                    className="dash-input"
+                                                />
+                                                <span className="text-[10px] text-gray-500 mt-1 block">Optional, for metadata reference</span>
+                                            </div>
+                                            <div>
+                                                <label className="dash-label">Meta Access Token (System User Token)</label>
+                                                <input
+                                                    type="password"
+                                                    value={agencyData.whatsappToken || ''}
+                                                    onChange={(e) => setAgencyData({ ...agencyData, whatsappToken: e.target.value })}
+                                                    placeholder="EAABw..."
+                                                    className="dash-input"
+                                                />
+                                                <span className="text-[10px] text-gray-500 mt-1 block">Use a permanent token generated in Business Manager</span>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {/* Connection status & verification buttons */}
+                                    {waConnectionStatus === 'connected' ? (
+                                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-3 border-t border-green-200">
+                                            <div className="flex items-center gap-2 bg-green-100 text-green-800 px-4 py-2.5 rounded-xl font-bold text-sm">
+                                                <Check className="w-4 h-4" /> Connected to official API
+                                            </div>
+                                            {waVerifiedName && (
+                                                <span className="text-xs text-green-700 font-bold bg-green-100/50 px-3 py-1 rounded-full border border-green-200">
+                                                    Account: {waVerifiedName}
+                                                </span>
+                                            )}
+                                            <button
+                                                onClick={handleConnectWhatsApp}
+                                                className="text-xs font-bold text-green-700 hover:text-green-900 underline"
+                                            >
+                                                Re-verify Credentials
+                                            </button>
                                         </div>
                                     ) : (
-                                        <div className="flex flex-col items-start gap-4">
-                                            <div className="flex items-center gap-3">
+                                        <div className="flex flex-col gap-3 pt-3 border-t border-green-200">
+                                            <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
                                                 <button
                                                     onClick={handleConnectWhatsApp}
                                                     disabled={waConnectionStatus === 'loading'}
                                                     className="btn-dash-teal disabled:opacity-70"
                                                 >
                                                     {waConnectionStatus === 'loading'
-                                                        ? <><Loader2 className="w-4 h-4 animate-spin" /> Initializing...</>
-                                                        : 'Generate QR Code'}
+                                                        ? <><Loader2 className="w-4 h-4 animate-spin" /> Verifying Connection...</>
+                                                        : 'Verify & Save Connection'}
                                                 </button>
                                                 <span className="text-xs text-gray-500 flex items-center gap-1">
-                                                    <Shield className="w-3.5 h-3.5 text-green-500" /> Secure Connection
+                                                    <Shield className="w-3.5 h-3.5 text-green-500" /> Meta API Verification
                                                 </span>
                                             </div>
-
-                                            {waConnectionStatus === 'ready' && qrCode && (
-                                                <div className="p-5 bg-white rounded-2xl shadow-sm border border-green-200 inline-block text-center">
-                                                    <p className="mb-3 font-bold text-gray-900 text-sm">Scan with WhatsApp</p>
-                                                    <img
-                                                        src={qrCode.startsWith('data:image') ? qrCode : `data:image/png;base64,${qrCode}`}
-                                                        alt="WhatsApp Connection QR Code"
-                                                        className="w-48 h-48 sm:w-56 sm:h-56 mx-auto rounded-xl border border-gray-100 shadow-sm"
-                                                    />
-                                                    <p className="mt-3 text-xs text-gray-500 max-w-[200px] mx-auto">
-                                                        Go to Settings &gt; Linked Devices to scan this code.
-                                                    </p>
-                                                    <button
-                                                        onClick={() => setWaConnectionStatus('connected')}
-                                                        className="mt-3 text-xs font-bold text-green-600 hover:text-green-800"
-                                                    >
-                                                        [Demo Only] Simulate Scan
-                                                    </button>
+                                            {waError && (
+                                                <div className="text-xs text-red-600 bg-red-50 border border-red-200 p-3 rounded-lg font-bold">
+                                                    ❌ Verification Error: {waError}
                                                 </div>
                                             )}
                                         </div>
@@ -501,21 +614,23 @@ const AgencySettings = () => {
                                 </div>
                             </div>
 
-                            {/* Instructions */}
+                            {/* Setup Instructions */}
                             <div className="border-t border-gray-100 pt-5">
-                                <h4 className="font-bold text-gray-900 mb-3 text-sm">Setup Instructions</h4>
-                                <ol className="space-y-2">
+                                <h4 className="font-bold text-gray-900 mb-3 text-sm">Official WhatsApp Setup Instructions</h4>
+                                <ol className="space-y-3">
                                     {[
-                                        'Enter your official agency WhatsApp number above.',
-                                        'Click Connect Number. A QR code will be generated.',
-                                        'Open WhatsApp on your phone, go to Linked Devices, and scan the QR code.',
-                                        'Once connected, the WA Saathi AI will automatically greet new incoming messages.'
+                                        'Create a Developer Account on developers.facebook.com and create a Business App.',
+                                        'Add WhatsApp integration to your app. Meta will assign a test phone number (you can bind a real business number later).',
+                                        'Retrieve your Phone Number ID and temporary Access Token from the Getting Started tab.',
+                                        'Fill in the WhatsApp Phone Number, Phone Number ID, WABA ID, and Meta Access Token above.',
+                                        'Click Verify & Save Connection to test connectivity with Meta\'s servers.',
+                                        'Copy the Callback URL and Verify Token from the Blue Webhook Configuration Card above, paste them into the Configuration page of your Meta WhatsApp app, and subscribe to the "messages" webhook event.'
                                     ].map((step, i) => (
                                         <li key={i} className="flex items-start gap-3 text-sm text-gray-600">
                                             <span className="w-5 h-5 rounded-full bg-accent-teal/10 text-accent-teal font-bold text-[11px] flex items-center justify-center shrink-0 mt-0.5">
                                                 {i + 1}
                                             </span>
-                                            {step}
+                                            <span className="flex-1">{step}</span>
                                         </li>
                                     ))}
                                 </ol>

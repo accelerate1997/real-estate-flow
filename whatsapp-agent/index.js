@@ -10,7 +10,7 @@ const jwt = require('jsonwebtoken');
 const db = require('./database');
 const { pool, initDB, autoMigrateIfEmpty } = require('./database/db');
 const { processMessage } = require('./openai_service');
-const { sendMessage } = require('./evolution');
+const { sendMessage } = require('./whatsapp');
 const followupEngine = require('./followup_engine');
 const { uploadToR2 } = require('./database/r2');
 
@@ -718,80 +718,140 @@ app.get('/health', (req, res) => {
     res.status(200).json({ status: 'AGENT_ALIVE_V2', recentWebhooks });
 });
 
+app.get('/webhook', (req, res) => {
+    const mode = req.query['hub.mode'];
+    const token = req.query['hub.verify_token'];
+    const challenge = req.query['hub.challenge'];
+    
+    const verifyToken = process.env.WHATSAPP_VERIFY_TOKEN || 'rajesh_real_estate';
+    
+    if (mode && token) {
+        if (mode === 'subscribe' && token === verifyToken) {
+            console.log('✅ Meta Webhook verified successfully!');
+            return res.status(200).send(challenge);
+        } else {
+            console.error('❌ Meta Webhook verification failed. Tokens do not match.');
+            return res.sendStatus(403);
+        }
+    }
+    return res.sendStatus(400);
+});
+
+// De-duplication cache
+const processedMessages = new Map();
+const CACHE_TTL = 5 * 60 * 1000;
+function isDuplicate(id) {
+    const now = Date.now();
+    if (processedMessages.has(id)) return true;
+    processedMessages.set(id, now);
+    // Clean old items from map occasionally
+    if (processedMessages.size > 1000) {
+        for (const [k, v] of processedMessages.entries()) {
+            if (now - v > CACHE_TTL) processedMessages.delete(k);
+        }
+    }
+    return false;
+}
+
 app.post('/webhook', async (req, res) => {
     try {
-        console.log("🔥 INCOMING WEBHOOK:", JSON.stringify(req.body, null, 2));
-        const { event, data } = req.body;
+        const body = req.body;
+        console.log("🔥 INCOMING META WEBHOOK:", JSON.stringify(body, null, 2));
 
-        const normalizedEvent = event ? event.toLowerCase() : '';
-        if (normalizedEvent !== 'messages.upsert') {
+        if (body.object !== 'whatsapp_business_account') {
             return res.sendStatus(200);
         }
 
-        const msg = Array.isArray(data) ? data[0] : data;
+        const entry = body.entry?.[0];
+        const change = entry?.changes?.[0];
+        const value = change?.value;
 
-        // Anti-loop and timeout logic
-        const rawTimestamp = msg?.messageTimestamp || (req.body.date_time ? Math.floor(new Date(req.body.date_time).getTime() / 1000) : null);
-        if (rawTimestamp) {
-            const age = Math.floor(Date.now() / 1000) - rawTimestamp;
-            if (age > 60 && age < 3600) {
+        if (!value || !value.messages || value.messages.length === 0) {
+            return res.sendStatus(200);
+        }
+
+        const msg = value.messages[0];
+        const msgId = msg.id;
+        const fromPhone = msg.from;
+
+        if (msgId && isDuplicate(msgId)) {
+            return res.sendStatus(200);
+        }
+
+        let text = '';
+        if (msg.type === 'text') {
+            text = msg.text?.body;
+        } else if (msg.type === 'button') {
+            text = msg.button?.text;
+        } else if (msg.type === 'interactive') {
+            const interactive = msg.interactive;
+            if (interactive.type === 'button_reply') {
+                text = interactive.button_reply?.title;
+            } else if (interactive.type === 'list_reply') {
+                text = interactive.list_reply?.title;
+            }
+        }
+
+        if (text) {
+            console.log(`\n📨 Received from ${fromPhone}: ${text}`);
+
+            const metadata = value.metadata;
+            const displayPhoneNumber = metadata?.display_phone_number;
+            const phoneNumberId = metadata?.phone_number_id;
+
+            let agency = null;
+            const cleanDisplayPhone = displayPhoneNumber ? displayPhoneNumber.replace(/[^\d]/g, '') : null;
+
+            if (phoneNumberId) {
+                const resDb = await pool.query(
+                    'SELECT * FROM users WHERE metadata->>\'whatsappPhoneNumberId\' = $1 LIMIT 1',
+                    [phoneNumberId]
+                );
+                if (resDb.rows.length > 0) {
+                    agency = resDb.rows[0];
+                }
+            }
+
+            if (!agency && cleanDisplayPhone) {
+                const resDb = await pool.query(
+                    'SELECT * FROM users WHERE REPLACE(phone, \' \', \'\') LIKE $1 LIMIT 1',
+                    [`%${cleanDisplayPhone}%`]
+                );
+                if (resDb.rows.length > 0) {
+                    agency = resDb.rows[0];
+                }
+            }
+
+            const agencyId = agency?.id || null;
+            const instanceName = `Agency_${agencyId}`;
+
+            let isEnabled = false;
+            if (agencyId) {
+                isEnabled = await db.isAgentEnabled(agencyId);
+            }
+
+            recentWebhooks.unshift({
+                time: new Date().toISOString(),
+                instanceName: agencyId ? instanceName : 'Unknown',
+                agencyId,
+                isEnabled,
+                sender: fromPhone
+            });
+            if (recentWebhooks.length > 10) recentWebhooks.pop();
+
+            if (!isEnabled || !agencyId) {
+                console.log(`ℹ️ Agent disabled or agency not found for ${fromPhone}. Skipping response.`);
                 return res.sendStatus(200);
             }
-        }
 
-        // Acknowledge receipt early
-        res.sendStatus(200);
+            res.sendStatus(200);
 
-        const key = msg?.key;
-        const msgId = key?.id;
-        const remoteJid = key?.remoteJid;
-        const fromMe = key?.fromMe;
-        const message = msg?.message;
+            const reply = await processMessage(text, fromPhone, agencyId);
+            console.log(`💬 Replying to ${fromPhone}: ${reply}`);
 
-        // Process message de-duplication inside webhook handler
-        const processedMessages = new Map();
-        const CACHE_TTL = 5 * 60 * 1000;
-        function isDuplicate(id) {
-            const now = Date.now();
-            if (processedMessages.has(id)) return true;
-            processedMessages.set(id, now);
-            return false;
-        }
-
-        if (msgId && isDuplicate(msgId)) return;
-
-        if (message && remoteJid && !fromMe) {
-            const text = message.conversation ||
-                message.extendedTextMessage?.text ||
-                message.imageMessage?.caption;
-
-            const phoneClean = remoteJid.split('@')[0];
-
-            if (text) {
-                console.log(`\n📨 Received from ${phoneClean}: ${text}`);
-
-                const instanceName = req.body.instance || req.body.data?.instance || 'Default';
-                const agencyId = instanceName.startsWith('Agency_') ? instanceName.split('_')[1] : null;
-
-                let isEnabled = await db.isAgentEnabled(agencyId);
-                
-                recentWebhooks.unshift({
-                    time: new Date().toISOString(),
-                    instanceName,
-                    agencyId,
-                    isEnabled,
-                    sender: phoneClean
-                });
-                if (recentWebhooks.length > 10) recentWebhooks.pop();
-
-                if (!isEnabled) return;
-
-                // Process with AI
-                const reply = await processMessage(text, phoneClean, agencyId);
-                console.log(`💬 Replying to ${phoneClean}: ${reply}`);
-
-                await sendMessage(phoneClean, reply, instanceName);
-            }
+            await sendMessage(fromPhone, reply, instanceName);
+        } else {
+            res.sendStatus(200);
         }
     } catch (error) {
         console.error('Webhook processing error:', error);
@@ -802,29 +862,108 @@ app.post('/webhook', async (req, res) => {
 // WhatsApp Instance Connection Management
 app.post('/api/whatsapp/connect', async (req, res) => {
     try {
-        const { agencyId, phoneNumber } = req.body;
-        if (!agencyId || !phoneNumber) return res.status(400).json({ error: 'Missing fields' });
+        const { agencyId, phoneNumber, whatsappToken, whatsappPhoneNumberId, whatsappBusinessAccountId } = req.body;
+        if (!agencyId || !phoneNumber || !whatsappToken || !whatsappPhoneNumberId) {
+            return res.status(400).json({ error: 'Missing required configuration fields' });
+        }
 
-        const evoUrl = process.env.EVOLUTION_API_URL;
-        const evoKey = process.env.EVOLUTION_API_KEY;
-        const instanceName = `Agency_${agencyId}`;
+        console.log(`🔌 [WhatsApp Connect] Storing and verifying credentials for agency ${agencyId}...`);
+
+        // Update database with Meta credentials in metadata JSONB
+        await pool.query(
+            `UPDATE users 
+             SET phone = $1,
+                 metadata = COALESCE(metadata, '{}'::jsonb) || JSONB_BUILD_OBJECT(
+                     'whatsappToken', $2::text,
+                     'whatsappPhoneNumberId', $3::text,
+                     'whatsappBusinessAccountId', $4::text
+                 )
+             WHERE id = $5`,
+            [phoneNumber, whatsappToken, whatsappPhoneNumberId, whatsappBusinessAccountId || '', agencyId]
+        );
+
+        // Verify the connection by calling Meta Graph API
+        try {
+            const metaRes = await fetch(`https://graph.facebook.com/v20.0/${whatsappPhoneNumberId}`, {
+                method: 'GET',
+                headers: {
+                    'Authorization': `Bearer ${whatsappToken}`
+                }
+            });
+
+            if (metaRes.ok) {
+                const data = await metaRes.json();
+                console.log(`✅ [WhatsApp Connect] Verified with Meta. Display Name: ${data.verified_name || 'N/A'}`);
+                return res.json({ 
+                    success: true, 
+                    connected: true, 
+                    displayPhoneNumber: data.display_phone_number,
+                    verifiedName: data.verified_name
+                });
+            } else {
+                const errData = await metaRes.json().catch(() => ({}));
+                const errMsg = errData.error?.message || `Meta HTTP Error ${metaRes.status}`;
+                console.error(`❌ [WhatsApp Connect] Meta verification failed: ${errMsg}`);
+                return res.json({ success: false, error: errMsg });
+            }
+        } catch (fetchErr) {
+            console.error(`❌ [WhatsApp Connect] Meta API unreachable: ${fetchErr.message}`);
+            return res.json({ success: false, error: `Meta API unreachable: ${fetchErr.message}` });
+        }
+    } catch (error) {
+        console.error('Error in /api/whatsapp/connect:', error);
+        res.status(500).json({ error: 'Internal Server Error' });
+    }
+});
+
+// Get current WhatsApp connection status
+app.get('/api/whatsapp/status', async (req, res) => {
+    try {
+        const { agencyId } = req.query;
+        if (!agencyId) return res.status(400).json({ error: 'Missing agencyId' });
+
+        const resDb = await pool.query('SELECT phone, metadata FROM users WHERE id = $1', [agencyId]);
+        if (resDb.rows.length === 0) {
+            return res.json({ success: true, connected: false, error: 'Agency not found' });
+        }
+
+        const agency = resDb.rows[0];
+        const metadata = agency.metadata || {};
+        
+        let token = metadata.whatsappToken || process.env.WHATSAPP_TOKEN;
+        let phoneNumberId = metadata.whatsappPhoneNumberId || process.env.WHATSAPP_PHONE_NUMBER_ID;
+
+        if (!token || !phoneNumberId) {
+            return res.json({ success: true, connected: false, configMissing: true });
+        }
 
         try {
-            await fetch(`${evoUrl}/instance/delete/${instanceName}`, { method: 'DELETE', headers: { 'apikey': evoKey } });
-        } catch (e) {}
-
-        const createRes = await fetch(`${evoUrl}/instance/create`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'apikey': evoKey },
-            body: JSON.stringify({ instanceName, qrcode: true, integration: "WHATSAPP-BAILEYS" })
-        });
-        const createData = await createRes.json();
-
-        if (createData?.qrcode?.base64) {
-            return res.json({ success: true, instanceName, qr: createData.qrcode.base64 });
+            const metaRes = await fetch(`https://graph.facebook.com/v20.0/${phoneNumberId}`, {
+                method: 'GET',
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            
+            if (metaRes.ok) {
+                const data = await metaRes.json();
+                return res.json({ 
+                    success: true, 
+                    connected: true, 
+                    displayPhoneNumber: data.display_phone_number || agency.phone,
+                    verifiedName: data.verified_name
+                });
+            } else {
+                const errData = await metaRes.json().catch(() => ({}));
+                return res.json({ 
+                    success: true, 
+                    connected: false, 
+                    error: errData.error?.message || 'Meta API credentials invalid' 
+                });
+            }
+        } catch (e) {
+            return res.json({ success: true, connected: false, error: 'Meta API unreachable: ' + e.message });
         }
-        res.status(500).json({ error: 'Failed to retrieve QR code' });
     } catch (error) {
+        console.error('Error checking WhatsApp status:', error);
         res.status(500).json({ error: 'Internal Server Error' });
     }
 });
