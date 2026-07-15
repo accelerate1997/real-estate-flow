@@ -3,6 +3,8 @@ import { useSearchParams, useNavigate, Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Loader2, AlertCircle, Eye, EyeOff, CheckCircle2 } from 'lucide-react';
 import { pb } from '../services/pocketbase';
+import { auth } from '../services/firebase';
+import { createUserWithEmailAndPassword } from 'firebase/auth';
 
 const AgentInviteRegister = () => {
     const [searchParams] = useSearchParams();
@@ -88,18 +90,19 @@ const AgentInviteRegister = () => {
         setIsLoading(true);
 
         try {
-            // 1. Register the Agent User
+            // Create user in Firebase first
+            const userCredential = await createUserWithEmailAndPassword(auth, formData.email, formData.password);
+            const uid = userCredential.user.uid;
+
+            // 1. Register the Agent User in PostgreSQL
             const datatoSend = {
-                username: formData.email.split('@')[0] + Math.floor(Math.random() * 1000),
+                id: uid,
                 email: formData.email,
-                emailVisibility: true,
-                password: formData.password,
-                passwordConfirm: formData.password,
                 name: formData.fullName,
                 phone: formData.phone,
                 role: 'agent',
                 isActive: true,
-                agencyId: inviteData.agencyId, // Link to the agency
+                agencyId: inviteData.agency_id || inviteData.agencyId, // Link to the agency (respect both fields)
                 metadata: { terms_accepted: formData.terms, joined_via_invite: inviteData.id }
             };
 
@@ -108,12 +111,11 @@ const AgentInviteRegister = () => {
             if (record) {
                 // 2. Mark invite as used
                 try {
-                    // Update as admin via backend or rely on relaxed permissions you set
                     await pb.collection('invites').update(inviteData.id, {
                         status: 'used'
                     });
                 } catch (updateErr) {
-                    console.error("Failed to mark invite as used (might require admin), continuing...", updateErr);
+                    console.error("Failed to mark invite as used, continuing...", updateErr);
                 }
 
                 setStatus('success');

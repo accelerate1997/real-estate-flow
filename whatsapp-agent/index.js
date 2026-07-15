@@ -5,7 +5,7 @@ const path = require('path');
 const fs = require('fs');
 const multer = require('multer');
 const bcrypt = require('bcryptjs');
-const jwt = require('jsonwebtoken');
+const admin = require('./firebase_admin');
 
 const db = require('./database');
 const { pool, initDB, autoMigrateIfEmpty } = require('./database/db');
@@ -68,7 +68,7 @@ app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-const JWT_SECRET = process.env.JWT_SECRET || 'rajesh_secret_key_123';
+
 
 // 1. Setup Static File Serving for Uploaded Files
 const uploadsDir = path.join(__dirname, 'uploads');
@@ -234,15 +234,42 @@ async function expandRecords(collectionName, records) {
     return newRecords;
 }
 
-// Auth Middleware to decode Bearer Token
-app.use((req, res, next) => {
+// Auth Middleware to decode Firebase ID Token
+app.use(async (req, res, next) => {
     const authHeader = req.headers.authorization;
     if (authHeader && authHeader.startsWith('Bearer ')) {
         const token = authHeader.substring(7);
         try {
-            const decoded = jwt.verify(token, JWT_SECRET);
-            req.user = decoded;
-        } catch (e) {}
+            // Verify ID Token with Firebase Admin SDK
+            const decodedToken = await admin.auth().verifyIdToken(token);
+            
+            // Query local user matching the Firebase uid (id column in pg users)
+            const userRes = await pool.query('SELECT * FROM users WHERE id = $1', [decodedToken.uid]);
+            if (userRes.rows.length > 0) {
+                const user = userRes.rows[0];
+                req.user = {
+                    id: user.id,
+                    email: user.email,
+                    name: user.name,
+                    role: user.role,
+                    agentEnabled: user.agentEnabled,
+                    isActive: user.isActive
+                };
+            } else {
+                // User authenticated in Firebase, but profile not created yet in PostgreSQL
+                req.user = {
+                    id: decodedToken.uid,
+                    email: decodedToken.email || '',
+                    name: decodedToken.name || '',
+                    role: 'agent',
+                    agentEnabled: true,
+                    isActive: true,
+                    isNewUser: true
+                };
+            }
+        } catch (e) {
+            console.error("Firebase Auth token verification failed:", e.message);
+        }
     }
     next();
 });
@@ -252,54 +279,59 @@ const recentWebhooks = [];
 
 // --- Authentication Endpoints ---
 
+// Register endpoint to sync a Firebase user profile to PostgreSQL
 app.post('/api/auth/register', async (req, res) => {
     try {
-        const { email, password, name, role } = req.body;
-        if (!email || !password) {
-            return res.status(400).json({ message: 'Email and password required' });
-        }
-        
-        const exist = await pool.query('SELECT * FROM users WHERE email = $1', [email]);
-        if (exist.rows.length > 0) {
-            return res.status(400).json({ message: 'User already exists' });
+        const { uid, email, name, role, agencyId, agencyName } = req.body;
+        if (!uid || !email) {
+            return res.status(400).json({ message: 'Firebase uid and email are required' });
         }
 
-        const id = generateId();
-        const hash = await bcrypt.hash(password, 10);
-        
+        const exist = await pool.query('SELECT * FROM users WHERE id = $1', [uid]);
+        if (exist.rows.length > 0) {
+            return res.status(400).json({ message: 'User profile already exists in PostgreSQL' });
+        }
+
         await pool.query(
-            `INSERT INTO users (id, email, password_hash, name, role, "agentEnabled", "isActive", created_at, updated_at)
-             VALUES ($1, $2, $3, $4, $5, TRUE, TRUE, NOW(), NOW())`,
-            [id, email, hash, name || '', role || 'agent']
+            `INSERT INTO users (id, email, password_hash, name, role, "agencyId", "agencyName", "agentEnabled", "isActive", created_at, updated_at)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, TRUE, TRUE, NOW(), NOW())`,
+            [uid, email, 'firebase_auth', name || '', role || 'agent', agencyId || null, agencyName || null]
         );
 
-        const record = { id, email, name, role: role || 'agent', agentEnabled: true, isActive: true };
-        const token = jwt.sign(record, JWT_SECRET, { expiresIn: '7d' });
-
-        res.json({ token, record });
+        const record = { id: uid, email, name: name || '', role: role || 'agent', agentEnabled: true, isActive: true };
+        res.json({ success: true, record });
     } catch (err) {
-        console.error("Registration error:", err);
+        console.error("PostgreSQL user sync/registration error:", err);
         res.status(500).json({ message: err.message });
     }
 });
 
-app.post('/api/auth/login', async (req, res) => {
+// Sync endpoint: verifies Firebase token and retrieves PostgreSQL user model
+app.post('/api/auth/sync', async (req, res) => {
     try {
-        const { email, password } = req.body;
-        if (!email || !password) {
-            return res.status(400).json({ message: 'Email and password required' });
+        const authHeader = req.headers.authorization;
+        if (!authHeader || !authHeader.startsWith('Bearer ')) {
+            return res.status(401).json({ message: 'No authorization token provided' });
         }
 
-        const userRes = await pool.query('SELECT * FROM users WHERE email = $1', [email]);
+        const token = authHeader.substring(7);
+        const decodedToken = await admin.auth().verifyIdToken(token);
+        const uid = decodedToken.uid;
+
+        let userRes = await pool.query('SELECT * FROM users WHERE id = $1', [uid]);
+        
+        // Auto-provision user record in PostgreSQL if they exist in Firebase but not in Postgres
         if (userRes.rows.length === 0) {
-            return res.status(400).json({ message: 'Invalid credentials' });
+            console.log(`👤 Auto-syncing Firebase user ${uid} to Postgres...`);
+            await pool.query(
+                `INSERT INTO users (id, email, password_hash, name, role, "agentEnabled", "isActive", created_at, updated_at)
+                 VALUES ($1, $2, $3, $4, $5, TRUE, TRUE, NOW(), NOW())`,
+                [uid, decodedToken.email, 'firebase_auth', decodedToken.name || '', 'agent']
+            );
+            userRes = await pool.query('SELECT * FROM users WHERE id = $1', [uid]);
         }
 
         const user = userRes.rows[0];
-        const match = await bcrypt.compare(password, user.password_hash);
-        if (!match) {
-            return res.status(400).json({ message: 'Invalid credentials' });
-        }
 
         if (user.isActive === false) {
             return res.status(403).json({ message: 'Your account has been deactivated. Please contact your agency owner.' });
@@ -311,14 +343,18 @@ app.post('/api/auth/login', async (req, res) => {
             name: user.name,
             role: user.role,
             agentEnabled: user.agentEnabled,
-            isActive: user.isActive
+            isActive: user.isActive,
+            agencyId: user.agencyId,
+            agencyName: user.agencyName,
+            phone: user.phone,
+            geminiKey: user.geminiKey,
+            metadata: user.metadata
         };
-        const token = jwt.sign(record, JWT_SECRET, { expiresIn: '7d' });
 
         res.json({ token, record });
     } catch (err) {
-        console.error("Login error:", err);
-        res.status(500).json({ message: err.message });
+        console.error("Firebase sync error:", err);
+        res.status(401).json({ message: 'Authentication sync failed: ' + err.message });
     }
 });
 
@@ -412,7 +448,7 @@ app.get('/api/collections/:collection/:id', async (req, res) => {
 app.post('/api/collections/:collection', upload.fields([{ name: 'images' }, { name: 'videos' }]), async (req, res) => {
     try {
         const { collection } = req.params;
-        const newId = generateId();
+        const newId = req.body.id || generateId();
 
         // Check if table exists
         const tableCheck = await pool.query(

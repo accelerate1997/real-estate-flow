@@ -1,5 +1,7 @@
 // A Mock/Compatibility wrapper mimicking the PocketBase JS SDK
 // to redirect all operations to the custom Express + PostgreSQL backend.
+import { auth } from './firebase';
+import { signInWithEmailAndPassword, signOut } from 'firebase/auth';
 
 class AuthStore {
     constructor() {
@@ -37,6 +39,7 @@ class AuthStore {
         this.token = '';
         this.model = null;
         localStorage.removeItem('pb_auth');
+        signOut(auth).catch(e => console.error("Firebase signout error:", e));
     }
 }
 
@@ -52,6 +55,16 @@ class Collection {
             ...options.headers,
         };
         
+        // Dynamically fetch fresh Firebase ID Token if logged in
+        if (auth.currentUser) {
+            try {
+                const firebaseToken = await auth.currentUser.getIdToken(true);
+                this.client.authStore.save(firebaseToken, this.client.authStore.model);
+            } catch (tokenErr) {
+                console.error("Firebase token refresh error:", tokenErr);
+            }
+        }
+
         if (this.client.authStore.token) {
             headers['Authorization'] = `Bearer ${this.client.authStore.token}`;
         }
@@ -141,16 +154,61 @@ class Collection {
     }
 
     async authWithPassword(email, password) {
-        const data = await this._request('/api/auth/login', {
+        // Authenticate with Firebase first
+        const userCredential = await signInWithEmailAndPassword(auth, email, password);
+        const firebaseToken = await userCredential.user.getIdToken(true);
+        
+        // Sync with PostgreSQL backend using Firebase Token
+        const url = `${this.client.baseUrl}/api/auth/sync`;
+        const res = await fetch(url, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ email, password })
+            headers: {
+                'Authorization': `Bearer ${firebaseToken}`,
+                'Content-Type': 'application/json'
+            }
         });
         
+        if (!res.ok) {
+            let errMsg = 'Authentication sync failed';
+            try {
+                const errData = await res.json();
+                errMsg = errData.message || errMsg;
+            } catch (e) {}
+            // Sign out of Firebase if PostgreSQL sync fails to keep them in sync
+            await signOut(auth);
+            throw new Error(errMsg);
+        }
+
+        const data = await res.json();
         if (data && data.token) {
             this.client.authStore.save(data.token, data.record);
         }
         return data;
+    }
+
+    async authRefresh() {
+        if (!auth.currentUser) return null;
+        try {
+            const firebaseToken = await auth.currentUser.getIdToken(true);
+            const url = `${this.client.baseUrl}/api/auth/sync`;
+            const res = await fetch(url, {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${firebaseToken}`,
+                    'Content-Type': 'application/json'
+                }
+            });
+            if (res.ok) {
+                const data = await res.json();
+                if (data && data.token) {
+                    this.client.authStore.save(data.token, data.record);
+                    return data;
+                }
+            }
+        } catch (e) {
+            console.error("Auth refresh error:", e);
+        }
+        return null;
     }
 }
 
@@ -194,7 +252,6 @@ class PocketBaseMock {
 const getPbUrl = () => {
     const envUrl = import.meta.env.VITE_POCKETBASE_URL;
     if (envUrl && envUrl !== 'http://127.0.0.1:8090' && envUrl !== 'http://localhost:8090') {
-        // When migrating to postgres custom Express api, the backend URL matches VITE_APP_URL or host port 3000
         return 'http://localhost:3000';
     }
     return typeof window !== 'undefined' ? window.location.origin : 'http://localhost:3000';

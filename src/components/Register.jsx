@@ -3,6 +3,8 @@ import { motion } from 'framer-motion';
 import { Loader2, AlertCircle, Eye, EyeOff } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import { pb } from '../services/pocketbase';
+import { auth } from '../services/firebase';
+import { createUserWithEmailAndPassword } from 'firebase/auth';
 
 const Register = () => {
     const navigate = useNavigate();
@@ -40,13 +42,14 @@ const Register = () => {
         setIsLoading(true);
 
         try {
-            // Register with PocketBase
+            // Create user in Firebase first
+            const userCredential = await createUserWithEmailAndPassword(auth, formData.email, formData.password);
+            const uid = userCredential.user.uid;
+
+            // Register with PostgreSQL
             const datatoSend = {
-                username: formData.email.split('@')[0] + Math.floor(Math.random() * 1000),
+                id: uid,
                 email: formData.email,
-                emailVisibility: true,
-                password: formData.password,
-                passwordConfirm: formData.password,
                 name: formData.fullName,
                 agencyName: formData.agencyName,
                 phone: formData.phone,
@@ -58,7 +61,7 @@ const Register = () => {
 
             if (record) {
                 // Auto login after registration
-                const authData = await pb.collection('users').authWithPassword(
+                await pb.collection('users').authWithPassword(
                     formData.email,
                     formData.password
                 );
