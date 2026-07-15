@@ -679,12 +679,29 @@ app.post('/api/leads/send-otp', async (req, res) => {
             [verifyId, cleanPhone, otp, expiresAt]
         );
 
-        // Send OTP via Evolution API
+        // Send OTP via WhatsApp (supports template if configured in environment)
         const instanceName = `Agency_${agencyId}`;
-        const messageText = `Your verification OTP for Rajesh Realty is: *${otp}*.\n\nThis code is valid for 5 minutes. Please do not share this OTP with anyone.`;
+        const otpTemplate = process.env.WHATSAPP_OTP_TEMPLATE_NAME || '';
         
-        console.log(`📡 Sending WhatsApp OTP to ${cleanPhone} via instance ${instanceName}...`);
-        await sendMessage(cleanPhone, messageText, instanceName);
+        if (otpTemplate) {
+            console.log(`📡 Sending WhatsApp OTP to ${cleanPhone} via template "${otpTemplate}"...`);
+            const components = [
+                {
+                    type: "body",
+                    parameters: [
+                        {
+                            type: "text",
+                            text: otp
+                        }
+                    ]
+                }
+            ];
+            await sendTemplateMessage(cleanPhone, otpTemplate, 'en_US', components, instanceName);
+        } else {
+            console.log(`📡 Sending WhatsApp OTP to ${cleanPhone} via plain text fallback...`);
+            const messageText = `Your verification OTP for Rajesh Realty is: *${otp}*.\n\nThis code is valid for 5 minutes. Please do not share this OTP with anyone.`;
+            await sendMessage(cleanPhone, messageText, instanceName);
+        }
 
         res.json({ success: true, message: 'Verification OTP sent successfully via WhatsApp!' });
     } catch (err) {
