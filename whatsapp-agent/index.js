@@ -911,6 +911,65 @@ app.post('/webhook', async (req, res) => {
             const agencyId = agency?.id || null;
             const instanceName = `Agency_${agencyId}`;
 
+            // --- DPDP ACT OPT-OUT / OPT-IN HANDLERS ---
+            if (agencyId) {
+                const cleanText = text.trim().toUpperCase();
+                
+                // 1. Process STOP/UNSUBSCRIBE
+                if (cleanText === 'STOP' || cleanText === 'UNSUBSCRIBE' || cleanText === 'STOP MARKETING') {
+                    console.log(`⛔ [Opt-Out] Received STOP from ${fromPhone}. Processing opt-out for agency ${agencyId}...`);
+                    res.sendStatus(200);
+                    
+                    const cleanPhoneNo = fromPhone.replace(/[^\d]/g, '');
+                    const leadsRes = await pool.query(
+                        'SELECT id, name FROM leads WHERE REPLACE(phone, \' \', \'\') LIKE $1 AND agency_id = $2',
+                        [`%${cleanPhoneNo}%`, agencyId]
+                    );
+                    
+                    if (leadsRes.rows.length > 0) {
+                        for (const lead of leadsRes.rows) {
+                            await pool.query('UPDATE leads SET marketing_opt_in = false WHERE id = $1', [lead.id]);
+                            const consentId = generateShortId();
+                            await pool.query(
+                                'INSERT INTO lead_consents (id, lead_id, consent_status, source, consent_clause) VALUES ($1, $2, $3, $4, $5)',
+                                [consentId, lead.id, 'withdrawn', 'whatsapp_optin', 'WhatsApp STOP keyword request']
+                            );
+                        }
+                    }
+                    
+                    const unsubscribeConfirmation = "You have been successfully unsubscribed from further marketing messages. Reply START at any time to opt-in again.";
+                    await sendMessage(fromPhone, unsubscribeConfirmation, instanceName);
+                    return;
+                }
+                
+                // 2. Process START/SUBSCRIBE
+                if (cleanText === 'START' || cleanText === 'SUBSCRIBE' || cleanText === 'RESUME') {
+                    console.log(`✅ [Opt-In] Received START from ${fromPhone}. Processing opt-in for agency ${agencyId}...`);
+                    res.sendStatus(200);
+                    
+                    const cleanPhoneNo = fromPhone.replace(/[^\d]/g, '');
+                    const leadsRes = await pool.query(
+                        'SELECT id, name FROM leads WHERE REPLACE(phone, \' \', \'\') LIKE $1 AND agency_id = $2',
+                        [`%${cleanPhoneNo}%`, agencyId]
+                    );
+                    
+                    if (leadsRes.rows.length > 0) {
+                        for (const lead of leadsRes.rows) {
+                            await pool.query('UPDATE leads SET marketing_opt_in = true WHERE id = $1', [lead.id]);
+                            const consentId = generateShortId();
+                            await pool.query(
+                                'INSERT INTO lead_consents (id, lead_id, consent_status, source, consent_clause) VALUES ($1, $2, $3, $4, $5)',
+                                [consentId, lead.id, 'active', 'whatsapp_optin', 'WhatsApp START keyword request']
+                            );
+                        }
+                    }
+                    
+                    const subscribeConfirmation = "Thank you! You have successfully opted back in to receive property alerts and updates from Rajesh Realty.";
+                    await sendMessage(fromPhone, subscribeConfirmation, instanceName);
+                    return;
+                }
+            }
+
             let isEnabled = false;
             if (agencyId) {
                 isEnabled = await db.isAgentEnabled(agencyId);
@@ -1231,6 +1290,20 @@ function generateShortId() {
     return result;
 }
 
+// DPDP Act Compliance Audit Logging Helper
+async function logCrmAction(userId, action, targetId = null, ip = null, details = null) {
+    try {
+        const id = generateShortId();
+        await pool.query(
+            'INSERT INTO crm_audit_logs (id, user_id, action, target_id, ip_address, details) VALUES ($1, $2, $3, $4, $5, $6)',
+            [id, userId || 'system', action, targetId, ip, details]
+        );
+        console.log(`🔒 [Audit Log] ${action} by user ${userId || 'system'} logged successfully.`);
+    } catch (err) {
+        console.error('❌ Failed to write to audit log:', err.message);
+    }
+}
+
 // 1. Get campaigns history with stats
 app.get('/api/campaigns', async (req, res) => {
     try {
@@ -1379,6 +1452,9 @@ app.post('/api/campaigns/:id/send', async (req, res) => {
         // Update campaign status
         await pool.query('UPDATE campaigns SET status = $1, updated_at = NOW() WHERE id = $2', ['sending', id]);
 
+        // Write to compliance audit log
+        await logCrmAction(campaign.agency_id, 'SEND_CAMPAIGN', id, req.ip, `Campaign: ${campaign.name}, Template: ${campaign.template_name}`);
+
         // Trigger asynchronous campaign processor
         runCampaignProcessor(id).catch(err => {
             console.error(`❌ Background runner error for campaign ${id}:`, err);
@@ -1395,6 +1471,11 @@ app.post('/api/campaigns/:id/send', async (req, res) => {
 app.get('/api/campaigns/:id/recipients', async (req, res) => {
     try {
         const { id } = req.params;
+        const { agencyId } = req.query;
+        
+        // Write to compliance audit log (reading personal data of recipients)
+        await logCrmAction(agencyId || 'unknown_admin', 'VIEW_CAMPAIGN_RECIPIENTS', id, req.ip);
+
         const query = `
             SELECT l.*, ld.name AS lead_name
             FROM campaign_logs l
@@ -1440,9 +1521,9 @@ async function runCampaignProcessor(campaignId) {
             }
         }
 
-        // Fetch pending recipients
+        // Fetch pending recipients (only those who have not opted out of marketing)
         const recipientsRes = await pool.query(
-            'SELECT l.*, ld.name, ld.target_location, ld.target_bhk FROM campaign_logs l JOIN leads ld ON l.lead_id = ld.id WHERE l.campaign_id = $1 AND l.status = $2',
+            'SELECT l.*, ld.name, ld.target_location, ld.target_bhk FROM campaign_logs l JOIN leads ld ON l.lead_id = ld.id WHERE l.campaign_id = $1 AND l.status = $2 AND ld.marketing_opt_in = true',
             [campaignId, 'pending']
         );
         const recipients = recipientsRes.rows;
