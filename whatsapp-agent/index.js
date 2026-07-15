@@ -1099,6 +1099,24 @@ app.post('/api/whatsapp/templates', async (req, res) => {
 
         console.log(`📡 Submitting template "${name}" to Meta for approval under WABA ID ${wabaId}...`);
 
+        // Auto-generate examples for variables if present (Meta requires this for templates with parameters)
+        const processedComponents = components.map(comp => {
+            if (comp.type === 'BODY' && comp.text) {
+                const matches = comp.text.match(/\{\{\d+\}\}/g);
+                if (matches && matches.length > 0) {
+                    const uniqueVars = [...new Set(matches)];
+                    const samples = uniqueVars.map((v, index) => `placeholder_value_${index + 1}`);
+                    return {
+                        ...comp,
+                        example: {
+                            body_text: [samples]
+                        }
+                    };
+                }
+            }
+            return comp;
+        });
+
         const metaRes = await fetch(`https://graph.facebook.com/v20.0/${wabaId}/message_templates`, {
             method: 'POST',
             headers: {
@@ -1109,7 +1127,7 @@ app.post('/api/whatsapp/templates', async (req, res) => {
                 name,
                 category,
                 language,
-                components
+                components: processedComponents
             })
         });
 
