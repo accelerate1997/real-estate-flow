@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { pb } from '../services/pocketbase';
 import {
-    Send, Plus, Loader2, Check, Shield
+    Send, Plus, Loader2, Check, Shield, Sparkles
 } from 'lucide-react';
 
 const BulkMarketing = () => {
@@ -26,6 +26,40 @@ const BulkMarketing = () => {
         language: 'en_US',
         bodyText: ''
     });
+
+    const [aiDraftText, setAiDraftText] = useState('');
+    const [isPolishing, setIsPolishing] = useState(false);
+    const [polishedVariables, setPolishedVariables] = useState([]);
+
+    const handlePolishWithAI = async () => {
+        if (!aiDraftText) return;
+        setIsPolishing(true);
+        try {
+            const res = await fetch('/api/whatsapp/templates/polish-with-ai', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ prompt: aiDraftText })
+            });
+            const data = await res.json();
+            if (data.success) {
+                setNewTemplateData({
+                    name: data.name || '',
+                    category: data.category || 'MARKETING',
+                    language: 'en_US',
+                    bodyText: data.bodyText || ''
+                });
+                setPolishedVariables(data.variables || []);
+                alert("AI template generated successfully! Fields have been autofilled.");
+            } else {
+                alert("AI Polish failed: " + (data.error || "Unknown error"));
+            }
+        } catch (error) {
+            console.error("Error polishing template with AI:", error);
+            alert("Error: " + error.message);
+        } finally {
+            setIsPolishing(false);
+        }
+    };
 
     useEffect(() => {
         if (subTab === 'templates') {
@@ -698,9 +732,55 @@ const BulkMarketing = () => {
                         </button>
                         <h3 className="font-bold text-gray-900 text-lg">Submit Message Template to Meta</h3>
                     </div>
-
                     <form onSubmit={handleCreateTemplate} className="space-y-5">
                         <div className="bg-white p-6 rounded-2xl border border-gray-150 shadow-sm space-y-4">
+                            {/* AI Assistant Writer */}
+                            <div className="bg-gradient-to-br from-indigo-50 to-purple-50 rounded-xl border border-indigo-100 p-4 space-y-3.5 mb-2">
+                                <div className="flex items-center gap-2">
+                                    <Sparkles className="w-5 h-5 text-indigo-600 animate-pulse" />
+                                    <div>
+                                        <h4 className="font-extrabold text-indigo-900 text-sm">AI Template Designer</h4>
+                                        <p className="text-[10px] text-indigo-500 font-medium">Describe your message draft in plain text and let AI format it perfectly.</p>
+                                    </div>
+                                </div>
+                                
+                                <div className="space-y-2">
+                                    <textarea
+                                        value={aiDraftText}
+                                        onChange={(e) => setAiDraftText(e.target.value)}
+                                        rows={3}
+                                        className="w-full px-3.5 py-2 bg-white border border-indigo-200 rounded-lg text-xs focus:outline-none focus:border-indigo-500 font-sans leading-relaxed text-gray-700 shadow-inner"
+                                        placeholder="e.g. Write a welcome outreach message greeting the client by name. Ask if they want a 3bhk in Mumbai. Sign off with Rajesh Realty."
+                                    />
+                                    
+                                    <div className="flex justify-between items-center gap-2">
+                                        <span className="text-[9px] text-indigo-400 font-semibold italic">Auto-generates compliant format (no trailing/leading variables)</span>
+                                        <button
+                                            type="button"
+                                            onClick={handlePolishWithAI}
+                                            disabled={isPolishing || !aiDraftText}
+                                            className="px-3.5 py-1.5 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white rounded-lg text-xs font-bold transition-all shadow-sm flex items-center gap-1.5 shrink-0"
+                                        >
+                                            {isPolishing ? <Loader2 className="w-3 h-3 animate-spin" /> : <Sparkles className="w-3.5 h-3.5" />}
+                                            Write & Format with AI
+                                        </button>
+                                    </div>
+                                </div>
+                                
+                                {polishedVariables.length > 0 && (
+                                    <div className="bg-white/80 rounded-lg p-3 text-xs text-gray-700 border border-indigo-50 space-y-1.5">
+                                        <span className="font-bold text-indigo-900 text-[10px] uppercase tracking-wider block">Identified Variables:</span>
+                                        <div className="flex flex-wrap gap-1.5">
+                                            {polishedVariables.map((v, idx) => (
+                                                <span key={idx} className="bg-indigo-50 text-indigo-700 border border-indigo-100 px-2 py-0.5 rounded-md font-medium text-[10px]" title={v}>
+                                                    {`{{${idx + 1}}}`}: {v}
+                                                </span>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+
                             <div>
                                 <label className="dash-label text-xs">Template Name</label>
                                 <input

@@ -9,7 +9,7 @@ const admin = require('./firebase_admin');
 
 const db = require('./database');
 const { pool, initDB, autoMigrateIfEmpty } = require('./database/db');
-const { processMessage } = require('./openai_service');
+const { processMessage, polishTemplateWithAI } = require('./openai_service');
 const { sendMessage, sendTemplateMessage } = require('./whatsapp');
 const followupEngine = require('./followup_engine');
 const { uploadToR2 } = require('./database/r2');
@@ -1199,6 +1199,23 @@ app.delete('/api/whatsapp/templates/:name', async (req, res) => {
         }
     } catch (error) {
         console.error('Error deleting WABA template:', error);
+        res.status(500).json({ error: 'Internal Server Error' });
+    }
+});
+
+// Polish a raw message draft using AI to fit WABA parameters
+app.post('/api/whatsapp/templates/polish-with-ai', async (req, res) => {
+    try {
+        const { prompt } = req.body;
+        if (!prompt) {
+            return res.status(400).json({ error: 'Missing prompt in request body' });
+        }
+
+        console.log(`🤖 Polishing WhatsApp template draft with AI...`);
+        const result = await polishTemplateWithAI(prompt);
+        res.json({ success: true, ...result });
+    } catch (error) {
+        console.error('Error polishing template with AI:', error);
         res.status(500).json({ error: 'Internal Server Error' });
     }
 });

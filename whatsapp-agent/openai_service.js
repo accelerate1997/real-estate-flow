@@ -206,4 +206,39 @@ async function getChats(phone) {
     return await db.getChatLogs(phone);
 }
 
-module.exports = { processMessage, getChats };
+async function polishTemplateWithAI(rawPrompt) {
+    try {
+        const systemPrompt = `You are an expert AI WhatsApp Business Template Architect. Your task is to take a raw real estate message description and convert it into a polished, professional WABA (WhatsApp Business API) template.
+
+RULES:
+1. Polish the text to sound highly professional, polite, and engaging for real estate prospects.
+2. Identify all dynamic placeholders (like name, property title, budget, date, time) and replace them with sequential variables starting at {{1}} (e.g., {{1}}, {{2}}, {{3}}).
+3. IMPORTANT META RULE: A template cannot start or end with a variable. Ensure there is static text before the first variable (e.g., "Hello {{1}}") and static text (or punctuation like a dot/signature) after the last variable (e.g., "{{2}} group." or "Best regards, {{3}}.").
+4. Recommend a category: "MARKETING" (for promos, follow-ups) or "UTILITY" (for appointments, OTPs, verification).
+5. Generate a valid WABA name: lowercase letters, numbers, and underscores only. Max 50 characters.
+
+Return a JSON object matching this schema:
+{
+  "name": "string (lowercase and underscores only)",
+  "category": "MARKETING | UTILITY",
+  "bodyText": "string (the polished template body)",
+  "variables": ["string explaining variable 1", "string explaining variable 2", ...]
+}`;
+
+        const response = await openai.chat.completions.create({
+            model: "gpt-4o-mini",
+            messages: [
+                { role: "system", content: systemPrompt },
+                { role: "user", content: `Raw draft: "${rawPrompt}"` }
+            ],
+            response_format: { type: "json_object" }
+        });
+
+        return JSON.parse(response.choices[0].message.content);
+    } catch (error) {
+        console.error("AI Template Polish Error:", error.message);
+        throw error;
+    }
+}
+
+module.exports = { processMessage, getChats, polishTemplateWithAI };
