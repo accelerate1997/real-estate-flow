@@ -60,7 +60,44 @@ const BulkMarketing = () => {
             setIsPolishing(false);
         }
     };
+
+    const getTemplateBodyText = (tName) => {
+        const t = templates.find(temp => temp.name === tName);
+        if (!t) return '';
+        const bodyComp = t.components?.find(c => c.type === 'BODY');
+        return bodyComp ? bodyComp.text : '';
+    };
+
+    const getPreviewText = () => {
+        if (!creatingCampaign?.templateName) return '';
+        let text = getTemplateBodyText(creatingCampaign.templateName);
+        if (!text) return '';
+
+        const prop = properties.find(p => p.id === selectedPropertyId);
+
+        creatingCampaign.variables.forEach((variableName, idx) => {
+            let replacement = `{{${idx + 1}}}`;
+            
+            if (variableName === 'name') {
+                replacement = 'John Doe (Sample Client)';
+            } else if (variableName === 'target_location') {
+                replacement = prop ? prop.location : 'Bandra West (Location)';
+            } else if (variableName === 'target_bhk') {
+                replacement = prop ? prop.bhk : '3BHK (BHK)';
+            } else if (variableName === 'price' || variableName === 'target_budget') {
+                replacement = prop ? `₹${Number(prop.price).toLocaleString()}` : '₹2.5 Cr (Budget)';
+            } else if (variableName) {
+                replacement = `[${variableName.toUpperCase()}]`;
+            }
+            
+            text = text.replaceAll(`{{${idx + 1}}}`, replacement);
+        });
+
+        return text;
+    };
+
     const [properties, setProperties] = useState([]);
+    const [selectedPropertyId, setSelectedPropertyId] = useState('');
 
     const fetchProperties = async () => {
         if (!currentUser?.id) return;
@@ -78,6 +115,9 @@ const BulkMarketing = () => {
     useEffect(() => {
         if (creatingCampaign) {
             fetchProperties();
+            fetchTemplates();
+        } else {
+            setSelectedPropertyId('');
         }
     }, [creatingCampaign]);
 
@@ -532,6 +572,7 @@ const BulkMarketing = () => {
                                         <select
                                             onChange={(e) => {
                                                 const propId = e.target.value;
+                                                setSelectedPropertyId(propId);
                                                 if (!propId) return;
                                                 const prop = properties.find(p => p.id === propId);
                                                 if (prop) {
@@ -620,15 +661,39 @@ const BulkMarketing = () => {
                                 
                                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                     <div>
-                                        <label className="dash-label text-xs">WhatsApp Template Name</label>
-                                        <input
-                                            type="text"
-                                            value={creatingCampaign.templateName}
-                                            onChange={(e) => setCreatingCampaign({ ...creatingCampaign, templateName: e.target.value })}
-                                            placeholder="e.g. property_outreach_alert"
-                                            className="dash-input"
-                                            required
-                                        />
+                                        <label className="dash-label text-xs">WhatsApp Template</label>
+                                        {templates.length > 0 ? (
+                                            <select
+                                                value={creatingCampaign.templateName}
+                                                onChange={(e) => {
+                                                    const tName = e.target.value;
+                                                    const t = templates.find(temp => temp.name === tName);
+                                                    setCreatingCampaign(prev => ({
+                                                        ...prev,
+                                                        templateName: tName,
+                                                        templateLanguage: t ? t.language : 'en_US'
+                                                    }));
+                                                }}
+                                                className="dash-input text-gray-700 font-semibold"
+                                                required
+                                            >
+                                                <option value="">-- Select a WABA Template --</option>
+                                                {templates.map(t => (
+                                                    <option key={t.name} value={t.name}>
+                                                        {t.name} ({t.status} - {t.category})
+                                                    </option>
+                                                ))}
+                                            </select>
+                                        ) : (
+                                            <input
+                                                type="text"
+                                                value={creatingCampaign.templateName}
+                                                onChange={(e) => setCreatingCampaign({ ...creatingCampaign, templateName: e.target.value })}
+                                                placeholder="e.g. property_outreach_alert"
+                                                className="dash-input"
+                                                required
+                                            />
+                                        )}
                                     </div>
                                     <div>
                                         <label className="dash-label text-xs">Template Language Code</label>
@@ -678,6 +743,43 @@ const BulkMarketing = () => {
                                     </div>
                                 </div>
                             </div>
+
+                            {/* WhatsApp Message Live Preview */}
+                            {creatingCampaign.templateName && (
+                                <div className="border-t border-gray-100 pt-4 space-y-3">
+                                    <h4 className="font-extrabold text-gray-800 text-sm">4. WhatsApp Message Preview</h4>
+                                    <p className="text-xs text-gray-500">Live preview of how the template message will look to matching leads.</p>
+                                    
+                                    <div className="flex justify-center p-4 bg-gray-50 rounded-2xl border border-gray-150 shadow-inner">
+                                        {/* WhatsApp Message Bubble Container */}
+                                        <div className="w-full max-w-sm rounded-xl overflow-hidden shadow-sm border border-[#e1f3d4] bg-[#efeae2]">
+                                            {/* Header */}
+                                            <div className="bg-[#075e54] px-4 py-2 text-white flex items-center gap-2">
+                                                <div className="w-7 h-7 bg-teal-800 rounded-full flex items-center justify-center font-bold text-xs shadow-inner">
+                                                    RR
+                                                </div>
+                                                <div>
+                                                    <div className="text-[11px] font-extrabold leading-none">Rajesh Realty Outreach</div>
+                                                    <span className="text-[8px] text-teal-200">typing...</span>
+                                                </div>
+                                            </div>
+                                            
+                                            {/* Chat Area */}
+                                            <div className="p-3 space-y-2 relative min-h-[100px] flex flex-col justify-end">
+                                                {/* Message Bubble */}
+                                                <div className="self-start max-w-[85%] bg-[#d9fdd3] text-gray-800 p-2.5 rounded-lg rounded-tl-none shadow-sm text-xs leading-relaxed relative border border-[#c1ebd0] whitespace-pre-wrap font-sans">
+                                                    {getPreviewText() || (
+                                                        <span className="italic text-gray-400">Select a template and map variables to view message preview.</span>
+                                                    )}
+                                                    <div className="text-[8px] text-gray-400 text-right mt-1 font-mono">
+                                                        12:00 PM
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
                         </div>
 
                         <div className="flex justify-end gap-3">
