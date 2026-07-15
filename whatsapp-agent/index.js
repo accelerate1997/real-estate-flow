@@ -1037,6 +1037,137 @@ app.get('/api/whatsapp/status', async (req, res) => {
     }
 });
 
+// Fetch WABA message templates from Meta Graph API
+app.get('/api/whatsapp/templates', async (req, res) => {
+    try {
+        const { agencyId } = req.query;
+        if (!agencyId) return res.status(400).json({ error: 'Missing agencyId' });
+
+        const resDb = await pool.query('SELECT metadata FROM users WHERE id = $1', [agencyId]);
+        if (resDb.rows.length === 0) {
+            return res.status(404).json({ error: 'Agency owner not found' });
+        }
+
+        const metadata = resDb.rows[0].metadata || {};
+        const token = metadata.whatsappToken || process.env.WHATSAPP_TOKEN;
+        const wabaId = metadata.whatsappBusinessAccountId || process.env.WHATSAPP_BUSINESS_ACCOUNT_ID;
+
+        if (!token || !wabaId) {
+            return res.status(400).json({ error: 'WhatsApp WABA configuration is missing for this agency.' });
+        }
+
+        const metaRes = await fetch(`https://graph.facebook.com/v20.0/${wabaId}/message_templates`, {
+            method: 'GET',
+            headers: {
+                'Authorization': `Bearer ${token}`
+            }
+        });
+
+        const data = await metaRes.json();
+        if (metaRes.ok) {
+            res.json({ success: true, items: data.data || [] });
+        } else {
+            console.error("Meta templates fetch error:", data);
+            res.status(metaRes.status).json({ success: false, error: data.error?.message || "Failed to fetch WABA templates" });
+        }
+    } catch (error) {
+        console.error('Error fetching WABA templates:', error);
+        res.status(500).json({ error: 'Internal Server Error' });
+    }
+});
+
+// Create and submit a new message template to Meta for approval
+app.post('/api/whatsapp/templates', async (req, res) => {
+    try {
+        const { agencyId, name, category, language, components } = req.body;
+        if (!agencyId || !name || !category || !language || !components) {
+            return res.status(400).json({ error: 'Missing required fields: agencyId, name, category, language, components' });
+        }
+
+        const resDb = await pool.query('SELECT metadata FROM users WHERE id = $1', [agencyId]);
+        if (resDb.rows.length === 0) {
+            return res.status(404).json({ error: 'Agency owner not found' });
+        }
+
+        const metadata = resDb.rows[0].metadata || {};
+        const token = metadata.whatsappToken || process.env.WHATSAPP_TOKEN;
+        const wabaId = metadata.whatsappBusinessAccountId || process.env.WHATSAPP_BUSINESS_ACCOUNT_ID;
+
+        if (!token || !wabaId) {
+            return res.status(400).json({ error: 'WhatsApp WABA configuration is missing for this agency.' });
+        }
+
+        console.log(`📡 Submitting template "${name}" to Meta for approval under WABA ID ${wabaId}...`);
+
+        const metaRes = await fetch(`https://graph.facebook.com/v20.0/${wabaId}/message_templates`, {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                name,
+                category,
+                language,
+                components
+            })
+        });
+
+        const data = await metaRes.json();
+        if (metaRes.ok) {
+            res.json({ success: true, data });
+        } else {
+            console.error("Meta template submission error:", data);
+            res.status(metaRes.status).json({ success: false, error: data.error?.message || "Meta rejected template submission" });
+        }
+    } catch (error) {
+        console.error('Error creating WABA template:', error);
+        res.status(500).json({ error: 'Internal Server Error' });
+    }
+});
+
+// Delete a message template from Meta
+app.delete('/api/whatsapp/templates/:name', async (req, res) => {
+    try {
+        const { name } = req.params;
+        const { agencyId } = req.query;
+        if (!agencyId) return res.status(400).json({ error: 'Missing agencyId' });
+
+        const resDb = await pool.query('SELECT metadata FROM users WHERE id = $1', [agencyId]);
+        if (resDb.rows.length === 0) {
+            return res.status(404).json({ error: 'Agency owner not found' });
+        }
+
+        const metadata = resDb.rows[0].metadata || {};
+        const token = metadata.whatsappToken || process.env.WHATSAPP_TOKEN;
+        const wabaId = metadata.whatsappBusinessAccountId || process.env.WHATSAPP_BUSINESS_ACCOUNT_ID;
+
+        if (!token || !wabaId) {
+            return res.status(400).json({ error: 'WhatsApp WABA configuration is missing for this agency.' });
+        }
+
+        console.log(`📡 Deleting template "${name}" from Meta for WABA ID ${wabaId}...`);
+
+        const metaRes = await fetch(`https://graph.facebook.com/v20.0/${wabaId}/message_templates?name=${encodeURIComponent(name)}`, {
+            method: 'DELETE',
+            headers: {
+                'Authorization': `Bearer ${token}`
+            }
+        });
+
+        const data = await metaRes.json();
+        if (metaRes.ok) {
+            res.json({ success: true, data });
+        } else {
+            console.error("Meta template deletion error:", data);
+            res.status(metaRes.status).json({ success: false, error: data.error?.message || "Meta rejected template deletion" });
+        }
+    } catch (error) {
+        console.error('Error deleting WABA template:', error);
+        res.status(500).json({ error: 'Internal Server Error' });
+    }
+});
+
 // Campaigns Endpoints
 // Helper to generate 15-char string IDs matching PocketBase's ID format
 function generateShortId() {

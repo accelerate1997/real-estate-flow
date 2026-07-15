@@ -16,9 +16,102 @@ const BulkMarketing = () => {
     const [isRecipientsLoading, setIsRecipientsLoading] = useState(false);
     const [isSaving, setIsSaving] = useState(false);
 
+    const [subTab, setSubTab] = useState('campaigns'); // 'campaigns' or 'templates'
+    const [templates, setTemplates] = useState([]);
+    const [isTemplatesLoading, setIsTemplatesLoading] = useState(false);
+    const [creatingTemplate, setCreatingTemplate] = useState(false);
+    const [newTemplateData, setNewTemplateData] = useState({
+        name: '',
+        category: 'MARKETING',
+        language: 'en_US',
+        bodyText: ''
+    });
+
     useEffect(() => {
-        fetchCampaigns();
-    }, []);
+        if (subTab === 'templates') {
+            fetchTemplates();
+        } else {
+            fetchCampaigns();
+        }
+    }, [subTab]);
+
+    const fetchTemplates = async () => {
+        if (!currentUser?.id) return;
+        setIsTemplatesLoading(true);
+        try {
+            const res = await fetch(`/api/whatsapp/templates?agencyId=${currentUser.id}`);
+            const data = await res.json();
+            if (data.success) {
+                setTemplates(data.items || []);
+            } else {
+                console.error("Error fetching templates:", data.error);
+            }
+        } catch (error) {
+            console.error("Error fetching templates:", error);
+        } finally {
+            setIsTemplatesLoading(false);
+        }
+    };
+
+    const handleDeleteTemplate = async (templateName) => {
+        if (!confirm(`Are you sure you want to delete template "${templateName}" from Meta? This action is permanent.`)) return;
+        try {
+            const res = await fetch(`/api/whatsapp/templates/${templateName}?agencyId=${currentUser.id}`, {
+                method: 'DELETE'
+            });
+            const data = await res.json();
+            if (data.success) {
+                alert("Template deleted successfully!");
+                fetchTemplates();
+            } else {
+                alert("Failed to delete template: " + (data.error || "Unknown error"));
+            }
+        } catch (error) {
+            console.error("Error deleting template:", error);
+            alert("Error: " + error.message);
+        }
+    };
+
+    const handleCreateTemplate = async (e) => {
+        e.preventDefault();
+        if (!newTemplateData.name) { alert("Template name is required"); return; }
+        if (!/^[a-z0-9_]+$/.test(newTemplateData.name)) { alert("Template name must be lowercase alphanumeric and underscores only"); return; }
+        if (!newTemplateData.bodyText) { alert("Template body text is required"); return; }
+
+        setIsSaving(true);
+        try {
+            const res = await fetch('/api/whatsapp/templates', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    agencyId: currentUser.id,
+                    name: newTemplateData.name,
+                    category: newTemplateData.category,
+                    language: newTemplateData.language,
+                    components: [
+                        {
+                            type: 'BODY',
+                            text: newTemplateData.bodyText
+                        }
+                    ]
+                })
+            });
+            const data = await res.json();
+            if (data.success) {
+                alert("Template submitted to Meta successfully! Status: PENDING");
+                setCreatingTemplate(false);
+                setNewTemplateData({ name: '', category: 'MARKETING', language: 'en_US', bodyText: '' });
+                fetchTemplates();
+            } else {
+                alert("Failed to submit template: " + (data.error || "Unknown error"));
+            }
+        } catch (error) {
+            console.error("Error creating template:", error);
+            alert("Error: " + error.message);
+        } finally {
+            setIsSaving(false);
+        }
+    };
 
     const fetchCampaigns = async () => {
         if (!currentUser?.id) return;
@@ -123,133 +216,225 @@ const BulkMarketing = () => {
 
     return (
         <div className="bg-white rounded-2xl shadow-sm border border-gray-155 p-6">
-            {!creatingCampaign && !viewingCampaignDetails && (
+            {!creatingCampaign && !viewingCampaignDetails && !creatingTemplate && (
                 <>
-                    <div className="flex justify-between items-center mb-6">
+                    {/* Header & Tabs */}
+                    <div className="flex flex-col md:flex-row justify-between md:items-center gap-4 mb-6 border-b border-gray-200 pb-4">
                         <div>
-                            <h3 className="font-bold text-gray-900 text-lg">Marketing Campaigns</h3>
-                            <p className="text-xs text-gray-500 mt-0.5">Send bulk WhatsApp template alerts to filtered leads.</p>
+                            <h3 className="font-bold text-gray-900 text-lg">Bulk Outreach & Templates</h3>
+                            <p className="text-xs text-gray-500 mt-0.5">Send bulk campaigns and manage official Meta templates.</p>
                         </div>
-                        <button
-                            onClick={() => {
-                                const initCamp = {
-                                    name: '',
-                                    templateName: '',
-                                    templateLanguage: 'en_US',
-                                    variables: ['name'],
-                                    filters: { location: '', bhk: '', maxBudget: '' }
-                                };
-                                setCreatingCampaign(initCamp);
-                                fetchTargetLeadCount(initCamp.filters);
-                            }}
-                            className="btn-dash-primary flex items-center gap-2"
-                        >
-                            <Plus className="w-4 h-4" /> New Campaign
-                        </button>
+                        <div className="flex items-center gap-2">
+                            <div className="bg-gray-100 p-0.5 rounded-lg flex items-center shrink-0">
+                                <button
+                                    onClick={() => setSubTab('campaigns')}
+                                    className={`px-3.5 py-1.5 rounded-md text-xs font-bold transition-all ${subTab === 'campaigns' ? 'bg-white text-gray-950 shadow-sm' : 'text-gray-500 hover:text-gray-800'}`}
+                                >
+                                    Campaigns
+                                </button>
+                                <button
+                                    onClick={() => setSubTab('templates')}
+                                    className={`px-3.5 py-1.5 rounded-md text-xs font-bold transition-all ${subTab === 'templates' ? 'bg-white text-gray-950 shadow-sm' : 'text-gray-500 hover:text-gray-800'}`}
+                                >
+                                    WABA Templates
+                                </button>
+                            </div>
+                            
+                            {subTab === 'campaigns' ? (
+                                <button
+                                    onClick={() => {
+                                        const initCamp = {
+                                            name: '',
+                                            templateName: '',
+                                            templateLanguage: 'en_US',
+                                            variables: ['name'],
+                                            filters: { location: '', bhk: '', maxBudget: '' }
+                                        };
+                                        setCreatingCampaign(initCamp);
+                                        fetchTargetLeadCount(initCamp.filters);
+                                    }}
+                                    className="btn-dash-primary flex items-center gap-2 text-xs py-1.5 px-3"
+                                >
+                                    <Plus className="w-4 h-4" /> New Campaign
+                                </button>
+                            ) : (
+                                <button
+                                    onClick={() => setCreatingTemplate(true)}
+                                    className="btn-dash-primary flex items-center gap-2 text-xs py-1.5 px-3"
+                                >
+                                    <Plus className="w-4 h-4" /> Submit Template
+                                </button>
+                            )}
+                        </div>
                     </div>
 
-                    {isCampaignsLoading ? (
-                        <div className="flex justify-center py-12">
-                            <div className="w-8 h-8 rounded-full border-2 border-primary/20 border-t-primary animate-spin" />
-                        </div>
-                    ) : campaigns.length === 0 ? (
-                        <div className="text-center py-12 bg-gray-50 rounded-2xl border border-gray-150 border-dashed">
-                            <div className="w-12 h-12 bg-gray-100 text-gray-400 rounded-full flex items-center justify-center mx-auto mb-3">
-                                <Send className="w-6 h-6 animate-pulse" />
+                    {subTab === 'campaigns' && (
+                        isCampaignsLoading ? (
+                            <div className="flex justify-center py-12">
+                                <div className="w-8 h-8 rounded-full border-2 border-primary/20 border-t-primary animate-spin" />
                             </div>
-                            <p className="text-sm font-bold text-gray-800">No campaigns launched yet</p>
-                            <p className="text-xs text-gray-500 mt-1">Create your first WhatsApp outreach campaign to connect with matching leads in bulk.</p>
-                        </div>
-                    ) : (
-                        <div className="space-y-4">
-                            {campaigns.map((camp) => {
-                                const total = parseInt(camp.total_recipients) || 0;
-                                const sent = parseInt(camp.sent_count) || 0;
-                                const deliv = parseInt(camp.delivered_count) || 0;
-                                const read = parseInt(camp.read_count) || 0;
-                                const fail = parseInt(camp.failed_count) || 0;
-                                
-                                const progressPercent = total > 0 ? Math.round(((sent + deliv + read + fail) / total) * 100) : 0;
-                                const openPercent = (sent + deliv + read) > 0 ? Math.round((read / (sent + deliv + read)) * 100) : 0;
+                        ) : campaigns.length === 0 ? (
+                            <div className="text-center py-12 bg-gray-50 rounded-2xl border border-gray-150 border-dashed">
+                                <div className="w-12 h-12 bg-gray-100 text-gray-400 rounded-full flex items-center justify-center mx-auto mb-3">
+                                    <Send className="w-6 h-6 animate-pulse" />
+                                </div>
+                                <p className="text-sm font-bold text-gray-800">No campaigns launched yet</p>
+                                <p className="text-xs text-gray-500 mt-1">Create your first WhatsApp outreach campaign to connect with matching leads in bulk.</p>
+                            </div>
+                        ) : (
+                            <div className="space-y-4">
+                                {campaigns.map((camp) => {
+                                    const total = parseInt(camp.total_recipients) || 0;
+                                    const sent = parseInt(camp.sent_count) || 0;
+                                    const deliv = parseInt(camp.delivered_count) || 0;
+                                    const read = parseInt(camp.read_count) || 0;
+                                    const fail = parseInt(camp.failed_count) || 0;
+                                    
+                                    const progressPercent = total > 0 ? Math.round(((sent + deliv + read + fail) / total) * 100) : 0;
+                                    const openPercent = (sent + deliv + read) > 0 ? Math.round((read / (sent + deliv + read)) * 100) : 0;
 
-                                return (
-                                    <div key={camp.id} className="bg-white rounded-2xl border border-gray-150 shadow-sm p-5 hover:border-gray-300 transition-all space-y-4">
-                                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                                            <div>
-                                                <h4 className="font-extrabold text-gray-900 text-base">{camp.name}</h4>
-                                                <div className="flex flex-wrap items-center gap-2 mt-1.5 text-xs text-gray-500">
-                                                    <span className="bg-gray-100 px-2 py-0.5 rounded font-mono">Template: {camp.template_name}</span>
-                                                    <span>•</span>
-                                                    <span>Created: {new Date(camp.created_at).toLocaleDateString()}</span>
+                                    return (
+                                        <div key={camp.id} className="bg-white rounded-2xl border border-gray-150 shadow-sm p-5 hover:border-gray-300 transition-all space-y-4">
+                                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                                                <div>
+                                                    <h4 className="font-extrabold text-gray-900 text-base">{camp.name}</h4>
+                                                    <div className="flex flex-wrap items-center gap-2 mt-1.5 text-xs text-gray-500">
+                                                        <span className="bg-gray-100 px-2 py-0.5 rounded font-mono">Template: {camp.template_name}</span>
+                                                        <span>•</span>
+                                                        <span>Created: {new Date(camp.created_at).toLocaleDateString()}</span>
+                                                    </div>
+                                                </div>
+                                                <div className="flex items-center gap-2 shrink-0">
+                                                    <span className={`px-3 py-1 rounded-full text-xs font-extrabold uppercase ${
+                                                        camp.status === 'completed' ? 'bg-green-50 text-green-700 border border-green-200' :
+                                                        camp.status === 'sending' ? 'bg-blue-50 text-blue-700 border border-blue-200 animate-pulse' :
+                                                        camp.status === 'failed' ? 'bg-red-50 text-red-700 border border-red-200' :
+                                                        'bg-gray-50 text-gray-700 border border-gray-200'
+                                                    }`}>
+                                                        {camp.status}
+                                                    </span>
+                                                    
+                                                    {camp.status === 'draft' && (
+                                                        <button
+                                                            onClick={() => handleSendCampaign(camp.id)}
+                                                            className="btn-dash-teal text-xs py-1 px-3"
+                                                        >
+                                                            Send WhatsApps
+                                                        </button>
+                                                    )}
+                                                    
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => {
+                                                            setViewingCampaignDetails(camp);
+                                                            fetchCampaignRecipients(camp.id);
+                                                        }}
+                                                        className="text-xs font-bold text-primary hover:text-primary-dark px-2 py-1"
+                                                    >
+                                                        Monitor Logs
+                                                    </button>
                                                 </div>
                                             </div>
-                                            <div className="flex items-center gap-2 shrink-0">
-                                                <span className={`px-3 py-1 rounded-full text-xs font-extrabold uppercase ${
-                                                    camp.status === 'completed' ? 'bg-green-50 text-green-700 border border-green-200' :
-                                                    camp.status === 'sending' ? 'bg-blue-50 text-blue-700 border border-blue-200 animate-pulse' :
-                                                    camp.status === 'failed' ? 'bg-red-50 text-red-700 border border-red-200' :
-                                                    'bg-gray-50 text-gray-700 border border-gray-200'
-                                                }`}>
-                                                    {camp.status}
-                                                </span>
+
+                                            {/* Stats badges */}
+                                            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 bg-gray-50 p-4 rounded-xl">
+                                                <div className="text-center">
+                                                    <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block">Recipients</span>
+                                                    <span className="text-lg font-extrabold text-gray-800">{total}</span>
+                                                </div>
+                                                <div className="text-center border-l border-gray-200">
+                                                    <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block">Sent / Deliv</span>
+                                                    <span className="text-lg font-extrabold text-gray-800">{sent + deliv}</span>
+                                                </div>
+                                                <div className="text-center border-l border-gray-200">
+                                                    <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block">Read (Open %)</span>
+                                                    <span className="text-lg font-extrabold text-green-600">{read} <span className="text-xs font-normal">({openPercent}%)</span></span>
+                                                </div>
+                                                <div className="text-center border-l border-gray-200">
+                                                    <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block">Failed</span>
+                                                    <span className={`text-lg font-extrabold ${fail > 0 ? 'text-red-500' : 'text-gray-800'}`}>{fail}</span>
+                                                </div>
+                                            </div>
+
+                                            {/* Progress Bar */}
+                                            <div className="space-y-1">
+                                                <div className="flex justify-between text-xs text-gray-500 font-medium">
+                                                    <span>Outreach Progress</span>
+                                                    <span>{progressPercent}% Sent</span>
+                                                </div>
+                                                <div className="w-full h-2 bg-gray-150 rounded-full overflow-hidden">
+                                                    <div
+                                                        className="h-full bg-accent-teal transition-all duration-500"
+                                                        style={{ width: `${progressPercent}%` }}
+                                                    />
+                                                </div>
+                                            </div>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        )
+                    )}
+
+                    {subTab === 'templates' && (
+                        isTemplatesLoading ? (
+                            <div className="flex justify-center py-12">
+                                <div className="w-8 h-8 rounded-full border-2 border-primary/20 border-t-primary animate-spin" />
+                            </div>
+                        ) : templates.length === 0 ? (
+                            <div className="text-center py-12 bg-gray-50 rounded-2xl border border-gray-150 border-dashed">
+                                <div className="w-12 h-12 bg-gray-100 text-gray-400 rounded-full flex items-center justify-center mx-auto mb-3">
+                                    <Send className="w-6 h-6 animate-pulse" />
+                                </div>
+                                <p className="text-sm font-bold text-gray-800">No WABA templates found</p>
+                                <p className="text-xs text-gray-500 mt-1">Submit your first template for Meta approval, or check your Meta App Dashboard connection.</p>
+                            </div>
+                        ) : (
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                {templates.map((tpl) => {
+                                    const bodyComp = tpl.components?.find(c => c.type === 'BODY') || {};
+                                    const headerComp = tpl.components?.find(c => c.type === 'HEADER') || {};
+                                    const footerComp = tpl.components?.find(c => c.type === 'FOOTER') || {};
+                                    
+                                    return (
+                                        <div key={tpl.id || tpl.name} className="bg-white rounded-2xl border border-gray-150 p-5 hover:border-gray-300 transition-all flex flex-col justify-between space-y-4">
+                                            <div className="space-y-3">
+                                                <div className="flex items-center justify-between gap-2">
+                                                    <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-extrabold uppercase ${
+                                                        tpl.status === 'APPROVED' ? 'bg-green-50 text-green-700 border border-green-200' :
+                                                        tpl.status === 'PENDING' ? 'bg-yellow-50 text-yellow-700 border border-yellow-200' :
+                                                        'bg-red-50 text-red-700 border border-red-200'
+                                                    }`}>
+                                                        {tpl.status}
+                                                    </span>
+                                                    <span className="text-[10px] text-gray-400 bg-gray-100 px-2 py-0.5 rounded uppercase font-bold">{tpl.category}</span>
+                                                </div>
                                                 
-                                                {camp.status === 'draft' && (
-                                                    <button
-                                                        onClick={() => handleSendCampaign(camp.id)}
-                                                        className="btn-dash-teal text-xs py-1 px-3"
-                                                    >
-                                                        Launch
-                                                    </button>
-                                                )}
+                                                <div>
+                                                    <h4 className="font-extrabold text-gray-900 text-sm truncate" title={tpl.name}>{tpl.name}</h4>
+                                                    <p className="text-[10px] text-gray-400 mt-0.5">Language: {tpl.language}</p>
+                                                </div>
+                                                
+                                                <div className="bg-gray-50 rounded-lg p-3 text-xs text-gray-700 border border-gray-100 max-h-32 overflow-y-auto whitespace-pre-wrap font-sans">
+                                                    {headerComp.text && <div className="font-bold border-b border-gray-200 pb-1 mb-1.5 text-gray-900 text-[11px]">{headerComp.text}</div>}
+                                                    <div>{bodyComp.text || "No body text defined."}</div>
+                                                    {footerComp.text && <div className="text-[10px] text-gray-400 mt-1.5 border-t border-gray-100 pt-1">{footerComp.text}</div>}
+                                                </div>
+                                            </div>
+
+                                            <div className="flex justify-end pt-2 border-t border-gray-100">
                                                 <button
-                                                    onClick={() => {
-                                                        setViewingCampaignDetails(camp);
-                                                        fetchCampaignRecipients(camp.id);
-                                                    }}
-                                                    className="text-xs font-bold text-primary hover:text-primary-dark px-2 py-1"
+                                                    onClick={() => handleDeleteTemplate(tpl.name)}
+                                                    className="text-red-500 hover:text-red-700 font-bold text-xs"
                                                 >
-                                                    Monitor Logs
+                                                    Delete Template
                                                 </button>
                                             </div>
                                         </div>
-
-                                        {/* Stats badges */}
-                                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 bg-gray-50 p-4 rounded-xl">
-                                            <div className="text-center">
-                                                <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block">Recipients</span>
-                                                <span className="text-lg font-extrabold text-gray-800">{total}</span>
-                                            </div>
-                                            <div className="text-center border-l border-gray-200">
-                                                <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block">Sent / Deliv</span>
-                                                <span className="text-lg font-extrabold text-gray-800">{sent + deliv}</span>
-                                            </div>
-                                            <div className="text-center border-l border-gray-200">
-                                                <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block">Read (Open %)</span>
-                                                <span className="text-lg font-extrabold text-green-600">{read} <span className="text-xs font-normal">({openPercent}%)</span></span>
-                                            </div>
-                                            <div className="text-center border-l border-gray-200">
-                                                <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block">Failed</span>
-                                                <span className={`text-lg font-extrabold ${fail > 0 ? 'text-red-500' : 'text-gray-800'}`}>{fail}</span>
-                                            </div>
-                                        </div>
-
-                                        {/* Progress Bar */}
-                                        <div className="space-y-1">
-                                            <div className="flex justify-between text-xs text-gray-500 font-medium">
-                                                <span>Outreach Progress</span>
-                                                <span>{progressPercent}% Sent</span>
-                                            </div>
-                                            <div className="w-full h-2 bg-gray-150 rounded-full overflow-hidden">
-                                                <div
-                                                    className="h-full bg-accent-teal transition-all duration-500"
-                                                    style={{ width: `${progressPercent}%` }}
-                                                />
-                                            </div>
-                                        </div>
-                                    </div>
-                                );
-                            })}
-                        </div>
+                                    );
+                                })}
+                            </div>
+                        )
                     )}
                 </>
             )}
@@ -498,6 +683,102 @@ const BulkMarketing = () => {
                             </div>
                         </div>
                     )}
+                </>
+            )}
+
+            {creatingTemplate && (
+                <>
+                    <div className="flex items-center gap-3 mb-5 pb-4 border-b border-gray-155">
+                        <button
+                            type="button"
+                            onClick={() => setCreatingTemplate(false)}
+                            className="text-xs font-bold text-gray-500 hover:text-gray-800"
+                        >
+                            &larr; Back to Templates
+                        </button>
+                        <h3 className="font-bold text-gray-900 text-lg">Submit Message Template to Meta</h3>
+                    </div>
+
+                    <form onSubmit={handleCreateTemplate} className="space-y-5">
+                        <div className="bg-white p-6 rounded-2xl border border-gray-150 shadow-sm space-y-4">
+                            <div>
+                                <label className="dash-label text-xs">Template Name</label>
+                                <input
+                                    type="text"
+                                    value={newTemplateData.name}
+                                    onChange={(e) => setNewTemplateData(prev => ({ ...prev, name: e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, '') }))}
+                                    className="dash-input font-mono"
+                                    placeholder="e.g. lead_followup_message"
+                                    required
+                                />
+                                <p className="text-[10px] text-gray-400 mt-1">Lowercase letters, numbers, and underscores only.</p>
+                            </div>
+                            
+                            <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label className="dash-label text-xs">Category</label>
+                                    <select
+                                        value={newTemplateData.category}
+                                        onChange={(e) => setNewTemplateData(prev => ({ ...prev, category: e.target.value }))}
+                                        className="dash-input"
+                                    >
+                                        <option value="MARKETING">Marketing (Offers, updates)</option>
+                                        <option value="UTILITY">Utility (Reminders, followups)</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label className="dash-label text-xs">Language</label>
+                                    <select
+                                        value={newTemplateData.language}
+                                        onChange={(e) => setNewTemplateData(prev => ({ ...prev, language: e.target.value }))}
+                                        className="dash-input"
+                                    >
+                                        <option value="en_US">English (US)</option>
+                                        <option value="es_ES">Spanish</option>
+                                        <option value="hi_IN">Hindi</option>
+                                    </select>
+                                </div>
+                            </div>
+                            
+                            <div>
+                                <label className="dash-label text-xs">Body Text</label>
+                                <textarea
+                                    value={newTemplateData.bodyText}
+                                    onChange={(e) => setNewTemplateData(prev => ({ ...prev, bodyText: e.target.value }))}
+                                    rows={6}
+                                    className="dash-input leading-relaxed"
+                                    placeholder={`Hello {{1}},\n\nThanks for showing interest in our properties. We have some great matches for you!\n\nBest regards,\n{{2}}`}
+                                    required
+                                />
+                                <p className="text-[10px] text-gray-400 mt-1">Use {"{{1}}"}, {"{{2}}"} for dynamic variables (e.g. {"{{1}}"} for recipient name).</p>
+                            </div>
+                            
+                            <div className="bg-teal-50 border border-teal-100 p-3.5 rounded-xl flex gap-2 text-xs text-teal-800">
+                                <Shield className="w-4 h-4 shrink-0" />
+                                <div>
+                                    <span className="font-bold">Meta Template Approval Guidelines:</span> Make sure your template name contains no capital letters or spaces. Submissions are reviewed and approved automatically by Meta within a few hours.
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="flex justify-end gap-3">
+                            <button
+                                type="button"
+                                onClick={() => setCreatingTemplate(false)}
+                                className="btn-dash-secondary"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                type="submit"
+                                disabled={isSaving}
+                                className="btn-dash-teal"
+                            >
+                                {isSaving ? <Loader2 className="w-4 h-4 animate-spin inline mr-1" /> : null}
+                                Submit to Meta
+                            </button>
+                        </div>
+                    </form>
                 </>
             )}
         </div>
