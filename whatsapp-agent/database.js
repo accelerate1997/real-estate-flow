@@ -147,9 +147,7 @@ module.exports = {
                 let finalName = existingLead.name;
                 if (name) {
                     finalName = name;
-                }
-
-                // Update existing lead
+                }                // Update existing lead
                 const updateQuery = `
                     UPDATE leads 
                     SET name = COALESCE($1, name), 
@@ -160,8 +158,9 @@ module.exports = {
                         date = COALESCE($6, date),
                         verified = COALESCE($7, verified),
                         "preferredLanguage" = COALESCE($8, "preferredLanguage"),
+                        marketing_opt_in = COALESCE($9, marketing_opt_in),
                         updated_at = NOW()
-                    WHERE id = $9
+                    WHERE id = $10
                     RETURNING *
                 `;
                 const updateRes = await pool.query(updateQuery, [
@@ -169,10 +168,21 @@ module.exports = {
                     maxBudget || null, followUpDate,
                     params.verified !== undefined ? params.verified : null,
                     params.preferredLanguage || null,
+                    params.marketing_opt_in !== undefined ? params.marketing_opt_in : null,
                     leadId
                 ]);
                 console.log(`[DB] Updated Lead ${leadId}`);
                 const updatedLead = updateRes.rows[0];
+                
+                // Log consent update if consent status changed
+                if (params.marketing_opt_in !== undefined && existingLead.marketing_opt_in !== params.marketing_opt_in) {
+                    const consentId = generateId();
+                    await pool.query(
+                        'INSERT INTO lead_consents (id, lead_id, consent_status, source, consent_clause) VALUES ($1, $2, $3, $4, $5)',
+                        [consentId, leadId, params.marketing_opt_in ? 'active' : 'withdrawn', 'web_form', 'Consent updated via lead form/system']
+                    );
+                }
+
                 if (!params.isChatUpdate) {
                     dbEvents.emit('lead_created', updatedLead);
                 }
@@ -180,18 +190,28 @@ module.exports = {
             } else {
                 // Insert new lead
                 const newId = generateId();
+                const optIn = params.marketing_opt_in !== undefined ? params.marketing_opt_in : true;
                 const insertQuery = `
-                    INSERT INTO leads (id, "agencyId", name, phone, requirement, target_bhk, target_location, max_budget, status, date, verified, "preferredLanguage", created_at, updated_at)
-                    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, NOW(), NOW())
+                    INSERT INTO leads (id, "agencyId", name, phone, requirement, target_bhk, target_location, max_budget, status, date, verified, "preferredLanguage", marketing_opt_in, created_at, updated_at)
+                    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, NOW(), NOW())
                     RETURNING *
                 `;
                 const insertRes = await pool.query(insertQuery, [
                     newId, agencyId, name || 'WhatsApp Contact', cleanPhone, requirementText,
                     targetBhk, targetLocation, maxBudget, 'New Lead', followUpDate,
-                    params.verified === true, params.preferredLanguage || 'English'
+                    params.verified === true, params.preferredLanguage || 'English',
+                    optIn
                 ]);
                 const newLead = insertRes.rows[0];
                 console.log(`[DB] Created new Lead: ${newLead.id}`);
+
+                // Log consent for new lead
+                const consentId = generateId();
+                await pool.query(
+                    'INSERT INTO lead_consents (id, lead_id, consent_status, source, consent_clause) VALUES ($1, $2, $3, $4, $5)',
+                    [consentId, newLead.id, optIn ? 'active' : 'withdrawn', 'web_form', 'Consent given via website property enquiry form']
+                );
+
                 dbEvents.emit('lead_created', newLead);
 
                 // Enroll in sequence

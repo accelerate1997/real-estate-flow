@@ -723,7 +723,8 @@ app.post('/api/leads/verify-otp', async (req, res) => {
             targetBhk,
             targetLocation,
             maxBudget,
-            preferredLanguage
+            preferredLanguage,
+            marketing_opt_in
         } = req.body;
 
         if (!phone || !otp || !agencyId) {
@@ -754,7 +755,8 @@ app.post('/api/leads/verify-otp', async (req, res) => {
             location: targetLocation,
             budget_in_rupees: maxBudget,
             verified: true,
-            preferredLanguage: preferredLanguage || 'English'
+            preferredLanguage: preferredLanguage || 'English',
+            marketing_opt_in: marketing_opt_in === true
         };
 
         const newLead = await db.upsertLead(cleanPhone, agencyId, leadParams);

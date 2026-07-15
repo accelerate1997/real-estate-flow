@@ -23,6 +23,7 @@ const PropertyDetails = () => {
     const [leadEmail, setLeadEmail] = useState('');
     const [isSubmittingLead, setIsSubmittingLead] = useState(false);
     const [leadSubmitted, setLeadSubmitted] = useState(false);
+    const [consentChecked, setConsentChecked] = useState(false);
     
     // OTP & Language state
     const [preferredLanguage, setPreferredLanguage] = useState('English');
@@ -111,7 +112,8 @@ const PropertyDetails = () => {
                     name: leadName,
                     email: leadEmail,
                     requirement: `Interested in property: "${property?.title}" (ID: ${property?.id})`,
-                    preferredLanguage
+                    preferredLanguage,
+                    marketing_opt_in: consentChecked
                 })
             });
             const data = await res.json();
@@ -611,6 +613,20 @@ const PropertyDetails = () => {
                                                         <option value="Spanish">Spanish (Español)</option>
                                                     </select>
                                                 </div>
+
+                                                <div className="flex items-start gap-2.5 bg-gray-50/50 p-3 rounded-xl border border-gray-100">
+                                                     <input
+                                                         type="checkbox"
+                                                         id="marketing_consent"
+                                                         checked={consentChecked}
+                                                         onChange={(e) => setConsentChecked(e.target.checked)}
+                                                         className="mt-0.5 rounded text-primary focus:ring-primary border-gray-300 w-4 h-4 cursor-pointer"
+                                                         required
+                                                     />
+                                                     <label htmlFor="marketing_consent" className="text-[11px] text-gray-500 leading-normal font-medium cursor-pointer">
+                                                         I consent to Rajesh Realty collecting my details to send matching properties, alerts, and updates via WhatsApp. I agree to the <a href="/privacy" target="_blank" rel="noopener noreferrer" className="text-primary font-bold hover:underline">Privacy Policy</a>.
+                                                     </label>
+                                                 </div>
 
                                                 <button
                                                     type="submit"

@@ -6,6 +6,17 @@ const LeadDetailsModal = ({ isOpen, onClose, lead }) => {
     const [isLoadingChats, setIsLoadingChats] = useState(false);
     const chatContainerRef = useRef(null);
 
+    const [consentLogs, setConsentLogs] = useState([]);
+    const [isUpdatingConsent, setIsUpdatingConsent] = useState(false);
+    const [leadOptIn, setLeadOptIn] = useState(lead ? lead.marketing_opt_in !== false : true);
+
+    useEffect(() => {
+        if (isOpen && lead) {
+            setLeadOptIn(lead.marketing_opt_in !== false);
+            fetchConsentLogs(lead.id);
+        }
+    }, [isOpen, lead]);
+
     useEffect(() => {
         if (isOpen && lead?.phone) {
             fetchChats(lead.phone);
@@ -18,6 +29,39 @@ const LeadDetailsModal = ({ isOpen, onClose, lead }) => {
             chatContainerRef.current.scrollTop = chatContainerRef.current.scrollHeight;
         }
     }, [chats]);
+
+    const fetchConsentLogs = async (leadId) => {
+        try {
+            const response = await fetch(`/api/collections/lead_consents?filter=lead_id='${leadId}'&sort=-created_at`);
+            if (response.ok) {
+                const data = await response.json();
+                setConsentLogs(data.items || []);
+            }
+        } catch (error) {
+            console.error("Failed to fetch consent logs:", error);
+        }
+    };
+
+    const toggleConsent = async () => {
+        setIsUpdatingConsent(true);
+        try {
+            const newOptIn = !leadOptIn;
+            const response = await fetch(`/api/collections/leads/${lead.id}`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ marketing_opt_in: newOptIn })
+            });
+            if (response.ok) {
+                setLeadOptIn(newOptIn);
+                await fetchConsentLogs(lead.id);
+                lead.marketing_opt_in = newOptIn; // update local object reference
+            }
+        } catch (error) {
+            console.error("Failed to update consent:", error);
+        } finally {
+            setIsUpdatingConsent(false);
+        }
+    };
 
     const fetchChats = async (phone) => {
         setIsLoadingChats(true);
@@ -123,6 +167,62 @@ const LeadDetailsModal = ({ isOpen, onClose, lead }) => {
                                     <p className="text-xs text-gray-500">Processed seamlessly via ChatGPT</p>
                                 </div>
                             </div>
+                        </div>
+
+                        {/* DPDP Consent Status & Logs */}
+                        <div className="bg-white p-4 rounded-xl border border-gray-100 shadow-sm space-y-3">
+                            <div className="flex justify-between items-center pb-2 border-b border-gray-105">
+                                <h4 className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">WhatsApp Consent</h4>
+                                {leadOptIn ? (
+                                    <span className="text-[9px] bg-green-50 text-green-700 border border-green-100 font-extrabold px-2 py-0.5 rounded-full">
+                                        Opted-In
+                                    </span>
+                                ) : (
+                                    <span className="text-[9px] bg-red-50 text-red-700 border border-red-100 font-extrabold px-2 py-0.5 rounded-full">
+                                        Opted-Out
+                                    </span>
+                                )}
+                            </div>
+
+                            <div className="flex justify-between items-center gap-2">
+                                <p className="text-[11px] text-gray-500 leading-normal">
+                                    {leadOptIn ? "Lead agrees to receive property alerts on WhatsApp." : "Lead has unsubscribed. Campaigns are blocked."}
+                                </p>
+                                <button
+                                    onClick={toggleConsent}
+                                    disabled={isUpdatingConsent}
+                                    className={`px-3 py-1.5 rounded-lg text-[10px] font-bold border transition-all ${
+                                        leadOptIn 
+                                        ? 'bg-red-50 border-red-200 text-red-700 hover:bg-red-100' 
+                                        : 'bg-green-50 border-green-200 text-green-700 hover:bg-green-100'
+                                    }`}
+                                >
+                                    {isUpdatingConsent ? 'Updating...' : (leadOptIn ? 'Unsubscribe' : 'Subscribe')}
+                                </button>
+                            </div>
+
+                            {/* Consent Audit Logs */}
+                            {consentLogs.length > 0 && (
+                                <div className="pt-2 border-t border-gray-100">
+                                    <h5 className="text-[9px] font-bold text-gray-400 uppercase tracking-wider mb-2">Consent Audit History</h5>
+                                    <div className="max-h-[120px] overflow-y-auto space-y-2 pr-1">
+                                        {consentLogs.map(log => (
+                                            <div key={log.id} className="text-[10px] bg-gray-50 border border-gray-100 rounded-lg p-2 flex flex-col gap-0.5">
+                                                <div className="flex justify-between items-center">
+                                                    <span className={`font-bold uppercase tracking-wider text-[8px] px-1 rounded-sm ${log.consent_status === 'active' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
+                                                        {log.consent_status === 'active' ? 'Granted' : 'Withdrawn'}
+                                                    </span>
+                                                    <span className="text-[8px] text-gray-400 font-mono">
+                                                        {new Date(log.created_at || log.updated_at).toLocaleString('en-IN', { dateStyle: 'short', timeStyle: 'short' })}
+                                                    </span>
+                                                </div>
+                                                <p className="text-gray-600 font-medium leading-normal">{log.consent_clause}</p>
+                                                <span className="text-[8px] text-gray-400 font-semibold italic">Source: {log.source}</span>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
                         </div>
                     </div>
                 </div>
