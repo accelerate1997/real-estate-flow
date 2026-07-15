@@ -60,6 +60,26 @@ const BulkMarketing = () => {
             setIsPolishing(false);
         }
     };
+    const [properties, setProperties] = useState([]);
+
+    const fetchProperties = async () => {
+        if (!currentUser?.id) return;
+        try {
+            const records = await pb.collection('properties').getFullList({
+                filter: `agencyId = "${currentUser.id}"`,
+                sort: '-created'
+            });
+            setProperties(records);
+        } catch (error) {
+            console.error('Error fetching properties for marketing:', error);
+        }
+    };
+
+    useEffect(() => {
+        if (creatingCampaign) {
+            fetchProperties();
+        }
+    }, [creatingCampaign]);
 
     useEffect(() => {
         if (subTab === 'templates') {
@@ -506,6 +526,41 @@ const BulkMarketing = () => {
                                 <h4 className="font-extrabold text-gray-800 text-sm">1. Target Audience Filters</h4>
                                 <p className="text-xs text-gray-500">Filter leads to target specific requirements. Leave empty or choose 'any' to select all.</p>
                                 
+                                {properties.length > 0 && (
+                                    <div className="bg-indigo-50/50 rounded-xl border border-indigo-100/60 p-4 space-y-2 max-w-xl">
+                                        <label className="dash-label text-xs text-indigo-900 font-bold block mb-1">Quick Autofill from Property Details</label>
+                                        <select
+                                            onChange={(e) => {
+                                                const propId = e.target.value;
+                                                if (!propId) return;
+                                                const prop = properties.find(p => p.id === propId);
+                                                if (prop) {
+                                                    const newFilters = {
+                                                        ...creatingCampaign.filters,
+                                                        location: prop.location || '',
+                                                        bhk: prop.bhk || '',
+                                                        maxBudget: prop.price || ''
+                                                    };
+                                                    setCreatingCampaign(prev => ({
+                                                        ...prev,
+                                                        filters: newFilters
+                                                    }));
+                                                    fetchTargetLeadCount(newFilters);
+                                                }
+                                            }}
+                                            className="dash-input bg-white border-indigo-200 text-gray-700 font-semibold"
+                                        >
+                                            <option value="">-- Select a Property --</option>
+                                            {properties.map(p => (
+                                                <option key={p.id} value={p.id}>
+                                                    {p.title} ({p.bhk ? `${p.bhk} - ` : ''}{p.location})
+                                                </option>
+                                            ))}
+                                        </select>
+                                        <p className="text-[10px] text-indigo-500 font-medium">Selecting a property automatically inputs its location, BHK, and price to find matching leads.</p>
+                                    </div>
+                                )}
+
                                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                                     <div>
                                         <label className="dash-label text-xs">Target Location</label>
