@@ -10,7 +10,7 @@ const jwt = require('jsonwebtoken');
 const db = require('./database');
 const { pool, initDB, autoMigrateIfEmpty } = require('./database/db');
 const { processMessage } = require('./openai_service');
-const { sendMessage } = require('./whatsapp');
+const { sendMessage, sendTemplateMessage } = require('./whatsapp');
 const followupEngine = require('./followup_engine');
 const { uploadToR2 } = require('./database/r2');
 
@@ -766,7 +766,40 @@ app.post('/webhook', async (req, res) => {
         const change = entry?.changes?.[0];
         const value = change?.value;
 
-        if (!value || !value.messages || value.messages.length === 0) {
+        if (!value) {
+            return res.sendStatus(200);
+        }
+
+        // Handle status receipts (sent, delivered, read, failed)
+        if (value.statuses && value.statuses.length > 0) {
+            const statusObj = value.statuses[0];
+            const messageId = statusObj.id;
+            const metaStatus = statusObj.status; // 'sent', 'delivered', 'read', 'failed'
+            
+            let status = 'sent';
+            if (metaStatus === 'delivered') status = 'delivered';
+            else if (metaStatus === 'read') status = 'read';
+            else if (metaStatus === 'failed') status = 'failed';
+            
+            const errMsg = statusObj.errors?.[0]?.message || null;
+
+            if (errMsg) {
+                console.log(`📡 [Webhook Status] Message ${messageId} failed: ${errMsg}`);
+                await pool.query(
+                    'UPDATE campaign_logs SET status = $1, error_message = $2, updated_at = NOW() WHERE meta_message_id = $3',
+                    [status, errMsg, messageId]
+                );
+            } else {
+                console.log(`📡 [Webhook Status] Message ${messageId} status updated to: ${status}`);
+                await pool.query(
+                    'UPDATE campaign_logs SET status = $1, updated_at = NOW() WHERE meta_message_id = $2',
+                    [status, messageId]
+                );
+            }
+            return res.sendStatus(200);
+        }
+
+        if (!value.messages || value.messages.length === 0) {
             return res.sendStatus(200);
         }
 
@@ -967,6 +1000,281 @@ app.get('/api/whatsapp/status', async (req, res) => {
         res.status(500).json({ error: 'Internal Server Error' });
     }
 });
+
+// Campaigns Endpoints
+// Helper to generate 15-char string IDs matching PocketBase's ID format
+function generateShortId() {
+    const chars = 'abcdefghijklmnopqrstuvwxyz0123456789';
+    let result = '';
+    for (let i = 0; i < 15; i++) {
+        result += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    return result;
+}
+
+// 1. Get campaigns history with stats
+app.get('/api/campaigns', async (req, res) => {
+    try {
+        const { agencyId } = req.query;
+        if (!agencyId) return res.status(400).json({ error: 'Missing agencyId' });
+
+        const query = `
+            SELECT c.*,
+                   COUNT(l.id) AS total_recipients,
+                   SUM(CASE WHEN l.status = 'sent' THEN 1 ELSE 0 END) AS sent_count,
+                   SUM(CASE WHEN l.status = 'delivered' THEN 1 ELSE 0 END) AS delivered_count,
+                   SUM(CASE WHEN l.status = 'read' THEN 1 ELSE 0 END) AS read_count,
+                   SUM(CASE WHEN l.status = 'failed' THEN 1 ELSE 0 END) AS failed_count
+            FROM campaigns c
+            LEFT JOIN campaign_logs l ON c.id = l.campaign_id
+            WHERE c.agency_id = $1
+            GROUP BY c.id
+            ORDER BY c.created_at DESC
+        `;
+        const result = await pool.query(query, [agencyId]);
+        res.json({ success: true, items: result.rows });
+    } catch (err) {
+        console.error('Error fetching campaigns:', err.message);
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// 2. Query target lead count based on filters
+app.post('/api/campaigns/target-count', async (req, res) => {
+    try {
+        const { agencyId, filters } = req.body;
+        if (!agencyId) return res.status(400).json({ error: 'Missing agencyId' });
+
+        const queryParams = [agencyId];
+        let queryText = 'SELECT COUNT(*) FROM leads WHERE "agencyId" = $1';
+        let paramIdx = 2;
+
+        if (filters) {
+            if (filters.location && filters.location !== 'any' && filters.location.trim() !== '') {
+                queryText += ` AND target_location ILIKE $${paramIdx}`;
+                queryParams.push(`%${filters.location.trim()}%`);
+                paramIdx++;
+            }
+            if (filters.bhk && filters.bhk !== 'any' && filters.bhk.trim() !== '') {
+                queryText += ` AND target_bhk ILIKE $${paramIdx}`;
+                queryParams.push(`%${filters.bhk.trim()}%`);
+                paramIdx++;
+            }
+            if (filters.maxBudget && parseFloat(filters.maxBudget) > 0) {
+                queryText += ` AND max_budget <= $${paramIdx}`;
+                queryParams.push(parseFloat(filters.maxBudget));
+                paramIdx++;
+            }
+        }
+
+        const result = await pool.query(queryText, queryParams);
+        res.json({ success: true, count: parseInt(result.rows[0].count) });
+    } catch (err) {
+        console.error('Error fetching lead target count:', err.message);
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// 3. Create a campaign & populate recipients
+app.post('/api/campaigns', async (req, res) => {
+    try {
+        const { agencyId, name, templateName, templateLanguage, variables, filters } = req.body;
+        if (!agencyId || !name || !templateName) {
+            return res.status(400).json({ error: 'Missing required fields: agencyId, name, or templateName' });
+        }
+
+        // Query matching leads
+        const queryParams = [agencyId];
+        let queryText = 'SELECT * FROM leads WHERE "agencyId" = $1';
+        let paramIdx = 2;
+
+        if (filters) {
+            if (filters.location && filters.location !== 'any' && filters.location.trim() !== '') {
+                queryText += ` AND target_location ILIKE $${paramIdx}`;
+                queryParams.push(`%${filters.location.trim()}%`);
+                paramIdx++;
+            }
+            if (filters.bhk && filters.bhk !== 'any' && filters.bhk.trim() !== '') {
+                queryText += ` AND target_bhk ILIKE $${paramIdx}`;
+                queryParams.push(`%${filters.bhk.trim()}%`);
+                paramIdx++;
+            }
+            if (filters.maxBudget && parseFloat(filters.maxBudget) > 0) {
+                queryText += ` AND max_budget <= $${paramIdx}`;
+                queryParams.push(parseFloat(filters.maxBudget));
+                paramIdx++;
+            }
+        }
+
+        const leadsRes = await pool.query(queryText, queryParams);
+        const leads = leadsRes.rows;
+
+        if (leads.length === 0) {
+            return res.status(400).json({ error: 'No matching leads found for the selected filters.' });
+        }
+
+        // Insert campaign
+        const campaignId = generateShortId();
+        const variablesJson = JSON.stringify(variables || []);
+        const filtersJson = JSON.stringify(filters || {});
+
+        await pool.query(
+            `INSERT INTO campaigns (id, name, template_name, template_language, variables, filters, status, agency_id, created_at, updated_at)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW(), NOW())`,
+            [campaignId, name, templateName, templateLanguage || 'en_US', variablesJson, filtersJson, 'draft', agencyId]
+        );
+
+        // Populate campaign logs
+        for (const lead of leads) {
+            const logId = generateShortId();
+            await pool.query(
+                `INSERT INTO campaign_logs (id, campaign_id, lead_id, phone, status, created_at, updated_at)
+                 VALUES ($1, $2, $3, $4, $5, NOW(), NOW())`,
+                [logId, campaignId, lead.id, lead.phone, 'pending']
+            );
+        }
+
+        res.json({ success: true, campaignId, totalRecipients: leads.length });
+    } catch (err) {
+        console.error('Error creating campaign:', err.message);
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// 4. Trigger campaign sending
+app.post('/api/campaigns/:id/send', async (req, res) => {
+    try {
+        const { id } = req.params;
+        
+        // Fetch campaign details
+        const campaignQuery = await pool.query('SELECT * FROM campaigns WHERE id = $1', [id]);
+        if (campaignQuery.rows.length === 0) {
+            return res.status(404).json({ error: 'Campaign not found' });
+        }
+
+        const campaign = campaignQuery.rows[0];
+        if (campaign.status === 'sending') {
+            return res.json({ success: true, message: 'Campaign is already sending' });
+        }
+
+        // Update campaign status
+        await pool.query('UPDATE campaigns SET status = $1, updated_at = NOW() WHERE id = $2', ['sending', id]);
+
+        // Trigger asynchronous campaign processor
+        runCampaignProcessor(id).catch(err => {
+            console.error(`❌ Background runner error for campaign ${id}:`, err);
+        });
+
+        res.json({ success: true, message: 'Campaign sending started in background' });
+    } catch (err) {
+        console.error('Error initiating campaign send:', err.message);
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// 5. Expand recipient details for monitoring
+app.get('/api/campaigns/:id/recipients', async (req, res) => {
+    try {
+        const { id } = req.params;
+        const query = `
+            SELECT l.*, ld.name AS lead_name
+            FROM campaign_logs l
+            JOIN leads ld ON l.lead_id = ld.id
+            WHERE l.campaign_id = $1
+            ORDER BY l.created_at ASC
+        `;
+        const result = await pool.query(query, [id]);
+        res.json({ success: true, items: result.rows });
+    } catch (err) {
+        console.error('Error fetching campaign recipients:', err.message);
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// Asynchronous background campaign sender
+async function runCampaignProcessor(campaignId) {
+    console.log(`🚀 [Campaign Runner] Starting processing for campaign ${campaignId}...`);
+    try {
+        // Fetch campaign details
+        const campaignRes = await pool.query('SELECT * FROM campaigns WHERE id = $1', [campaignId]);
+        if (campaignRes.rows.length === 0) return;
+        const campaign = campaignRes.rows[0];
+        const { template_name, template_language, variables, agency_id } = campaign;
+        const mappedVars = Array.isArray(variables) ? variables : JSON.parse(variables || '[]');
+
+        // Fetch pending recipients
+        const recipientsRes = await pool.query(
+            'SELECT l.*, ld.name, ld.target_location, ld.target_bhk FROM campaign_logs l JOIN leads ld ON l.lead_id = ld.id WHERE l.campaign_id = $1 AND l.status = $2',
+            [campaignId, 'pending']
+        );
+        const recipients = recipientsRes.rows;
+        console.log(`[Campaign Runner] Found ${recipients.length} pending recipients for campaign ${campaignId}`);
+
+        const instanceName = `Agency_${agency_id}`;
+
+        for (const recipient of recipients) {
+            try {
+                // Pause to pace sends and respect Meta rate limits (approx 150ms)
+                await new Promise(resolve => setTimeout(resolve, 150));
+
+                // Re-verify campaign status was not cancelled or paused in DB
+                const currentStatusCheck = await pool.query('SELECT status FROM campaigns WHERE id = $1', [campaignId]);
+                if (currentStatusCheck.rows[0]?.status !== 'sending') {
+                    console.log(`[Campaign Runner] Campaign status changed to ${currentStatusCheck.rows[0]?.status}. Aborting runner.`);
+                    return;
+                }
+
+                // Construct component parameters
+                const parameters = mappedVars.map(v => {
+                    if (v === 'name') return { type: 'text', text: recipient.name || 'Customer' };
+                    if (v === 'target_location') return { type: 'text', text: recipient.target_location || 'Any' };
+                    if (v === 'target_bhk') return { type: 'text', text: recipient.target_bhk || 'Any' };
+                    return { type: 'text', text: v }; // Literal fallback
+                });
+
+                const components = parameters.length > 0 ? [{
+                    type: 'body',
+                    parameters: parameters
+                }] : [];
+
+                // Send message via Meta WhatsApp Cloud API
+                const metaMessageId = await sendTemplateMessage(
+                    recipient.phone,
+                    template_name,
+                    template_language,
+                    components,
+                    instanceName
+                );
+
+                if (metaMessageId) {
+                    await pool.query(
+                        'UPDATE campaign_logs SET status = $1, meta_message_id = $2, error_message = NULL, updated_at = NOW() WHERE id = $3',
+                        ['sent', metaMessageId, recipient.id]
+                    );
+                } else {
+                    await pool.query(
+                        'UPDATE campaign_logs SET status = $1, error_message = $2, updated_at = NOW() WHERE id = $3',
+                        ['failed', 'Meta sending failed (missing keys or API error)', recipient.id]
+                    );
+                }
+            } catch (errRecip) {
+                console.error(`[Campaign Runner] Error sending to recipient ${recipient.phone}:`, errRecip.message);
+                await pool.query(
+                    'UPDATE campaign_logs SET status = $1, error_message = $2, updated_at = NOW() WHERE id = $3',
+                    ['failed', errRecip.message, recipient.id]
+                );
+            }
+        }
+
+        // Mark campaign as completed
+        await pool.query('UPDATE campaigns SET status = $1, updated_at = NOW() WHERE id = $2', ['completed', campaignId]);
+        console.log(`✅ [Campaign Runner] Campaign ${campaignId} processed successfully!`);
+
+    } catch (errCampaign) {
+        console.error(`❌ [Campaign Runner] Major campaign execution failure:`, errCampaign.message);
+        await pool.query('UPDATE campaigns SET status = $1, updated_at = NOW() WHERE id = $2', ['failed', campaignId]);
+    }
+}
 
 app.post('/api/properties/match', async (req, res) => {
     try {

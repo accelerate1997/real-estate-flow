@@ -165,3 +165,30 @@ CREATE TABLE IF NOT EXISTS otp_verifications (
     expires_at TIMESTAMP WITH TIME ZONE NOT NULL
 );
 
+-- Campaigns
+CREATE TABLE IF NOT EXISTS campaigns (
+    id VARCHAR(15) PRIMARY KEY,
+    name VARCHAR(255) NOT NULL,
+    template_name VARCHAR(255) NOT NULL,
+    template_language VARCHAR(50) DEFAULT 'en_US',
+    variables JSONB DEFAULT '[]'::jsonb,
+    filters JSONB DEFAULT '{}'::jsonb,
+    status VARCHAR(50) DEFAULT 'draft',
+    agency_id VARCHAR(15) REFERENCES users(id) ON DELETE CASCADE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Campaign Logs / Recipients
+CREATE TABLE IF NOT EXISTS campaign_logs (
+    id VARCHAR(15) PRIMARY KEY,
+    campaign_id VARCHAR(15) REFERENCES campaigns(id) ON DELETE CASCADE,
+    lead_id VARCHAR(15) REFERENCES leads(id) ON DELETE CASCADE,
+    phone VARCHAR(50) NOT NULL,
+    status VARCHAR(50) DEFAULT 'pending',
+    meta_message_id VARCHAR(100),
+    error_message TEXT,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
