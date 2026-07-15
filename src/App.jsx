@@ -11,6 +11,7 @@ import Login from './components/Login';
 import AgencyDashboard from './components/AgencyDashboard';
 import AgentInviteRegister from './components/AgentInviteRegister';
 import PropertyDetails from './components/PropertyDetails';
+import PrivacyPolicy from './components/PrivacyPolicy';
 
 // New Redesign Components
 import Features from './components/Features';
@@ -76,6 +77,8 @@ function App() {
             <Route path="/login" element={<Login />} />
             <Route path="/invite" element={<AgentInviteRegister />} />
             <Route path="/agency-dashboard" element={<AgencyDashboard />} />
+            <Route path="/privacy" element={<PrivacyPolicy />} />
+            <Route path="/privacy-policy" element={<PrivacyPolicy />} />
           </Routes>
         </Layout>
       </div>
