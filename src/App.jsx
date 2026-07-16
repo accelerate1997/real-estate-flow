@@ -23,10 +23,39 @@ import PropertyCard from './components/PropertyCard';
 import Partners from './components/Partners';
 import Footer from './components/Footer';
 
+import { initializeTracking, trackPageView } from './services/tracking';
+import { pb } from './services/pocketbase';
+
 // Layout wrapper to conditionally render Header/Footer
 const Layout = ({ children }) => {
   const location = useLocation();
   const isAuthPage = ['/login', '/register', '/agency-dashboard', '/invite'].includes(location.pathname);
+
+  // Initialize and track global page views on public pages
+  React.useEffect(() => {
+    if (isAuthPage) return;
+
+    const setupGlobalTracking = async () => {
+      try {
+        // Fetch the first owner (primary agency) profile
+        const owner = await pb.collection('users').getFirstListItem("role='owner'");
+        if (owner?.metadata?.googleTagId || owner?.metadata?.metaPixelId) {
+          initializeTracking(owner.metadata.googleTagId, owner.metadata.metaPixelId);
+          trackPageView(location.pathname);
+        }
+      } catch (err) {
+        console.log("Failed to load global tracking settings (no primary owner yet).");
+      }
+    };
+
+    setupGlobalTracking();
+  }, []);
+
+  // Track page views on route changes
+  React.useEffect(() => {
+    if (isAuthPage) return;
+    trackPageView(location.pathname);
+  }, [location.pathname, isAuthPage]);
 
   return (
     <>

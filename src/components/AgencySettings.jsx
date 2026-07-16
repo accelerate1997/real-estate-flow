@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import {
     Save, Building, Bell, Shield, CreditCard, ChevronRight, MessageSquare,
-    Check, Loader2, BrainCircuit, Key, Plus, Trash2, Clock, Edit2, Lock, Globe
+    Check, Loader2, BrainCircuit, Key, Plus, Trash2, Clock, Edit2, Lock, Globe, Activity
 } from 'lucide-react';
 import { pb } from '../services/pocketbase';
 
@@ -113,7 +113,9 @@ const AgencySettings = () => {
         agentEnabled: currentUser?.agentEnabled ?? true,
         whatsappToken: currentUser?.metadata?.whatsappToken || '',
         whatsappPhoneNumberId: currentUser?.metadata?.whatsappPhoneNumberId || '',
-        whatsappBusinessAccountId: currentUser?.metadata?.whatsappBusinessAccountId || ''
+        whatsappBusinessAccountId: currentUser?.metadata?.whatsappBusinessAccountId || '',
+        googleTagId: currentUser?.metadata?.googleTagId || '',
+        metaPixelId: currentUser?.metadata?.metaPixelId || ''
     });
 
     const fetchWhatsAppStatus = async () => {
@@ -305,7 +307,9 @@ const fetchSequences = async () => {
                         ...currentUser.metadata,
                         whatsappToken: agencyData.whatsappToken,
                         whatsappPhoneNumberId: agencyData.whatsappPhoneNumberId,
-                        whatsappBusinessAccountId: agencyData.whatsappBusinessAccountId
+                        whatsappBusinessAccountId: agencyData.whatsappBusinessAccountId,
+                        googleTagId: agencyData.googleTagId,
+                        metaPixelId: agencyData.metaPixelId
                     }
                 });
                 await pb.collection('users').authRefresh();
@@ -355,7 +359,9 @@ const fetchSequences = async () => {
                             ...currentUser.metadata,
                             whatsappToken: agencyData.whatsappToken,
                             whatsappPhoneNumberId: agencyData.whatsappPhoneNumberId,
-                            whatsappBusinessAccountId: agencyData.whatsappBusinessAccountId
+                            whatsappBusinessAccountId: agencyData.whatsappBusinessAccountId,
+                            googleTagId: agencyData.googleTagId,
+                            metaPixelId: agencyData.metaPixelId
                         }
                     });
                     await pb.collection('users').authRefresh();
@@ -379,6 +385,7 @@ const fetchSequences = async () => {
         { id: 'profile',       name: 'Agency Profile',       icon: Building,      description: 'Manage your agency details and public information.' },
         { id: 'whatsapp',      name: 'Connect WhatsApp',     icon: MessageSquare, description: 'Connect your agency WhatsApp number to assign the AI Agent.' },
         { id: 'brain',         name: 'Brain Keys',           icon: BrainCircuit,  description: 'Configure your custom LLM API keys to power your AI Agent.' },
+        { id: 'tracking',      name: 'Tracking & Pixels',    icon: Activity,      description: 'Configure Google Tags and Meta Pixels to track visits and run remarketing.' },
         { id: 'integrations',  name: 'Portal Integrations',  icon: Globe,         description: 'Connect third-party real estate portals like Magicbricks, 99acres, etc.' },
         { id: 'security',      name: 'Security & Access',    icon: Shield,        description: 'Manage passwords and two-factor authentication.' },
         { id: 'billing',       name: 'Billing & Plan',       icon: CreditCard,    description: 'Manage your subscription and payment methods.' },
@@ -671,6 +678,65 @@ const fetchSequences = async () => {
                                             Google AI Studio
                                         </a>.
                                     </p>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Tracking & Pixels */}
+                    {activeSection === 'tracking' && (
+                        <div className="space-y-6">
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                {/* Google Tags Integration */}
+                                <div className="bg-white border border-gray-150 rounded-2xl p-5 hover:shadow-md transition-all duration-300">
+                                    <div className="flex items-start gap-4 mb-4">
+                                        <div className="w-10 h-10 bg-blue-50 rounded-xl flex items-center justify-center shrink-0 border border-blue-100">
+                                            <Globe className="w-5 h-5 text-blue-600" />
+                                        </div>
+                                        <div>
+                                            <h3 className="font-bold text-gray-950 text-sm">Google Tag Manager / Analytics</h3>
+                                            <p className="text-xs text-gray-500 mt-1">Track website page views, traffic sources, and conversion events automatically.</p>
+                                        </div>
+                                    </div>
+                                    <div className="pt-2">
+                                        <label className="dash-label">Google Tag ID / Measurement ID</label>
+                                        <input
+                                            type="text"
+                                            value={agencyData.googleTagId}
+                                            onChange={(e) => setAgencyData({ ...agencyData, googleTagId: e.target.value })}
+                                            placeholder="e.g. G-XXXXXXXXXX or AW-XXXXXXXXXX"
+                                            className="dash-input"
+                                        />
+                                        <p className="text-[10px] text-gray-400 mt-1.5 leading-normal">
+                                            Enter your Google Analytics 4 (GA4) measurement ID or Google Ads conversion tag ID to activate tracking.
+                                        </p>
+                                    </div>
+                                </div>
+
+                                {/* Meta Pixel Integration */}
+                                <div className="bg-white border border-gray-150 rounded-2xl p-5 hover:shadow-md transition-all duration-300">
+                                    <div className="flex items-start gap-4 mb-4">
+                                        <div className="w-10 h-10 bg-indigo-50 rounded-xl flex items-center justify-center shrink-0 border border-indigo-100">
+                                            <Activity className="w-5 h-5 text-indigo-600" />
+                                        </div>
+                                        <div>
+                                            <h3 className="font-bold text-gray-955 text-sm">Meta Pixel (Facebook Pixel)</h3>
+                                            <p className="text-xs text-gray-500 mt-1">Monitor page visits and run retargeting ads to prospects on Facebook & Instagram.</p>
+                                        </div>
+                                    </div>
+                                    <div className="pt-2">
+                                        <label className="dash-label">Meta Pixel ID</label>
+                                        <input
+                                            type="text"
+                                            value={agencyData.metaPixelId}
+                                            onChange={(e) => setAgencyData({ ...agencyData, metaPixelId: e.target.value })}
+                                            placeholder="e.g. 123456789012345"
+                                            className="dash-input"
+                                        />
+                                        <p className="text-[10px] text-gray-400 mt-1.5 leading-normal">
+                                            Enter the 15-digit numeric Pixel ID from your Meta Event Manager to start tracking PageView and Lead events.
+                                        </p>
+                                    </div>
                                 </div>
                             </div>
                         </div>

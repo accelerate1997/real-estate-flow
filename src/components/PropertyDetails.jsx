@@ -4,6 +4,7 @@ import { pb } from '../services/pocketbase';
 import { MapPin, Bed, Bath, Square, Ruler, Building2, Construction, ArrowLeft, Loader2, Phone, Mail, Image as ImageIcon, Check, ChevronLeft, ChevronRight, X, Calendar, ShieldCheck, Heart, Share2, Compass, Sparkles } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import clsx from 'clsx';
+import { initializeTracking, trackPageView, trackLeadSubmission, trackContactClick } from '../services/tracking';
 
 const PropertyDetails = () => {
     const { id } = useParams();
@@ -40,6 +41,15 @@ const PropertyDetails = () => {
                     expand: 'createdBy,agencyId'
                 });
                 setProperty(record);
+
+                // Initialize tracking with agency credentials and send page_view event
+                const agencyUser = record.expand?.agencyId || record.expand?.createdBy;
+                const googleTagId = agencyUser?.metadata?.googleTagId;
+                const metaPixelId = agencyUser?.metadata?.metaPixelId;
+                if (googleTagId || metaPixelId) {
+                    initializeTracking(googleTagId, metaPixelId);
+                    trackPageView(window.location.pathname, record.title);
+                }
             } catch (err) {
                 console.error("Failed to fetch property:", err);
                 setError(err.status === 404 ? "Property not found." : "Failed to load property details.");
@@ -124,6 +134,13 @@ const PropertyDetails = () => {
                 setLeadEmail('');
                 setOtpCode('');
                 setOtpStep(1);
+
+                // Track Lead submission event
+                trackLeadSubmission({
+                    title: property?.title,
+                    value: property?.price,
+                    location: property?.location
+                });
             } else {
                 setOtpError(data.message || "Invalid verification code.");
             }
@@ -718,6 +735,7 @@ const PropertyDetails = () => {
                                                 href={waLink} 
                                                 target="_blank" 
                                                 rel="noreferrer" 
+                                                onClick={() => trackContactClick('whatsapp')}
                                                 className="w-full flex items-center justify-center gap-2 bg-[#25D366] text-white py-4 rounded-xl font-extrabold text-xs uppercase tracking-widest hover:bg-[#128C7E] transition-all shadow-md shadow-green-100 hover:-translate-y-0.5 active:translate-y-0"
                                             >
                                                 <Phone className="w-4.5 h-4.5" />
