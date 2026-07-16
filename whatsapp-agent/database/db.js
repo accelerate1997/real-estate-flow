@@ -2,13 +2,7 @@ const { Pool } = require('pg');
 const fs = require('fs');
 const path = require('path');
 
-let connectionString = process.env.DATABASE_URL || 'postgresql://postgres:postgres_password@localhost:5432/rajesh_realestate';
-
-// Dynamically handle Docker internal networking for production database if running on Linux
-if (process.platform === 'linux' && connectionString.includes('31.97.231.139:5436')) {
-    console.log("🐳 [Database] Running in production Linux container. Rewriting DATABASE_URL to use internal Coolify network.");
-    connectionString = connectionString.replace('31.97.231.139:5436', 'v0ws8kk8okogwsgw80o0go8s:5432');
-}
+const connectionString = process.env.DATABASE_URL || 'postgresql://postgres:postgres_password@localhost:5432/rajesh_realestate';
 
 console.log(`🔌 [Database] Connecting to PostgreSQL at ${connectionString.split('@')[1] || connectionString}`);
 
