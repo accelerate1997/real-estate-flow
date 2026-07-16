@@ -118,7 +118,16 @@ module.exports = {
             const reqParts = [];
             if (params.bhk) reqParts.push(`Looking for ${params.bhk}`);
             if (params.location) reqParts.push(`in ${params.location}`);
-            if (params.budget_in_rupees) reqParts.push(`with a budget of ₹${(params.budget_in_rupees / 10000000).toFixed(2)}Cr`);
+            if (params.budget_in_rupees) {
+                const budgetNum = parseFloat(params.budget_in_rupees);
+                if (budgetNum >= 10000000) {
+                    reqParts.push(`with a budget of ₹${(budgetNum / 10000000).toFixed(2)}Cr`);
+                } else if (budgetNum >= 100000) {
+                    reqParts.push(`with a budget of ₹${(budgetNum / 100000).toFixed(2)} Lakh`);
+                } else {
+                    reqParts.push(`with a budget of ₹${budgetNum.toLocaleString('en-IN')}`);
+                }
+            }
             if (params.timeframe) reqParts.push(`Target timeframe: ${params.timeframe}`);
             if (params.purpose) reqParts.push(`Purpose: ${params.purpose}`);
 

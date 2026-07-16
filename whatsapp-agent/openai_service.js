@@ -122,11 +122,8 @@ async function processMessage(userInput, phone, agencyId) {
         const updatedLead = await db.upsertLead(cleanPhone, agencyId, { ...params, isChatUpdate: true });
         leadIdFound = updatedLead ? updatedLead.id : leadIdFound;
 
-        // Log messages
-        await db.logChat(cleanPhone, "user", userInput, agencyId, leadIdFound);
-        await db.logChat(cleanPhone, "assistant", parsed.human_response || responseText, agencyId, leadIdFound);
-        
-        chatContext.push({ role: "assistant", content: responseText });
+        let finalReplyText = parsed.human_response || "How else can I assist you?";
+        let assistantContextText = responseText;
 
         // 5. Intent Handling
         if (intent === 'SEARCH_PROPERTIES') {
@@ -137,44 +134,43 @@ async function processMessage(userInput, phone, agencyId) {
             });
 
             if (properties.length === 0) {
-                const failContext = [...chatContext, { role: "system", content: "SYSTEM NOTE: No properties found. Inform user gracefully." }];
+                const tempContext = [...chatContext, { role: "assistant", content: responseText }];
+                const failContext = [...tempContext, { role: "system", content: "SYSTEM NOTE: No properties found. Inform user gracefully." }];
                 const retryResponse = await openai.chat.completions.create({
                     model: "gpt-4o-mini",
                     messages: failContext,
                     response_format: { type: "json_object" }
                 });
-                return JSON.parse(retryResponse.choices[0].message.content).human_response;
+                const retryText = retryResponse.choices[0].message.content;
+                const retryData = JSON.parse(retryText);
+                finalReplyText = retryData.human_response || "I couldn't find any properties matching those criteria at the moment.";
+                assistantContextText = retryText;
+            } else {
+                const propertyList = properties.map(p => {
+                    const priceVal = p.price || 0;
+                    let priceText = priceVal >= 10000000 ? `₹${(priceVal / 10000000).toFixed(2)} Cr` : `₹${(priceVal / 100000).toFixed(2)} Lakh`;
+                    const baseUrl = process.env.BASE_URL || 'https://realestateflow.elevetoai.com';
+                    return `🏡 *${p.title}*\n📍 ${p.location}\n💰 ${priceText}\n🔗 Link: ${baseUrl}/properties/${p.id}`;
+                }).join('\n\n');
+
+                const successMsg = `SYSTEM NOTE: Found properties:\n${propertyList}\n\nPresent them and ask about a site visit.`;
+                const tempContext = [...chatContext, { role: "assistant", content: responseText }];
+                const finalContext = [...tempContext, { role: "system", content: successMsg }];
+                const finalResponse = await openai.chat.completions.create({
+                    model: "gpt-4o-mini",
+                    messages: finalContext,
+                    response_format: { type: "json_object" }
+                });
+                const finalResponseText = finalResponse.choices[0].message.content;
+                const finalData = JSON.parse(finalResponseText);
+                finalReplyText = finalData.human_response || "Here are the matching properties.";
+                assistantContextText = finalResponseText;
             }
-
-            const propertyList = properties.map(p => {
-                const priceVal = p.price || 0;
-                let priceText = priceVal >= 10000000 ? `₹${(priceVal / 10000000).toFixed(2)} Cr` : `₹${(priceVal / 100000).toFixed(2)} Lakh`;
-                const baseUrl = process.env.BASE_URL || 'https://realestateflow.elevetoai.com';
-                return `🏡 *${p.title}*\n📍 ${p.location}\n💰 ${priceText}\n🔗 Link: ${baseUrl}/properties/${p.id}`;
-            }).join('\n\n');
-
-            const successMsg = `SYSTEM NOTE: Found properties:\n${propertyList}\n\nPresent them and ask about a site visit.`;
-            const finalContext = [...chatContext, { role: "system", content: successMsg }];
-            const finalResponse = await openai.chat.completions.create({
-                model: "gpt-4o-mini",
-                messages: finalContext,
-                response_format: { type: "json_object" }
-            });
-
-            const finalData = JSON.parse(finalResponse.choices[0].message.content);
-            chatContext.push({ role: "assistant", content: JSON.stringify(finalData) });
-            return finalData.human_response;
-        }
-
-        if (intent === 'SCHEDULE_SITE_VISIT') {
+        } else if (intent === 'SCHEDULE_SITE_VISIT') {
             const propertyId = params.visit_property_id;
             const visitDate = params.visit_date;
             
-            if (!propertyId || !visitDate || visitDate.includes('YYYY')) {
-                return parsed.human_response;
-            }
-
-            if (leadIdFound) {
+            if (propertyId && visitDate && !visitDate.includes('YYYY') && leadIdFound) {
                 await db.scheduleVisit(
                     leadIdFound,
                     propertyId,
@@ -185,16 +181,28 @@ async function processMessage(userInput, phone, agencyId) {
                 );
                 
                 const confirmationMsg = "SYSTEM NOTE: Site visit recorded. Confirm professionally.";
+                const tempContext = [...chatContext, { role: "assistant", content: responseText }];
+                const finalContext = [...tempContext, { role: "user", content: confirmationMsg }];
                 const confirmRes = await openai.chat.completions.create({
                     model: "gpt-4o-mini",
-                    messages: [{ role: "system", content: SYSTEM_PROMPT }, ...chatContext, { role: "user", content: confirmationMsg }],
+                    messages: [{ role: "system", content: SYSTEM_PROMPT }, ...finalContext],
                     response_format: { type: "json_object" }
                 });
-                return JSON.parse(confirmRes.choices[0].message.content).human_response;
+                const confirmText = confirmRes.choices[0].message.content;
+                const confirmData = JSON.parse(confirmText);
+                finalReplyText = confirmData.human_response || "Your site visit has been scheduled.";
+                assistantContextText = confirmText;
             }
         }
 
-        return parsed.human_response || "How else can I assist you?";
+        // 6. Log both User input and Assistant response to database
+        await db.logChat(cleanPhone, "user", userInput, agencyId, leadIdFound);
+        await db.logChat(cleanPhone, "assistant", finalReplyText, agencyId, leadIdFound);
+        
+        // 7. Save Assistant Context in memory session
+        chatContext.push({ role: "assistant", content: assistantContextText });
+
+        return finalReplyText;
 
     } catch (error) {
         console.error('Process Message Error:', error.message);
