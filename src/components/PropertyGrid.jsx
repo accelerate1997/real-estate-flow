@@ -34,20 +34,6 @@ const PropertyGrid = () => {
     const [selectedProperty, setSelectedProperty] = useState(null);
     const navigate = useNavigate();
 
-    const getImageUrl = (property) => {
-        const imageList = Array.isArray(property.images)
-            ? property.images
-            : (typeof property.images === 'string' && property.images.trim() !== '' ? [property.images] : []);
-        if (imageList.length > 0) {
-            const firstImg = imageList[0];
-            if (typeof firstImg === 'string' && firstImg.startsWith('http')) {
-                return firstImg;
-            }
-            return pb.files.getURL(property, firstImg, { token: pb.authStore.token });
-        }
-        return "https://images.unsplash.com/photo-1600585154340-be6191dae10c?auto=format&fit=crop&q=80&w=1000";
-    };
-
     useEffect(() => {
         const fetchProperties = async () => {
             setIsLoading(true);
@@ -77,6 +63,21 @@ const PropertyGrid = () => {
     const newProjects = properties.filter(p => getCategoryMatch(p, 'NewProjects')).slice(0, 4);
 
     console.log("PropertyGrid: Section counts - Residential:", residential.length, "Commercial:", commercial.length, "NewProjects:", newProjects.length);
+
+    const getImageUrl = (property) => {
+        const imageList = Array.isArray(property.images)
+            ? property.images
+            : (typeof property.images === 'string' && property.images.trim() !== '' ? [property.images] : []);
+
+        if (imageList.length > 0) {
+            const firstImg = imageList[0];
+            if (typeof firstImg === 'string' && firstImg.startsWith('http')) {
+                return firstImg;
+            }
+            return pb.files.getURL(property, firstImg, { token: pb.authStore.token });
+        }
+        return "https://images.unsplash.com/photo-1600585154340-be6191dae10c?auto=format&fit=crop&q=80&w=1000";
+    };
 
     return (
         <section id="properties" className="py-20 bg-white">
