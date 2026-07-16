@@ -1,7 +1,7 @@
 // A Mock/Compatibility wrapper mimicking the PocketBase JS SDK
 // to redirect all operations to the custom Express + PostgreSQL backend.
 import { auth } from './firebase';
-import { signInWithEmailAndPassword, signOut } from 'firebase/auth';
+import { signInWithEmailAndPassword, signOut, GoogleAuthProvider, signInWithPopup } from 'firebase/auth';
 
 class AuthStore {
     constructor() {
@@ -184,6 +184,45 @@ class Collection {
             this.client.authStore.save(data.token, data.record);
         }
         return data;
+    }
+
+    async authWithOAuth2(providerName) {
+        if (providerName === 'google') {
+            const provider = new GoogleAuthProvider();
+            // Force select account to allow choosing different accounts easily
+            provider.setCustomParameters({ prompt: 'select_account' });
+            
+            const userCredential = await signInWithPopup(auth, provider);
+            const firebaseToken = await userCredential.user.getIdToken(true);
+            
+            // Sync with PostgreSQL backend using Firebase Token
+            const url = `${this.client.baseUrl}/api/auth/sync`;
+            const res = await fetch(url, {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${firebaseToken}`,
+                    'Content-Type': 'application/json'
+                }
+            });
+            
+            if (!res.ok) {
+                let errMsg = 'Authentication sync failed';
+                try {
+                    const errData = await res.json();
+                    errMsg = errData.message || errMsg;
+                } catch (e) {}
+                // Sign out of Firebase if PostgreSQL sync fails to keep them in sync
+                await signOut(auth);
+                throw new Error(errMsg);
+            }
+
+            const data = await res.json();
+            if (data && data.token) {
+                this.client.authStore.save(data.token, data.record);
+            }
+            return data;
+        }
+        throw new Error(`OAuth provider ${providerName} is not supported`);
     }
 
     async authRefresh() {
