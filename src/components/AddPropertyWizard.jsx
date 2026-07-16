@@ -719,7 +719,7 @@ const AddPropertyWizard = ({ onClose, onSuccess, targetAgencyId, currentUserId, 
                                     </div>
 
                                     <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
-                                        {Array.from(new Set([...(AMENITIES_LIST[formData.propertyCategory] || AMENITIES_LIST.Residential), ...formData.amenities])).map((amenity) => {
+                                        {Array.from(new Set([...(formData.propertyCategory === 'NewProjects' ? (AMENITIES_LIST[formData.newProjectType] || AMENITIES_LIST.Residential) : (AMENITIES_LIST[formData.propertyCategory] || AMENITIES_LIST.Residential)), ...formData.amenities])).map((amenity) => {
                                             const isActive = formData.amenities.includes(amenity);
                                             return (
                                                 <button
