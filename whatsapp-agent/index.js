@@ -557,11 +557,49 @@ app.post('/api/collections/:collection', upload.fields([{ name: 'images' }, { na
     }
 });
 
-// 4. UPDATE Record
-app.patch('/api/collections/:collection/:id', async (req, res) => {
+// 4. UPDATE Record (Supports Multer Form-Data File Uploads)
+app.patch('/api/collections/:collection/:id', upload.fields([{ name: 'images' }, { name: 'videos' }]), async (req, res) => {
     try {
         const { collection, id } = req.params;
         const body = { ...req.body };
+
+        // Handle newly uploaded files and merge with existing ones
+        const imageFiles = req.files && req.files['images'] ? req.files['images'] : [];
+        const videoFiles = req.files && req.files['videos'] ? req.files['videos'] : [];
+
+        if (imageFiles.length > 0 || videoFiles.length > 0) {
+            const recordUploadDir = path.join(uploadsDir, collection, id);
+            fs.mkdirSync(recordUploadDir, { recursive: true });
+
+            // Fetch existing images/videos to merge
+            const existingRes = await pool.query(`SELECT images, videos FROM "${collection}" WHERE id = $1`, [id]);
+            const existingRow = existingRes.rows[0] || {};
+            let existingImages = [];
+            let existingVideos = [];
+            try { existingImages = typeof existingRow.images === 'string' ? JSON.parse(existingRow.images) : (existingRow.images || []); } catch(e) {}
+            try { existingVideos = typeof existingRow.videos === 'string' ? JSON.parse(existingRow.videos) : (existingRow.videos || []); } catch(e) {}
+
+            const newImageNames = [...existingImages];
+            const newVideoNames = [...existingVideos];
+
+            for (const file of imageFiles) {
+                const destPath = path.join(recordUploadDir, file.filename);
+                fs.renameSync(file.path, destPath);
+                newImageNames.push(file.filename);
+                const r2Key = `${collection}/${id}/${file.filename}`;
+                await uploadToR2(destPath, r2Key);
+            }
+            for (const file of videoFiles) {
+                const destPath = path.join(recordUploadDir, file.filename);
+                fs.renameSync(file.path, destPath);
+                newVideoNames.push(file.filename);
+                const r2Key = `${collection}/${id}/${file.filename}`;
+                await uploadToR2(destPath, r2Key);
+            }
+
+            body.images = JSON.stringify(newImageNames);
+            body.videos = JSON.stringify(newVideoNames);
+        }
 
         // Fetch valid columns
         const columnsRes = await pool.query(
