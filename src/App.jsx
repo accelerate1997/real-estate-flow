@@ -12,6 +12,7 @@ import AgencyDashboard from './components/AgencyDashboard';
 import AgentInviteRegister from './components/AgentInviteRegister';
 import PropertyDetails from './components/PropertyDetails';
 import PrivacyPolicy from './components/PrivacyPolicy';
+import PlotsLandProperties from './components/PlotsLandProperties';
 
 // New Redesign Components
 import Features from './components/Features';
@@ -99,6 +100,7 @@ function App() {
             <Route path="/" element={<Home />} />
             <Route path="/properties/residential" element={<ResidentialProperties />} />
             <Route path="/properties/commercial" element={<CommercialProperties />} />
+            <Route path="/properties/plots-land" element={<PlotsLandProperties />} />
             <Route path="/properties/under-development" element={<UnderDevelopment />} />
             <Route path="/property/:id" element={<PropertyDetails />} />
             <Route path="/properties/:id" element={<PropertyDetails />} />

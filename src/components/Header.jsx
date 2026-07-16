@@ -27,6 +27,7 @@ const Header = () => {
             submenu: [
                 { name: 'Residential Property', href: '/properties/residential' },
                 { name: 'Commercial Property', href: '/properties/commercial' },
+                { name: 'Plots & Land', href: '/properties/plots-land' },
                 { name: 'Under Development', href: '/properties/under-development' }
             ]
         },
