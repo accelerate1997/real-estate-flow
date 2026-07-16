@@ -49,7 +49,11 @@ const CommercialProperties = () => {
             : (typeof property.images === 'string' && property.images.trim() !== '' ? [property.images] : []);
 
         if (imageList.length > 0) {
-            return pb.files.getURL(property, imageList[0], { token: pb.authStore.token });
+            const firstImg = imageList[0];
+            if (typeof firstImg === 'string' && firstImg.startsWith('http')) {
+                return firstImg;
+            }
+            return pb.files.getURL(property, firstImg, { token: pb.authStore.token });
         }
         return "https://images.unsplash.com/photo-1497366216548-37526070297c?q=80&w=2669&auto=format&fit=crop"; // Default fallback
     };

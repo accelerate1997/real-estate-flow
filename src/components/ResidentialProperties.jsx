@@ -133,7 +133,11 @@ const ResidentialProperties = () => {
             ? property.images
             : (typeof property.images === 'string' && property.images.trim() !== '' ? [property.images] : []);
         if (imageList.length > 0) {
-            return pb.files.getURL(property, imageList[0], { token: pb.authStore.token });
+            const firstImg = imageList[0];
+            if (typeof firstImg === 'string' && firstImg.startsWith('http')) {
+                return firstImg;
+            }
+            return pb.files.getURL(property, firstImg, { token: pb.authStore.token });
         }
         return "https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?q=80&w=2675&auto=format&fit=crop";
     };
