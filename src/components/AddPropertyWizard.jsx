@@ -19,8 +19,9 @@ const AddPropertyWizard = ({ onClose, onSuccess, targetAgencyId, currentUserId, 
     const [errors, setErrors] = useState({});
 
     // Parse initial neighborhood highlights
+    const PRESET_HIGHLIGHT_NAMES = new Set(["Metro / Transit Station", "Premium Shopping Mall", "International Airport", "Supermarket & Groceries", "Multi-specialty Hospital"]);
     const getInitHighlights = () => {
-        const res = { metro: '', mall: '', airport: '', groceries: '', hospital: '' };
+        const res = { metro: '', mall: '', airport: '', groceries: '', hospital: '', customs: [] };
         if (initialData?.neighborhoodHighlights) {
             try {
                 const parsed = typeof initialData.neighborhoodHighlights === 'string'
@@ -29,10 +30,11 @@ const AddPropertyWizard = ({ onClose, onSuccess, targetAgencyId, currentUserId, 
                 if (Array.isArray(parsed)) {
                     parsed.forEach(h => {
                         if (h.name === "Metro / Transit Station") res.metro = h.distance;
-                        if (h.name === "Premium Shopping Mall") res.mall = h.distance;
-                        if (h.name === "International Airport") res.airport = h.distance;
-                        if (h.name === "Supermarket & Groceries") res.groceries = h.distance;
-                        if (h.name === "Multi-specialty Hospital") res.hospital = h.distance;
+                        else if (h.name === "Premium Shopping Mall") res.mall = h.distance;
+                        else if (h.name === "International Airport") res.airport = h.distance;
+                        else if (h.name === "Supermarket & Groceries") res.groceries = h.distance;
+                        else if (h.name === "Multi-specialty Hospital") res.hospital = h.distance;
+                        else res.customs.push({ name: h.name, distance: h.distance });
                     });
                 }
             } catch (e) {}
@@ -77,6 +79,9 @@ const AddPropertyWizard = ({ onClose, onSuccess, targetAgencyId, currentUserId, 
     const fileInputRef = useRef(null);
     const videoInputRef = useRef(null);
     const [customAmenityInput, setCustomAmenityInput] = useState('');
+    const [customHighlights, setCustomHighlights] = useState(initHighlights.customs || []);
+    const [customHighlightName, setCustomHighlightName] = useState('');
+    const [customHighlightDistance, setCustomHighlightDistance] = useState('');
     const [imageUrlInput, setImageUrlInput] = useState('');
     const [isDownloadingImage, setIsDownloadingImage] = useState(false);
     const [isCompressingImage, setIsCompressingImage] = useState(false);
@@ -347,6 +352,10 @@ const AddPropertyWizard = ({ onClose, onSuccess, targetAgencyId, currentUserId, 
             if (formData.highlight_airport) highlights.push({ name: "International Airport", distance: formData.highlight_airport });
             if (formData.highlight_groceries) highlights.push({ name: "Supermarket & Groceries", distance: formData.highlight_groceries });
             if (formData.highlight_hospital) highlights.push({ name: "Multi-specialty Hospital", distance: formData.highlight_hospital });
+            // Append custom highlights
+            customHighlights.forEach(h => {
+                if (h.name && h.name.trim()) highlights.push({ name: h.name.trim(), distance: h.distance });
+            });
             pbData.append('neighborhoodHighlights', JSON.stringify(highlights));
 
             // Append images array
@@ -711,7 +720,7 @@ const AddPropertyWizard = ({ onClose, onSuccess, targetAgencyId, currentUserId, 
                                                 />
                                             </div>
                                             <div>
-                                                <label className="block text-sm font-medium text-gray-700 mb-2">Supermarket & Groceries</label>
+                                                <label className="block text-sm font-medium text-gray-700 mb-2">Supermarket &amp; Groceries</label>
                                                 <input
                                                     type="text"
                                                     name="highlight_groceries"
@@ -732,6 +741,59 @@ const AddPropertyWizard = ({ onClose, onSuccess, targetAgencyId, currentUserId, 
                                                     className="w-full px-4 py-3 rounded-lg border border-gray-200 focus:outline-none focus:border-primary"
                                                 />
                                             </div>
+                                        </div>
+
+                                        {/* Custom Highlights */}
+                                        <div className="mt-6 border-t border-dashed border-gray-200 pt-5">
+                                            <h5 className="text-sm font-semibold text-gray-700 mb-3">Add Custom Landmark</h5>
+                                            <div className="flex flex-col sm:flex-row gap-3">
+                                                <input
+                                                    type="text"
+                                                    value={customHighlightName}
+                                                    onChange={e => setCustomHighlightName(e.target.value)}
+                                                    placeholder="Landmark name (e.g. International School)"
+                                                    className="flex-1 px-4 py-3 rounded-lg border border-gray-200 focus:outline-none focus:border-primary text-sm"
+                                                />
+                                                <input
+                                                    type="text"
+                                                    value={customHighlightDistance}
+                                                    onChange={e => setCustomHighlightDistance(e.target.value)}
+                                                    placeholder="Travel time (e.g. 5 mins)"
+                                                    className="w-full sm:w-40 px-4 py-3 rounded-lg border border-gray-200 focus:outline-none focus:border-primary text-sm"
+                                                />
+                                                <button
+                                                    type="button"
+                                                    onClick={() => {
+                                                        const name = customHighlightName.trim();
+                                                        const distance = customHighlightDistance.trim();
+                                                        if (!name) return;
+                                                        setCustomHighlights(prev => [...prev, { name, distance }]);
+                                                        setCustomHighlightName('');
+                                                        setCustomHighlightDistance('');
+                                                    }}
+                                                    className="px-5 py-3 bg-dark text-white text-sm font-bold rounded-lg hover:bg-gray-800 transition-colors whitespace-nowrap"
+                                                >
+                                                    + Add
+                                                </button>
+                                            </div>
+
+                                            {/* Custom Highlights List */}
+                                            {customHighlights.length > 0 && (
+                                                <div className="mt-4 flex flex-wrap gap-2">
+                                                    {customHighlights.map((h, idx) => (
+                                                        <div key={idx} className="flex items-center gap-2 bg-blue-50 border border-blue-100 text-blue-800 px-3 py-1.5 rounded-full text-sm font-medium">
+                                                            <span>📍 {h.name}{h.distance ? ` — ${h.distance}` : ''}</span>
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => setCustomHighlights(prev => prev.filter((_, i) => i !== idx))}
+                                                                className="text-blue-400 hover:text-red-500 transition-colors ml-1 font-bold leading-none"
+                                                            >
+                                                                ×
+                                                            </button>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            )}
                                         </div>
                                     </div>
                                 </div>
