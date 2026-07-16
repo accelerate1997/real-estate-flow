@@ -2,12 +2,12 @@
 
 -- Users / Agencies
 CREATE TABLE IF NOT EXISTS users (
-    id VARCHAR(15) PRIMARY KEY,
+    id VARCHAR(50) PRIMARY KEY,
     email VARCHAR(255) UNIQUE NOT NULL,
     password_hash VARCHAR(255) NOT NULL,
     name VARCHAR(255),
     role VARCHAR(50) DEFAULT 'agent',
-    "agencyId" VARCHAR(15) REFERENCES users(id) ON DELETE SET NULL,
+    "agencyId" VARCHAR(50) REFERENCES users(id) ON DELETE SET NULL,
     "agencyName" VARCHAR(255),
     phone VARCHAR(50),
     "geminiKey" TEXT,
@@ -24,7 +24,7 @@ CREATE TABLE IF NOT EXISTS invites (
     id VARCHAR(15) PRIMARY KEY,
     email VARCHAR(255) UNIQUE NOT NULL,
     role VARCHAR(50) DEFAULT 'agent',
-    agency_id VARCHAR(15) REFERENCES users(id) ON DELETE CASCADE,
+    agency_id VARCHAR(50) REFERENCES users(id) ON DELETE CASCADE,
     status VARCHAR(50) DEFAULT 'Pending',
     token VARCHAR(255),
     "expiresAt" TIMESTAMP WITH TIME ZONE,
@@ -57,8 +57,8 @@ CREATE TABLE IF NOT EXISTS properties (
     "projectAmenities" JSONB DEFAULT '[]'::jsonb,
     images JSONB DEFAULT '[]'::jsonb,
     videos JSONB DEFAULT '[]'::jsonb,
-    "agencyId" VARCHAR(15) REFERENCES users(id) ON DELETE CASCADE,
-    "createdBy" VARCHAR(15) REFERENCES users(id) ON DELETE SET NULL,
+    "agencyId" VARCHAR(50) REFERENCES users(id) ON DELETE CASCADE,
+    "createdBy" VARCHAR(50) REFERENCES users(id) ON DELETE SET NULL,
     "isFeatured" BOOLEAN DEFAULT FALSE,
     "neighborhoodHighlights" JSONB DEFAULT '[]'::jsonb,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
@@ -68,7 +68,7 @@ CREATE TABLE IF NOT EXISTS properties (
 -- Leads
 CREATE TABLE IF NOT EXISTS leads (
     id VARCHAR(15) PRIMARY KEY,
-    "agencyId" VARCHAR(15) REFERENCES users(id) ON DELETE CASCADE,
+    "agencyId" VARCHAR(50) REFERENCES users(id) ON DELETE CASCADE,
     name VARCHAR(255),
     phone VARCHAR(50),
     requirement TEXT,
@@ -88,7 +88,7 @@ CREATE TABLE IF NOT EXISTS matches (
     id VARCHAR(15) PRIMARY KEY,
     lead_id VARCHAR(15) REFERENCES leads(id) ON DELETE CASCADE,
     property_id VARCHAR(15) REFERENCES properties(id) ON DELETE CASCADE,
-    agency_id VARCHAR(15) REFERENCES users(id) ON DELETE CASCADE,
+    agency_id VARCHAR(50) REFERENCES users(id) ON DELETE CASCADE,
     status VARCHAR(50) DEFAULT 'Pending Review',
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
@@ -103,7 +103,7 @@ CREATE TABLE IF NOT EXISTS site_visits (
     visit_time VARCHAR(50),
     status VARCHAR(50) DEFAULT 'Scheduled',
     notes TEXT,
-    agency_id VARCHAR(15) REFERENCES users(id) ON DELETE CASCADE,
+    agency_id VARCHAR(50) REFERENCES users(id) ON DELETE CASCADE,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
@@ -114,7 +114,7 @@ CREATE TABLE IF NOT EXISTS chat_logs (
     phone VARCHAR(50),
     role VARCHAR(50),
     content TEXT,
-    agency_id VARCHAR(15) REFERENCES users(id) ON DELETE CASCADE,
+    agency_id VARCHAR(50) REFERENCES users(id) ON DELETE CASCADE,
     lead_id VARCHAR(15) REFERENCES leads(id) ON DELETE CASCADE,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
@@ -125,7 +125,7 @@ CREATE TABLE IF NOT EXISTS sequences (
     id VARCHAR(15) PRIMARY KEY,
     name VARCHAR(255),
     steps JSONB DEFAULT '[]'::jsonb,
-    agency_id VARCHAR(15) REFERENCES users(id) ON DELETE CASCADE,
+    agency_id VARCHAR(50) REFERENCES users(id) ON DELETE CASCADE,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
@@ -138,7 +138,7 @@ CREATE TABLE IF NOT EXISTS lead_followups (
     current_step INTEGER DEFAULT 0,
     next_send_at TIMESTAMP WITH TIME ZONE,
     status VARCHAR(50) DEFAULT 'pending',
-    agency_id VARCHAR(15) REFERENCES users(id) ON DELETE CASCADE,
+    agency_id VARCHAR(50) REFERENCES users(id) ON DELETE CASCADE,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
@@ -146,7 +146,7 @@ CREATE TABLE IF NOT EXISTS lead_followups (
 -- Portal Integrations
 CREATE TABLE IF NOT EXISTS portal_integrations (
     id VARCHAR(15) PRIMARY KEY,
-    agency_id VARCHAR(15) REFERENCES users(id) ON DELETE CASCADE,
+    agency_id VARCHAR(50) REFERENCES users(id) ON DELETE CASCADE,
     portal VARCHAR(50) NOT NULL,
     api_key TEXT,
     agent_id VARCHAR(100),
@@ -176,7 +176,7 @@ CREATE TABLE IF NOT EXISTS campaigns (
     variables JSONB DEFAULT '[]'::jsonb,
     filters JSONB DEFAULT '{}'::jsonb,
     status VARCHAR(50) DEFAULT 'draft',
-    agency_id VARCHAR(15) REFERENCES users(id) ON DELETE CASCADE,
+    agency_id VARCHAR(50) REFERENCES users(id) ON DELETE CASCADE,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
