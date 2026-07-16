@@ -260,7 +260,7 @@ const PropertyManagement = () => {
                             : (typeof property.images === 'string' && property.images.trim() !== '' ? [property.images] : []);
                         const hasImages = imageList.length > 0;
                         const coverImageUrl = hasImages
-                            ? pb.files.getURL(property, imageList[0], { token: pb.authStore.token })
+                            ? pb.files.getURL(property, imageList[0])
                             : null;
 
                         return (
@@ -278,7 +278,15 @@ const PropertyManagement = () => {
                                 {/* Thumbnail */}
                                 <div className="h-16 w-16 shrink-0 bg-gray-100 rounded-xl overflow-hidden relative shadow-sm">
                                     {coverImageUrl ? (
-                                        <img src={coverImageUrl} alt={property.title} className="w-full h-full object-cover" />
+                                        <img 
+                                            src={coverImageUrl} 
+                                            alt={property.title} 
+                                            className="w-full h-full object-cover" 
+                                            onError={(e) => {
+                                                e.target.onerror = null;
+                                                e.target.src = "https://placehold.co/600x400/f3f4f6/9ca3af?text=No+Image+Available";
+                                            }}
+                                        />
                                     ) : (
                                         <div className="w-full h-full flex items-center justify-center bg-gray-50">
                                             {getPropertyIcon(property.propertyCategory)}

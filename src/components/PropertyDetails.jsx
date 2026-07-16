@@ -183,15 +183,15 @@ const PropertyDetails = () => {
         : (typeof property.images === 'string' && property.images.trim() !== '' ? [property.images] : []);
 
     const coverImageUrl = imageList.length > 0
-        ? pb.files.getURL(property, imageList[0], { token: pb.authStore.token })
+        ? pb.files.getURL(property, imageList[0])
         : null;
 
     const secondaryImagesUrls = imageList.slice(1).map(img =>
-        pb.files.getURL(property, img, { token: pb.authStore.token })
+        pb.files.getURL(property, img)
     );
 
     const allImagesUrls = imageList.map(img => 
-        pb.files.getURL(property, img, { token: pb.authStore.token })
+        pb.files.getURL(property, img)
     );
 
     // Process videos
@@ -200,7 +200,7 @@ const PropertyDetails = () => {
         : (typeof property.videos === 'string' && property.videos.trim() !== '' ? [property.videos] : []);
 
     const videoUrls = videoList.map(vid =>
-        pb.files.getURL(property, vid, { token: pb.authStore.token })
+        pb.files.getURL(property, vid)
     );
 
     // Parse Amenities
@@ -292,6 +292,10 @@ const PropertyDetails = () => {
                                 src={coverImageUrl}
                                 alt={property.title}
                                 className="w-full h-full object-cover group-hover:scale-[1.02] transition-transform duration-700 ease-out"
+                                onError={(e) => {
+                                    e.target.onerror = null;
+                                    e.target.src = "https://placehold.co/600x400/f3f4f6/9ca3af?text=No+Image+Available";
+                                }}
                             />
                         ) : (
                             <div className="w-full h-full flex flex-col items-center justify-center text-gray-400">
@@ -335,6 +339,10 @@ const PropertyDetails = () => {
                                         src={url} 
                                         alt={`Property thumbnail ${index + 1}`} 
                                         className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                                        onError={(e) => {
+                                            e.target.onerror = null;
+                                            e.target.src = "https://placehold.co/600x400/f3f4f6/9ca3af?text=No+Image+Available";
+                                        }}
                                     />
                                     <div className="absolute inset-0 bg-black/10 group-hover:bg-transparent transition-colors duration-300" />
                                     
@@ -835,7 +843,7 @@ const PropertyDetails = () => {
                                             activeImageIndex === idx ? "border-primary scale-105" : "border-transparent opacity-50 hover:opacity-80"
                                         )}
                                     >
-                                        <img src={url} alt="thumbnail cursor" className="w-full h-full object-cover" />
+                                        <img src={url} alt="thumbnail cursor" className="w-full h-full object-cover" onError={(e) => { e.target.onerror = null; e.target.src = "https://placehold.co/600x400/f3f4f6/9ca3af?text=No+Image+Available"; }} />
                                     </div>
                                 ))}
                             </div>

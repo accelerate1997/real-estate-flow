@@ -138,7 +138,7 @@ const PlotsLandProperties = () => {
             if (typeof firstImg === 'string' && firstImg.startsWith('http')) {
                 return firstImg;
             }
-            return pb.files.getURL(property, firstImg, { token: pb.authStore.token });
+            return pb.files.getURL(property, firstImg);
         }
         return "https://images.unsplash.com/photo-1500382017468-9049fed747ef?q=80&w=2675&auto=format&fit=crop";
     };

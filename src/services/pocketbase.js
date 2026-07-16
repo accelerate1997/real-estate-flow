@@ -259,7 +259,7 @@ class Files {
     getURL(record, filename, options = {}) {
         if (!record || !filename) return '';
         const collection = record.collectionName || 'properties';
-        return `${this.client.baseUrl}/api/files/${collection}/${record.id}/${filename}`;
+        return `https://pub-6b00eae276bf483fafd7296068e638b0.r2.dev/${collection}/${record.id}/${filename}`;
     }
 }
 

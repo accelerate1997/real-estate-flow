@@ -19,7 +19,7 @@ const PropertyCard = ({ property, onClick }) => {
 
     // Helper to get image URL
     const getImageUrl = () => {
-        if (!property) return "https://images.unsplash.com/photo-1600585154340-be6191dae10c?auto=format&fit=crop&q=80&w=1000";
+        if (!property) return "https://placehold.co/600x400/f3f4f6/9ca3af?text=No+Image+Available";
 
         const images = property.images || [];
         const firstImage = Array.isArray(images) ? images[0] : images;
@@ -29,7 +29,7 @@ const PropertyCard = ({ property, onClick }) => {
             return firstImage;
         }
 
-        return "https://images.unsplash.com/photo-1600585154340-be6191dae10c?auto=format&fit=crop&q=80&w=1000";
+        return "https://placehold.co/600x400/f3f4f6/9ca3af?text=No+Image+Available";
     };
 
     const getCategoryBadge = () => {
@@ -82,6 +82,10 @@ const PropertyCard = ({ property, onClick }) => {
                     className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
                     initial={{ scale: 1 }}
                     whileInView={{ scale: 1 }}
+                    onError={(e) => {
+                        e.target.onerror = null;
+                        e.target.src = "https://placehold.co/600x400/f3f4f6/9ca3af?text=No+Image+Available";
+                    }}
                 />
 
                 {/* Gradient overlay */}

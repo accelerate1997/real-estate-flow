@@ -137,7 +137,7 @@ const ResidentialProperties = () => {
             if (typeof firstImg === 'string' && firstImg.startsWith('http')) {
                 return firstImg;
             }
-            return pb.files.getURL(property, firstImg, { token: pb.authStore.token });
+            return pb.files.getURL(property, firstImg);
         }
         return "https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?q=80&w=2675&auto=format&fit=crop";
     };

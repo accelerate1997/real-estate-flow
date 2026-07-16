@@ -74,7 +74,7 @@ const PropertyGrid = () => {
             if (typeof firstImg === 'string' && firstImg.startsWith('http')) {
                 return firstImg;
             }
-            return pb.files.getURL(property, firstImg, { token: pb.authStore.token });
+            return pb.files.getURL(property, firstImg);
         }
         return "https://images.unsplash.com/photo-1600585154340-be6191dae10c?auto=format&fit=crop&q=80&w=1000";
     };
