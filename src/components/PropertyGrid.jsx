@@ -34,6 +34,20 @@ const PropertyGrid = () => {
     const [selectedProperty, setSelectedProperty] = useState(null);
     const navigate = useNavigate();
 
+    const getImageUrl = (property) => {
+        const imageList = Array.isArray(property.images)
+            ? property.images
+            : (typeof property.images === 'string' && property.images.trim() !== '' ? [property.images] : []);
+        if (imageList.length > 0) {
+            const firstImg = imageList[0];
+            if (typeof firstImg === 'string' && firstImg.startsWith('http')) {
+                return firstImg;
+            }
+            return pb.files.getURL(property, firstImg, { token: pb.authStore.token });
+        }
+        return "https://images.unsplash.com/photo-1600585154340-be6191dae10c?auto=format&fit=crop&q=80&w=1000";
+    };
+
     useEffect(() => {
         const fetchProperties = async () => {
             setIsLoading(true);
@@ -88,7 +102,7 @@ const PropertyGrid = () => {
                                     {residential.map((property) => (
                                         <PropertyCard key={property.id} property={{
                                             ...property,
-                                            images: [pb.files.getURL(property, property.images?.[0], { token: pb.authStore.token })]
+                                            images: [getImageUrl(property)]
                                         }} onClick={() => navigate(`/property/${property.id}`)} />
                                     ))}
                                 </div>
@@ -104,7 +118,7 @@ const PropertyGrid = () => {
                                     {commercial.map((property) => (
                                         <PropertyCard key={property.id} property={{
                                             ...property,
-                                            images: [pb.files.getURL(property, property.images?.[0], { token: pb.authStore.token })]
+                                            images: [getImageUrl(property)]
                                         }} onClick={() => navigate(`/property/${property.id}`)} />
                                     ))}
                                 </div>
@@ -120,7 +134,7 @@ const PropertyGrid = () => {
                                     {newProjects.map((property) => (
                                         <PropertyCard key={property.id} property={{
                                             ...property,
-                                            images: [pb.files.getURL(property, property.images?.[0], { token: pb.authStore.token })]
+                                            images: [getImageUrl(property)]
                                         }} onClick={() => navigate(`/property/${property.id}`)} />
                                     ))}
                                 </div>
