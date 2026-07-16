@@ -8,7 +8,7 @@ const getTargetFields = (category) => {
     const baseFields = [
         { key: 'title', label: 'Property Title', required: true },
         { key: 'description', label: 'Description', required: false },
-        { key: 'transactionType', label: 'Transaction Type (Sale/Rent)', required: true },
+        { key: 'transactionType', label: 'Transaction Type (Sell/Rent)', required: true },
         { key: 'price', label: 'Price/Rent Amount (Number)', required: true },
         { key: 'locality', label: 'Locality / Area', required: true },
         { key: 'city', label: 'City', required: true },
@@ -184,7 +184,10 @@ const BulkUploadWizard = ({ isOpen, onClose, onSuccess, targetAgencyId, currentU
             }
 
             // Provide minimum required defaults if CSV lacked them but PocketBase requires them
-            payload.transactionType = payload.transactionType || 'Sale';
+            payload.transactionType = payload.transactionType || 'Sell';
+            if (payload.transactionType === 'Sale' || payload.transactionType === 'Buy') {
+                payload.transactionType = 'Sell';
+            }
             payload.builtUpArea = payload.builtUpArea || 1; // Required by Backend
             payload.carpetArea = payload.carpetArea || 1;   // Required by Backend
 

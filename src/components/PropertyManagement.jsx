@@ -120,12 +120,14 @@ const PropertyManagement = () => {
         const matchesSearch = (p.title || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
             (p.location || '').toLowerCase().includes(searchTerm.toLowerCase());
         const matchesCategory = filterCategory === 'All' || p.propertyCategory === filterCategory;
-        const matchesType = filterType === 'All' || p.transactionType === filterType;
+        const matchesType = filterType === 'All' || 
+            (filterType === 'Sell' && p.transactionType !== 'Rent') ||
+            (filterType === 'Rent' && p.transactionType === 'Rent');
         return matchesSearch && matchesCategory && matchesType;
     });
 
     const categories = ['All', 'Residential', 'Commercial', 'NewProjects'];
-    const types = ['All', 'Buy', 'Rent'];
+    const types = ['All', 'Sell', 'Rent'];
 
     return (
         <div className="space-y-5">

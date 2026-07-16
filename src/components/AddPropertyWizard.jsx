@@ -44,7 +44,7 @@ const AddPropertyWizard = ({ onClose, onSuccess, targetAgencyId, currentUserId, 
     // Core Form State
     const [formData, setFormData] = useState({
         propertyCategory: initialData?.propertyCategory || 'Residential',
-        transactionType: initialData?.transactionType || 'Rent',
+        transactionType: (initialData?.transactionType === 'Sale' || initialData?.transactionType === 'Buy') ? 'Sell' : (initialData?.transactionType || 'Rent'),
         title: initialData?.title || '',
         description: initialData?.description || '',
         price: initialData?.price || '',
@@ -504,7 +504,7 @@ const AddPropertyWizard = ({ onClose, onSuccess, targetAgencyId, currentUserId, 
                                     <div className="bg-gray-50 p-6 rounded-xl border border-gray-100">
                                         <h3 className="text-sm font-bold text-gray-700 uppercase tracking-wider mb-4">Transaction Type</h3>
                                         <div className="flex gap-4">
-                                            {['Rent', 'Sale'].map((type) => (
+                                            {['Rent', 'Sell'].map((type) => (
                                                 <label key={type} className={`cursor-pointer flex-1 flex items-center justify-center p-4 rounded-xl border-2 font-medium transition-all ${formData.transactionType === type ? 'border-primary bg-red-50 text-red-700' : 'border-gray-200 bg-white text-gray-600 hover:border-gray-300'}`}>
                                                     <input type="radio" name="transactionType" value={type} checked={formData.transactionType === type} onChange={handleInputChange} className="hidden" />
                                                     For {type}

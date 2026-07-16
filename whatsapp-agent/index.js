@@ -1557,7 +1557,7 @@ async function runCampaignProcessor(campaignId) {
                     if (v === 'property_bhk') return { type: 'text', text: property ? property.bhk : '2BHK/3BHK' };
                     if (v === 'property_price') return { type: 'text', text: property ? `₹${Number(property.price).toLocaleString()}` : 'Ask for Price' };
                     if (v === 'property_type') return { type: 'text', text: property ? property.type : 'Apartment' };
-                    if (v === 'property_listing_type') return { type: 'text', text: property ? property.listing_type : 'Sale' };
+                    if (v === 'property_listing_type') return { type: 'text', text: property ? (property.transactionType || 'Sell') : 'Sell' };
                     if (v === 'property_link') {
                         const appUrl = process.env.VITE_APP_URL || 'https://realestateflow.elevetoai.com';
                         const propId = property ? property.id : '';
