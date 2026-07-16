@@ -24,6 +24,9 @@ services:
       - VITE_FIREBASE_MESSAGING_SENDER_ID=${VITE_FIREBASE_MESSAGING_SENDER_ID}
       - VITE_FIREBASE_APP_ID=${VITE_FIREBASE_APP_ID}
 
+    networks:
+      - coolify
+
   whatsapp_agent:
     build:
       context: ./whatsapp-agent
@@ -43,6 +46,13 @@ services:
       - DATABASE_URL=${DATABASE_URL}
       - VITE_FIREBASE_PROJECT_ID=${VITE_FIREBASE_PROJECT_ID}
       - FIREBASE_PROJECT_ID=${VITE_FIREBASE_PROJECT_ID}
+    networks:
+      - coolify
+
+networks:
+  coolify:
+    name: coolify
+    external: true
 
 
 
