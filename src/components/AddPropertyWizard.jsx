@@ -291,6 +291,7 @@ const AddPropertyWizard = ({ onClose, onSuccess, targetAgencyId, currentUserId, 
                 if (cArea >= bArea && bArea > 0) {
                     newErrors.carpetArea = "Carpet Area must be strictly less than Built-up Area.";
                     isValid = false;
+                }
             }
         }
 
@@ -913,8 +914,8 @@ const AddPropertyWizard = ({ onClose, onSuccess, targetAgencyId, currentUserId, 
                                     <div className="pt-6 border-t border-gray-100">
                                         <div className="flex justify-between items-end mb-4">
                                             <div>
-                                                <h3 className="text-lg font-bold text-gray-900">Property Images</h3>
-                                                <p className="text-xs text-gray-500">Upload genuine photos of the property (at least 4 recommended). First image acts as Cover.</p>
+                                                <h3 className="text-lg font-bold text-gray-900">Property Images *</h3>
+                                                <p className="text-xs text-gray-500">Upload at least 3 genuine photos of the property. First image acts as Cover.</p>
                                             </div>
                                             <span className="text-sm font-medium text-gray-400">{images.length} / 10 added</span>
                                         </div>
@@ -988,7 +989,7 @@ const AddPropertyWizard = ({ onClose, onSuccess, targetAgencyId, currentUserId, 
                                         <div className="flex justify-between items-end mb-4">
                                             <div>
                                                 <h3 className="text-lg font-bold text-gray-900">Property Videos (Optional)</h3>
-                                                <p className="text-xs text-gray-500">Add property walkthroughs to boost engagement (at least 1 video recommended). Max 50MB per video.</p>
+                                                <p className="text-xs text-gray-500">Add property walkthroughs to boost engagement. Max 50MB per video.</p>
                                             </div>
                                             <span className="text-sm font-medium text-gray-400">{videos.length} / 3 added</span>
                                         </div>
