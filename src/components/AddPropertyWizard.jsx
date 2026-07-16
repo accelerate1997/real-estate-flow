@@ -1,7 +1,7 @@
 import React, { useState, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
-    X, Home, Building2, Construction, MapPin,
+    X, Home, Building2, Construction, MapPin, LandPlot,
     CheckCircle2, AlertCircle, IndianRupee, ImagePlus, ChevronRight, ChevronLeft, Trash2, Loader2
 } from 'lucide-react';
 import { pb } from '../services/pocketbase';
@@ -10,7 +10,8 @@ import imageCompression from 'browser-image-compression';
 const AMENITIES_LIST = {
     Residential: ['Parking', 'Gym', 'Swimming Pool', 'Security', 'Club House', 'Power Backup', 'Lift', 'Park'],
     Commercial: ['Visitor Parking', 'Loading Dock', 'Central AC', 'Food Court', 'Security', 'Service Lift', 'Fire Safety', 'Cafeteria'],
-    NewProjects: ['Club House', 'Swimming Pool', 'Gym', 'Jogging Track', 'Kids Play Area', 'Security', 'Power Backup', 'Indoor Games']
+    NewProjects: ['Club House', 'Swimming Pool', 'Gym', 'Jogging Track', 'Kids Play Area', 'Security', 'Power Backup', 'Indoor Games'],
+    PlotsLand: ['Gated Community', 'Corner Plot', 'Park Facing', 'Road Facing', 'Fencing', 'Water Connection', 'Electricity Connection', 'Clear Title']
 };
 
 const AddPropertyWizard = ({ onClose, onSuccess, targetAgencyId, currentUserId, initialData }) => {
@@ -47,6 +48,8 @@ const AddPropertyWizard = ({ onClose, onSuccess, targetAgencyId, currentUserId, 
     const [formData, setFormData] = useState({
         propertyCategory: initialData?.propertyCategory || 'Residential',
         transactionType: (initialData?.transactionType === 'Sale' || initialData?.transactionType === 'Buy') ? 'Sell' : (initialData?.transactionType || 'Rent'),
+        newProjectType: initialData?.newProjectType || 'Residential',
+        plotType: initialData?.plotType || 'Residential Plot',
         title: initialData?.title || '',
         description: initialData?.description || '',
         price: initialData?.price || '',
@@ -249,6 +252,10 @@ const AddPropertyWizard = ({ onClose, onSuccess, targetAgencyId, currentUserId, 
             }
             if (formData.propertyCategory === 'NewProjects') {
                 if (!formData.constructionStatus) { newErrors.constructionStatus = "Required"; isValid = false; }
+                if (!formData.newProjectType) { newErrors.newProjectType = "Required"; isValid = false; }
+            }
+            if (formData.propertyCategory === 'PlotsLand') {
+                if (!formData.plotType) { newErrors.plotType = "Required"; isValid = false; }
             }
         }
         else if (currentStep === 2) {
@@ -270,15 +277,21 @@ const AddPropertyWizard = ({ onClose, onSuccess, targetAgencyId, currentUserId, 
                 newErrors.expectedDeposit = "Deposit required for rentals."; isValid = false;
             }
 
-            const cArea = parseFloat(formData.carpetArea || 0);
-            const bArea = parseFloat(formData.builtUpArea || 0);
+            // For Plots & Land, only builtUpArea (total plot area) is required, carpetArea is optional
+            if (formData.propertyCategory === 'PlotsLand') {
+                const bArea = parseFloat(formData.builtUpArea || 0);
+                if (bArea <= 0) { newErrors.builtUpArea = "Plot area is required."; isValid = false; }
+            } else {
+                const cArea = parseFloat(formData.carpetArea || 0);
+                const bArea = parseFloat(formData.builtUpArea || 0);
 
-            if (cArea <= 0) { newErrors.carpetArea = "Required."; isValid = false; }
-            if (bArea <= 0) { newErrors.builtUpArea = "Required."; isValid = false; }
+                if (cArea <= 0) { newErrors.carpetArea = "Required."; isValid = false; }
+                if (bArea <= 0) { newErrors.builtUpArea = "Required."; isValid = false; }
 
-            if (cArea >= bArea && bArea > 0) {
-                newErrors.carpetArea = "Carpet Area must be strictly less than Built-up Area.";
-                isValid = false;
+                if (cArea >= bArea && bArea > 0) {
+                    newErrors.carpetArea = "Carpet Area must be strictly less than Built-up Area.";
+                    isValid = false;
+                }
             }
 
             if (!initialData && images.length < 3) {
@@ -332,6 +345,10 @@ const AddPropertyWizard = ({ onClose, onSuccess, targetAgencyId, currentUserId, 
             if (formData.propertyCategory === 'NewProjects') {
                 pbData.append('constructionStatus', formData.constructionStatus);
                 pbData.append('reraId', formData.reraId);
+                pbData.append('businessTypeSuitability', formData.newProjectType); // reuse field to store sub-type
+            }
+            if (formData.propertyCategory === 'PlotsLand') {
+                pbData.append('businessTypeSuitability', formData.plotType);
             }
 
             if (formData.transactionType === 'Rent') {
@@ -502,10 +519,11 @@ const AddPropertyWizard = ({ onClose, onSuccess, targetAgencyId, currentUserId, 
                                     {/* Property Category */}
                                     <div>
                                         <h3 className="text-lg font-bold text-gray-900 mb-4">What kind of property are you listing?</h3>
-                                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
                                             <CategoryCard icon={Home} title="Residential" value="Residential" />
                                             <CategoryCard icon={Building2} title="Commercial" value="Commercial" />
                                             <CategoryCard icon={Construction} title="New Projects" value="NewProjects" />
+                                            <CategoryCard icon={LandPlot} title="Plots & Land" value="PlotsLand" />
                                         </div>
                                     </div>
 
@@ -586,6 +604,19 @@ const AddPropertyWizard = ({ onClose, onSuccess, targetAgencyId, currentUserId, 
                                         {/* New Projects Specifics */}
                                         {formData.propertyCategory === 'NewProjects' && (
                                             <>
+                                                {/* Sub-type: Residential or Commercial */}
+                                                <div className="md:col-span-2">
+                                                    <label className="block text-sm font-medium text-gray-700 mb-2">Project Type *</label>
+                                                    <div className="flex gap-3">
+                                                        {['Residential', 'Commercial'].map(pt => (
+                                                            <label key={pt} className={`cursor-pointer flex-1 flex items-center justify-center p-3 rounded-xl border-2 font-medium transition-all text-sm ${formData.newProjectType === pt ? 'border-primary bg-red-50 text-red-700' : 'border-gray-200 bg-white text-gray-600 hover:border-gray-300'}`}>
+                                                                <input type="radio" name="newProjectType" value={pt} checked={formData.newProjectType === pt} onChange={handleInputChange} className="hidden" />
+                                                                {pt === 'Residential' ? '🏘️' : '🏢'} {pt}
+                                                            </label>
+                                                        ))}
+                                                    </div>
+                                                    {errors.newProjectType && <p className="text-red-500 text-xs mt-1">{errors.newProjectType}</p>}
+                                                </div>
                                                 <div>
                                                     <label className="block text-sm font-medium text-gray-700 mb-2">Construction Status *</label>
                                                     <select name="constructionStatus" value={formData.constructionStatus} onChange={handleInputChange} className="w-full px-4 py-3 rounded-lg border border-gray-200 focus:outline-none focus:border-primary">
@@ -596,6 +627,32 @@ const AddPropertyWizard = ({ onClose, onSuccess, targetAgencyId, currentUserId, 
                                                 <div>
                                                     <label className="block text-sm font-medium text-gray-700 mb-2">RERA ID</label>
                                                     <input type="text" name="reraId" value={formData.reraId} onChange={handleInputChange} placeholder="e.g. PR/123/456" className="w-full px-4 py-3 rounded-lg border border-gray-200 focus:outline-none focus:border-primary" />
+                                                </div>
+                                            </>
+                                        )}
+
+                                        {/* Plots & Land Specifics */}
+                                        {formData.propertyCategory === 'PlotsLand' && (
+                                            <>
+                                                <div>
+                                                    <label className="block text-sm font-medium text-gray-700 mb-2">Plot Type *</label>
+                                                    <select name="plotType" value={formData.plotType} onChange={handleInputChange} className={`w-full px-4 py-3 rounded-lg border focus:outline-none focus:border-primary ${errors.plotType ? 'border-red-500' : 'border-gray-200'}`}>
+                                                        <option value="Residential Plot">Residential Plot</option>
+                                                        <option value="Commercial Plot">Commercial Plot</option>
+                                                        <option value="Agricultural Land">Agricultural Land</option>
+                                                        <option value="Industrial Plot">Industrial Plot</option>
+                                                        <option value="Farm Land">Farm Land</option>
+                                                        <option value="NA Plot">NA Plot (Non-Agricultural)</option>
+                                                    </select>
+                                                    {errors.plotType && <p className="text-red-500 text-xs mt-1">{errors.plotType}</p>}
+                                                </div>
+                                                <div>
+                                                    <label className="block text-sm font-medium text-gray-700 mb-2">Road Width (optional)</label>
+                                                    <input type="text" name="floorDetails" value={formData.floorDetails} onChange={handleInputChange} placeholder="e.g. 30 ft road" className="w-full px-4 py-3 rounded-lg border border-gray-200 focus:outline-none focus:border-primary" />
+                                                </div>
+                                                <div className="md:col-span-2">
+                                                    <label className="block text-sm font-medium text-gray-700 mb-2">Additional Info (optional)</label>
+                                                    <input type="text" name="businessTypeSuitability" value={formData.businessTypeSuitability} onChange={handleInputChange} placeholder="e.g. Corner plot, North facing, clear title..." className="w-full px-4 py-3 rounded-lg border border-gray-200 focus:outline-none focus:border-primary" />
                                                 </div>
                                             </>
                                         )}
@@ -662,7 +719,7 @@ const AddPropertyWizard = ({ onClose, onSuccess, targetAgencyId, currentUserId, 
                                     </div>
 
                                     <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
-                                        {Array.from(new Set([...AMENITIES_LIST[formData.propertyCategory], ...formData.amenities])).map((amenity) => {
+                                        {Array.from(new Set([...(AMENITIES_LIST[formData.propertyCategory] || AMENITIES_LIST.Residential), ...formData.amenities])).map((amenity) => {
                                             const isActive = formData.amenities.includes(amenity);
                                             return (
                                                 <button
