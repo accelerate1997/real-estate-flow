@@ -15,12 +15,6 @@ import PrivacyPolicy from './components/PrivacyPolicy';
 import PlotsLandProperties from './components/PlotsLandProperties';
 
 // New Redesign Components
-import Features from './components/Features';
-import Neighborhoods from './components/Neighborhoods';
-import Newsletter from './components/Newsletter';
-import Testimonials from './components/Testimonials';
-import Team from './components/Team';
-import PropertyCard from './components/PropertyCard';
 import Partners from './components/Partners';
 import Footer from './components/Footer';
 
@@ -68,36 +62,17 @@ const Layout = ({ children }) => {
   );
 };
 
-// Home Page Component
+// Theme Components
 import ThemeModern from './components/ThemeModern';
 import ThemeMinimal from './components/ThemeMinimal';
+import ThemeClassic from './components/ThemeClassic';
 
-// Home Page Component
+// Home Page Component — routes to correct theme
 const Home = () => {
   const template = window.agencyConfig?.templateId || 'classic';
   if (template === 'modern') return <ThemeModern />;
   if (template === 'minimal') return <ThemeMinimal />;
-  
-  return (
-    <>
-      <Hero />
-      <Partners />
-      <Features />
-      <div className="section-padding bg-white">
-        <div className="container-custom">
-          <div className="mb-12">
-            <span className="text-primary font-bold tracking-widest uppercase text-sm">Featured</span>
-            <h2 className="text-4xl md:text-5xl font-bold mt-2">Latest <span className="text-accent-teal">Properties</span></h2>
-          </div>
-          <PropertyGrid />
-        </div>
-      </div>
-      <Newsletter />
-      <Neighborhoods />
-      <Testimonials />
-      <Team />
-    </>
-  );
+  return <ThemeClassic />;
 };
 
 function App() {
