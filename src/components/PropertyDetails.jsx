@@ -242,15 +242,23 @@ const PropertyDetails = () => {
         ];
     }
 
+    const templateId = window.agencyConfig?.templateId || 'classic';
+    const isModern = templateId === 'modern';
+    const isMinimal = templateId === 'minimal';
+
     return (
-        <div className="min-h-screen bg-gray-50/30 pt-20 pb-20 font-sans text-text antialiased">
+        <div className={`min-h-screen pt-20 pb-20 transition-colors duration-300 ${
+            isModern ? 'bg-[#080610] text-white' : isMinimal ? 'bg-[#FAF9F6] text-gray-900 font-serif' : 'bg-gray-50/30 text-gray-900 font-sans'
+        }`}>
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                 
                 {/* Navigation Bar */}
                 <div className="flex items-center justify-between py-6 mb-6">
                     <button
                         onClick={() => navigate(-1)}
-                        className="group flex items-center gap-2.5 text-gray-500 hover:text-gray-900 transition-colors font-semibold text-sm"
+                        className={`group flex items-center gap-2.5 transition-colors font-semibold text-sm ${
+                            isModern ? 'text-white/60 hover:text-white' : 'text-gray-500 hover:text-gray-900'
+                        }`}
                     >
                         <ArrowLeft className="w-5 h-5 group-hover:-translate-x-1 transition-transform" />
                         <span>Back to Listings</span>
@@ -259,15 +267,26 @@ const PropertyDetails = () => {
                         <button 
                             onClick={() => setIsFavorite(!isFavorite)}
                             className={clsx(
-                                "p-3 rounded-full border border-gray-200 transition-all active:scale-95 shadow-sm bg-white",
-                                isFavorite ? "text-red-500 border-red-100 bg-red-50" : "text-gray-400 hover:text-gray-700 hover:bg-gray-50"
+                                "p-3 border transition-all active:scale-95 shadow-sm",
+                                isFavorite 
+                                    ? "text-red-500 border-red-100 bg-red-50" 
+                                    : isModern 
+                                        ? "bg-white/5 border-white/10 text-white/70 hover:bg-white/10 hover:text-white" 
+                                        : "bg-white border-gray-200 text-gray-400 hover:text-gray-700 hover:bg-gray-50",
+                                isMinimal ? "rounded-none" : "rounded-full"
                             )}
                         >
                             <Heart className="w-5 h-5" fill={isFavorite ? "currentColor" : "none"} />
                         </button>
                         <button 
                             onClick={handleShare}
-                            className="p-3 rounded-full border border-gray-200 text-gray-400 hover:text-gray-700 hover:bg-gray-50 transition-all active:scale-95 shadow-sm bg-white"
+                            className={clsx(
+                                "p-3 border transition-all active:scale-95 shadow-sm",
+                                isModern 
+                                    ? "bg-white/5 border-white/10 text-white/70 hover:bg-white/10 hover:text-white" 
+                                    : "bg-white border-gray-200 text-gray-400 hover:text-gray-700 hover:bg-gray-50",
+                                isMinimal ? "rounded-none" : "rounded-full"
+                            )}
                         >
                             <Share2 className="w-5 h-5" />
                         </button>
@@ -275,12 +294,21 @@ const PropertyDetails = () => {
                 </div>
 
                 {/* Premium Grid Gallery */}
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-10 rounded-[2.5rem] overflow-hidden shadow-premium border border-gray-100 bg-white p-3">
+                <div className={clsx(
+                    "grid grid-cols-1 gap-4 mb-10 overflow-hidden",
+                    allImagesUrls.length > 1 ? "md:grid-cols-3" : "grid-cols-1",
+                    isModern 
+                        ? "bg-white/4 border border-white/8 rounded-[2.5rem] p-3 shadow-2xl" 
+                        : isMinimal 
+                            ? "bg-transparent border-none rounded-none p-0 shadow-none" 
+                            : "bg-white border border-gray-100 rounded-[2.5rem] p-3 shadow-premium"
+                )}>
                     {/* Main Image */}
                     <div 
                         className={clsx(
-                            "relative overflow-hidden cursor-pointer group aspect-[4/3] rounded-2xl bg-gray-100",
-                            allImagesUrls.length > 1 ? "md:col-span-2 md:aspect-auto md:h-[480px]" : "md:col-span-3 md:aspect-[21/9]"
+                            "relative overflow-hidden cursor-pointer group aspect-[4/3] bg-gray-100",
+                            allImagesUrls.length > 1 ? "md:col-span-2 md:aspect-auto md:h-[480px]" : "md:col-span-3 md:aspect-[21/9]",
+                            isMinimal ? "rounded-none" : "rounded-2xl"
                         )}
                         onClick={() => {
                             setActiveImageIndex(0);
@@ -329,7 +357,10 @@ const PropertyDetails = () => {
                             {secondaryImagesUrls.slice(0, 2).map((url, index) => (
                                 <div 
                                     key={index} 
-                                    className="relative rounded-2xl overflow-hidden cursor-pointer group h-full min-h-[140px] md:min-h-0 bg-gray-100"
+                                    className={clsx(
+                                        "relative overflow-hidden cursor-pointer group h-full min-h-[140px] md:min-h-0 bg-gray-100",
+                                        isMinimal ? "rounded-none" : "rounded-2xl"
+                                    )}
                                     onClick={() => {
                                         setActiveImageIndex(index + 1);
                                         setIsLightboxOpen(true);
@@ -366,7 +397,14 @@ const PropertyDetails = () => {
                     <div className="lg:col-span-8 space-y-8">
                         
                         {/* Title, Address & Price Block */}
-                        <div className="bg-white rounded-[2rem] p-8 md:p-10 shadow-premium border border-gray-100/60 relative overflow-hidden">
+                        <div className={clsx(
+                            "p-8 md:p-10 border relative overflow-hidden",
+                            isModern 
+                                ? "bg-white/4 border-white/8 rounded-2xl shadow-xl" 
+                                : isMinimal 
+                                    ? "bg-white border-gray-300 rounded-none shadow-none" 
+                                    : "bg-white rounded-[2rem] shadow-premium border border-gray-100/60"
+                        )}>
                             <div className="absolute top-0 right-0 w-48 h-48 bg-primary/5 rounded-full blur-3xl pointer-events-none" />
                             
                             <div className="flex flex-col md:flex-row md:items-start justify-between gap-6">
@@ -379,7 +417,14 @@ const PropertyDetails = () => {
                                         {property.title}
                                     </h1>
                                 </div>
-                                <div className="bg-gray-50/50 p-6 rounded-2xl border border-gray-100 text-left md:text-right min-w-[200px] flex flex-col justify-center">
+                                <div className={clsx(
+                                    "p-6 text-left md:text-right min-w-[200px] flex flex-col justify-center border",
+                                    isModern 
+                                        ? "bg-white/5 border-white/10 rounded-xl" 
+                                        : isMinimal 
+                                            ? "bg-[#FAF9F6] border-gray-300 rounded-none" 
+                                            : "bg-gray-50/50 border border-gray-100 rounded-2xl"
+                                )}>
                                     <span className="text-[10px] text-gray-400 font-extrabold uppercase tracking-widest block mb-1">Asking Price</span>
                                     <span className="text-3xl md:text-4xl font-black text-primary tracking-tighter">
                                         {formatCurrency(property.price)}
@@ -391,98 +436,166 @@ const PropertyDetails = () => {
                             </div>
 
                             {/* Core Specs Grid */}
-                            <div className="grid grid-cols-2 md:grid-cols-4 gap-3.5 pt-8 mt-8 border-t border-gray-100">
-                                <div className="flex items-center gap-3 bg-gray-550/20 p-3 rounded-2xl border border-gray-100 hover:bg-white hover:border-primary/20 hover:shadow-sm transition-all duration-300">
+                            <div className={`grid grid-cols-2 md:grid-cols-4 gap-3.5 pt-8 mt-8 border-t ${
+                                isModern ? 'border-white/8' : 'border-gray-100'
+                            }`}>
+                                <div className={clsx(
+                                    "flex items-center gap-3 p-3 border transition-all duration-300",
+                                    isModern 
+                                        ? "bg-white/5 border-white/10 rounded-xl hover:bg-white/10 text-white" 
+                                        : isMinimal 
+                                            ? "bg-white border-gray-200 rounded-none hover:border-gray-900 text-gray-900" 
+                                            : "bg-gray-50/20 rounded-2xl border border-gray-100 hover:bg-white hover:border-primary/20 hover:shadow-sm"
+                                )}>
                                     <div className="w-9 h-9 rounded-xl bg-primary/5 flex items-center justify-center text-primary shrink-0">
                                         <Square className="w-4 h-4" />
                                     </div>
                                     <div className="min-w-0">
                                         <p className="text-[9px] font-bold text-gray-400 uppercase tracking-wider leading-none mb-1">Carpet Area</p>
-                                        <p className="font-extrabold text-dark text-xs truncate">{property.carpetArea || '-'}<span className="text-[10px] ml-0.5 font-normal text-gray-500">sqft</span></p>
+                                        <p className={`font-extrabold text-xs truncate ${isModern ? 'text-white' : 'text-dark'}`}>{property.carpetArea || '-'}<span className="text-[10px] ml-0.5 font-normal text-gray-500">sqft</span></p>
                                     </div>
                                 </div>
 
                                 {property.propertyCategory === 'Residential' ? (
                                     <>
-                                        <div className="flex items-center gap-3 bg-gray-550/20 p-3 rounded-2xl border border-gray-100 hover:bg-white hover:border-primary/20 hover:shadow-sm transition-all duration-300">
+                                        <div className={clsx(
+                                            "flex items-center gap-3 p-3 border transition-all duration-300",
+                                            isModern 
+                                                ? "bg-white/5 border-white/10 rounded-xl hover:bg-white/10 text-white" 
+                                                : isMinimal 
+                                                    ? "bg-white border-gray-200 rounded-none hover:border-gray-900 text-gray-900" 
+                                                    : "bg-gray-50/20 rounded-2xl border border-gray-100 hover:bg-white hover:border-primary/20 hover:shadow-sm"
+                                        )}>
                                             <div className="w-9 h-9 rounded-xl bg-primary/5 flex items-center justify-center text-primary shrink-0">
                                                 <Bed className="w-4.5 h-4.5" />
                                             </div>
                                             <div className="min-w-0">
                                                 <p className="text-[9px] font-bold text-gray-400 uppercase tracking-wider leading-none mb-1">Configuration</p>
-                                                <p className="font-extrabold text-dark text-xs truncate">{property.bhkType || '-'}</p>
+                                                <p className={`font-extrabold text-xs truncate ${isModern ? 'text-white' : 'text-dark'}`}>{property.bhkType || '-'}</p>
                                             </div>
                                         </div>
-                                        <div className="flex items-center gap-3 bg-gray-550/20 p-3 rounded-2xl border border-gray-100 hover:bg-white hover:border-primary/20 hover:shadow-sm transition-all duration-300">
+                                        <div className={clsx(
+                                            "flex items-center gap-3 p-3 border transition-all duration-300",
+                                            isModern 
+                                                ? "bg-white/5 border-white/10 rounded-xl hover:bg-white/10 text-white" 
+                                                : isMinimal 
+                                                    ? "bg-white border-gray-200 rounded-none hover:border-gray-900 text-gray-900" 
+                                                    : "bg-gray-50/20 rounded-2xl border border-gray-100 hover:bg-white hover:border-primary/20 hover:shadow-sm"
+                                        )}>
                                             <div className="w-9 h-9 rounded-xl bg-primary/5 flex items-center justify-center text-primary shrink-0">
                                                 <Building2 className="w-4.5 h-4.5" />
                                             </div>
                                             <div className="min-w-0">
                                                 <p className="text-[9px] font-bold text-gray-400 uppercase tracking-wider leading-none mb-1">Furnishing</p>
-                                                <p className="font-extrabold text-dark text-xs truncate">{property.furnishing || '-'}</p>
+                                                <p className={`font-extrabold text-xs truncate ${isModern ? 'text-white' : 'text-dark'}`}>{property.furnishing || '-'}</p>
                                             </div>
                                         </div>
                                     </>
                                 ) : (
                                     <>
-                                        <div className="flex items-center gap-3 bg-gray-550/20 p-3 rounded-2xl border border-gray-100 hover:bg-white hover:border-primary/20 hover:shadow-sm transition-all duration-300">
+                                        <div className={clsx(
+                                            "flex items-center gap-3 p-3 border transition-all duration-300",
+                                            isModern 
+                                                ? "bg-white/5 border-white/10 rounded-xl hover:bg-white/10 text-white" 
+                                                : isMinimal 
+                                                    ? "bg-white border-gray-200 rounded-none hover:border-gray-900 text-gray-900" 
+                                                    : "bg-gray-50/20 rounded-2xl border border-gray-100 hover:bg-white hover:border-primary/20 hover:shadow-sm"
+                                        )}>
                                             <div className="w-9 h-9 rounded-xl bg-primary/5 flex items-center justify-center text-primary shrink-0">
                                                 <Building2 className="w-4.5 h-4.5" />
                                             </div>
                                             <div className="min-w-0">
                                                 <p className="text-[9px] font-bold text-gray-400 uppercase tracking-wider leading-none mb-1">Property Type</p>
-                                                <p className="font-extrabold text-dark text-xs truncate">{property.propertyType || 'Commercial'}</p>
+                                                <p className={`font-extrabold text-xs truncate ${isModern ? 'text-white' : 'text-dark'}`}>{property.propertyType || 'Commercial'}</p>
                                             </div>
                                         </div>
-                                        <div className="flex items-center gap-3 bg-gray-550/20 p-3 rounded-2xl border border-gray-100 hover:bg-white hover:border-primary/20 hover:shadow-sm transition-all duration-300">
+                                        <div className={clsx(
+                                            "flex items-center gap-3 p-3 border transition-all duration-300",
+                                            isModern 
+                                                ? "bg-white/5 border-white/10 rounded-xl hover:bg-white/10 text-white" 
+                                                : isMinimal 
+                                                    ? "bg-white border-gray-200 rounded-none hover:border-gray-900 text-gray-900" 
+                                                    : "bg-gray-50/20 rounded-2xl border border-gray-100 hover:bg-white hover:border-primary/20 hover:shadow-sm"
+                                        )}>
                                             <div className="w-9 h-9 rounded-xl bg-primary/5 flex items-center justify-center text-primary shrink-0">
                                                 <Compass className="w-4.5 h-4.5" />
                                             </div>
                                             <div className="min-w-0">
                                                 <p className="text-[9px] font-bold text-gray-400 uppercase tracking-wider leading-none mb-1">Ideal For</p>
-                                                <p className="font-extrabold text-dark text-xs truncate">{property.idealFor || 'Offices / Shops'}</p>
+                                                <p className={`font-extrabold text-xs truncate ${isModern ? 'text-white' : 'text-dark'}`}>{property.idealFor || 'Offices / Shops'}</p>
                                             </div>
                                         </div>
                                     </>
                                 )}
 
-                                <div className="flex items-center gap-3 bg-gray-550/20 p-3 rounded-2xl border border-gray-100 hover:bg-white hover:border-primary/20 hover:shadow-sm transition-all duration-300">
+                                <div className={clsx(
+                                    "flex items-center gap-3 p-3 border transition-all duration-300",
+                                    isModern 
+                                        ? "bg-white/5 border-white/10 rounded-xl hover:bg-white/10 text-white" 
+                                        : isMinimal 
+                                            ? "bg-white border-gray-200 rounded-none hover:border-gray-900 text-gray-900" 
+                                            : "bg-gray-50/20 rounded-2xl border border-gray-100 hover:bg-white hover:border-primary/20 hover:shadow-sm"
+                                )}>
                                     <div className="w-9 h-9 rounded-xl bg-primary/5 flex items-center justify-center text-primary shrink-0">
                                         <Construction className="w-4.5 h-4.5" />
                                     </div>
                                     <div className="min-w-0">
                                         <p className="text-[9px] font-bold text-gray-400 uppercase tracking-wider leading-none mb-1">Status</p>
-                                        <p className="font-extrabold text-dark text-xs truncate">Ready to Move</p>
+                                        <p className={`font-extrabold text-xs truncate ${isModern ? 'text-white' : 'text-dark'}`}>Ready to Move</p>
                                     </div>
                                 </div>
                             </div>
                         </div>
 
                         {/* Overview Description */}
-                        <div className="bg-white rounded-[2rem] p-8 md:p-10 shadow-premium border border-gray-100/60">
-                            <h3 className="text-2xl font-black text-dark mb-6 flex items-center gap-3">
+                        <div className={clsx(
+                            "p-8 md:p-10 border",
+                            isModern 
+                                ? "bg-white/4 border-white/8 rounded-2xl shadow-xl" 
+                                : isMinimal 
+                                    ? "bg-white border-gray-300 rounded-none shadow-none" 
+                                    : "bg-white rounded-[2rem] shadow-premium border border-gray-100/60"
+                        )}>
+                            <h3 className="text-2xl font-black mb-6 flex items-center gap-3">
                                 <span className="w-2.5 h-7 bg-primary rounded-full" />
                                 Property Overview
                             </h3>
-                            <p className="text-gray-600 text-base md:text-lg leading-relaxed whitespace-pre-line font-medium">
+                            <p className={clsx(
+                                "text-base md:text-lg leading-relaxed whitespace-pre-line font-medium",
+                                isModern ? "text-white/70" : "text-gray-600"
+                            )}>
                                 {property.description || "Experience the pinnacle of premium living in this exceptional property, meticulously curated to provide the perfect blend of architectural grandeur, high-end comfort, and flawless functionality. Positioned in one of the city's most desirable and well-connected neighborhoods, this property sets a new standard for luxury real estate."}
                             </p>
                         </div>
 
                         {/* Project Amenities */}
                         {amenitiesList.length > 0 && (
-                            <div className="bg-white rounded-[2rem] p-8 md:p-10 shadow-premium border border-gray-100/60">
-                                <h3 className="text-2xl font-black text-dark mb-6 flex items-center gap-3">
+                            <div className={clsx(
+                                "p-8 md:p-10 border",
+                                isModern 
+                                    ? "bg-white/4 border-white/8 rounded-2xl shadow-xl" 
+                                    : isMinimal 
+                                        ? "bg-white border-gray-300 rounded-none shadow-none" 
+                                        : "bg-white rounded-[2rem] shadow-premium border border-gray-100/60"
+                            )}>
+                                <h3 className="text-2xl font-black mb-6 flex items-center gap-3">
                                     <span className="w-2.5 h-7 bg-primary rounded-full" />
                                     Premium Amenities
                                 </h3>
                                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                                     {amenitiesList.map((amenity, idx) => (
-                                        <div key={idx} className="flex items-center gap-2.5 p-2.5 bg-gray-50/50 border border-gray-100 rounded-xl hover:border-primary/20 hover:bg-white transition-all group">
-                                            <div className="w-6 h-6 rounded-md bg-green-50 flex items-center justify-center text-green-600 shrink-0">
+                                        <div key={idx} className={clsx(
+                                            "flex items-center gap-2.5 p-2.5 border transition-all group",
+                                            isModern 
+                                                ? "bg-white/5 border-white/10 hover:border-primary/20 hover:bg-white/10 text-white" 
+                                                : isMinimal 
+                                                    ? "bg-[#FAF9F6] border-gray-200 rounded-none hover:border-gray-900 text-gray-900" 
+                                                    : "bg-gray-50/50 border border-gray-100 rounded-xl hover:border-primary/20 hover:bg-white"
+                                        )}>
+                                            <div className="w-6 h-6 rounded-md bg-green-550/10 flex items-center justify-center text-green-500 shrink-0">
                                                 <Check className="w-3.5 h-3.5" />
                                             </div>
-                                            <span className="text-xs font-semibold text-gray-700 truncate">{amenity}</span>
+                                            <span className="text-xs font-semibold truncate">{amenity}</span>
                                         </div>
                                     ))}
                                 </div>
@@ -490,19 +603,33 @@ const PropertyDetails = () => {
                         )}
 
                         {/* Location Proximity timeline */}
-                        <div className="bg-white rounded-[2rem] p-8 md:p-10 shadow-premium border border-gray-100/60">
-                            <h3 className="text-2xl font-black text-dark mb-6 flex items-center gap-3">
+                        <div className={clsx(
+                            "p-8 md:p-10 border",
+                            isModern 
+                                ? "bg-white/4 border-white/8 rounded-2xl shadow-xl" 
+                                : isMinimal 
+                                    ? "bg-white border-gray-300 rounded-none shadow-none" 
+                                    : "bg-white rounded-[2rem] shadow-premium border border-gray-100/60"
+                        )}>
+                            <h3 className="text-2xl font-black mb-6 flex items-center gap-3">
                                 <span className="w-2.5 h-7 bg-primary rounded-full" />
                                 Neighborhood Highlights
                             </h3>
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                 {proximityHighlights.map((highlight, idx) => (
-                                    <div key={idx} className="flex items-center justify-between p-4 border border-gray-100 rounded-2xl bg-gray-50/30">
+                                    <div key={idx} className={clsx(
+                                        "flex items-center justify-between p-4 border",
+                                        isModern 
+                                            ? "bg-white/5 border-white/10 rounded-2xl" 
+                                            : isMinimal 
+                                                ? "bg-[#FAF9F6] border-gray-200 rounded-none" 
+                                                : "border border-gray-100 rounded-2xl bg-gray-50/30"
+                                    )}>
                                         <div className="flex items-center gap-3">
                                             <div className="w-9 h-9 rounded-xl bg-primary/10 flex items-center justify-center text-primary shrink-0">
                                                 <Compass className="w-4.5 h-4.5" />
                                             </div>
-                                            <span className="text-sm font-semibold text-gray-700">{highlight.name}</span>
+                                            <span className="text-sm font-semibold">{highlight.name}</span>
                                         </div>
                                         <span className="text-xs font-black text-primary bg-primary/5 px-2.5 py-1.5 rounded-lg border border-primary/5">{highlight.distance}</span>
                                     </div>
@@ -512,14 +639,28 @@ const PropertyDetails = () => {
 
                         {/* Videos Section */}
                         {videoUrls.length > 0 && (
-                            <div className="bg-white rounded-[2rem] p-8 md:p-10 shadow-premium border border-gray-100/60">
-                                <h3 className="text-2xl font-black text-dark mb-6 flex items-center gap-3">
+                            <div className={clsx(
+                                "p-8 md:p-10 border",
+                                isModern 
+                                    ? "bg-white/4 border-white/8 rounded-2xl shadow-xl" 
+                                    : isMinimal 
+                                        ? "bg-white border-gray-300 rounded-none shadow-none" 
+                                        : "bg-white rounded-[2rem] shadow-premium border border-gray-100/60"
+                            )}>
+                                <h3 className="text-2xl font-black mb-6 flex items-center gap-3">
                                     <span className="w-2.5 h-7 bg-primary rounded-full" />
                                     Property Video Tour
                                 </h3>
                                 <div className="space-y-6">
                                     {videoUrls.map((url, idx) => (
-                                        <div key={idx} className="rounded-3xl overflow-hidden bg-gray-900 aspect-video shadow-lg relative border border-gray-100">
+                                        <div key={idx} className={clsx(
+                                            "overflow-hidden aspect-video shadow-lg relative border",
+                                            isModern 
+                                                ? "bg-black/40 border-white/10 rounded-2xl" 
+                                                : isMinimal 
+                                                    ? "bg-[#FAF9F6] border-gray-300 rounded-none" 
+                                                    : "bg-gray-900 border border-gray-100 rounded-3xl"
+                                        )}>
                                             <video src={url} controls className="w-full h-full object-cover" preload="metadata" />
                                         </div>
                                     ))}
@@ -533,17 +674,31 @@ const PropertyDetails = () => {
                         <div className="sticky top-28 space-y-6">
                             
                             {/* Verified Partner info & Inline Lead form */}
-                            <div className="bg-white rounded-[2rem] p-8 border border-gray-100 shadow-premium relative overflow-hidden">
+                            <div className={clsx(
+                                "p-8 border relative overflow-hidden",
+                                isModern 
+                                    ? "bg-white/4 border-white/8 rounded-2xl shadow-xl" 
+                                    : isMinimal 
+                                        ? "bg-white border-gray-300 rounded-none shadow-none" 
+                                        : "bg-white border border-gray-100 shadow-premium rounded-[2rem]"
+                            )}>
                                 <div className="absolute top-0 right-0 w-32 h-32 bg-primary/5 rounded-full -translate-y-1/2 translate-x-1/2 blur-2xl" />
                                 
-                                <h3 className="text-xl font-black text-dark mb-1 flex items-center gap-2">
+                                <h3 className={`text-xl font-black mb-1 flex items-center gap-2 ${isModern ? 'text-white' : 'text-dark'}`}>
                                     <Sparkles className="w-5 h-5 text-primary" />
                                     Contact Agent
                                 </h3>
                                 <p className="text-xs text-gray-400 mb-6 font-semibold uppercase tracking-wider">Verified Listing Partner</p>
-
+ 
                                 {/* Partner Card */}
-                                <div className="flex items-center gap-4 mb-6 p-4 bg-gray-50/50 rounded-2xl border border-gray-100/80">
+                                <div className={clsx(
+                                    "flex items-center gap-4 mb-6 p-4 border",
+                                    isModern 
+                                        ? "bg-white/5 border-white/10 rounded-2xl" 
+                                        : isMinimal 
+                                            ? "bg-[#FAF9F6] border-gray-300 rounded-none" 
+                                            : "bg-gray-50/50 rounded-2xl border border-gray-100/80"
+                                )}>
                                     <div className="w-12 h-12 rounded-full bg-primary text-white flex items-center justify-center font-black text-lg shadow-md ring-4 ring-white overflow-hidden shrink-0">
                                         {property.expand?.createdBy?.avatar ? (
                                             <img 
@@ -555,7 +710,7 @@ const PropertyDetails = () => {
                                     </div>
                                     <div className="min-w-0">
                                         <div className="flex items-center gap-1">
-                                            <p className="font-extrabold text-dark leading-tight truncate text-sm">
+                                            <p className={`font-extrabold leading-tight truncate text-sm ${isModern ? 'text-white' : 'text-dark'}`}>
                                                 {property.expand?.createdBy?.name || 'Premier Agent'}
                                             </p>
                                             <ShieldCheck className="w-4 h-4 text-green-500 shrink-0" />
@@ -599,7 +754,13 @@ const PropertyDetails = () => {
                                                         value={leadName}
                                                         onChange={(e) => setLeadName(e.target.value)}
                                                         placeholder="e.g. John Doe"
-                                                        className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-xl text-sm placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-primary/10 focus:border-primary transition-all hover:border-gray-200"
+                                                        className={`w-full px-4 py-3 border text-sm placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-primary/10 focus:border-primary transition-all hover:border-gray-200 ${
+                                                            isModern 
+                                                                ? 'bg-white/5 border-white/10 text-white rounded-xl' 
+                                                                : isMinimal 
+                                                                    ? 'bg-white border-gray-300 text-gray-900 rounded-none' 
+                                                                    : 'bg-gray-50 border border-gray-100 rounded-xl'
+                                                        }`}
                                                     />
                                                 </div>
                                                 <div>
@@ -610,7 +771,13 @@ const PropertyDetails = () => {
                                                         value={leadPhone}
                                                         onChange={(e) => setLeadPhone(e.target.value)}
                                                         placeholder="e.g. +91 99999 99999"
-                                                        className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-xl text-sm placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-primary/10 focus:border-primary transition-all hover:border-gray-200"
+                                                        className={`w-full px-4 py-3 border text-sm placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-primary/10 focus:border-primary transition-all hover:border-gray-200 ${
+                                                            isModern 
+                                                                ? 'bg-white/5 border-white/10 text-white rounded-xl' 
+                                                                : isMinimal 
+                                                                    ? 'bg-white border-gray-300 text-gray-900 rounded-none' 
+                                                                    : 'bg-gray-50 border border-gray-100 rounded-xl'
+                                                        }`}
                                                     />
                                                 </div>
                                                 <div>
@@ -621,7 +788,13 @@ const PropertyDetails = () => {
                                                         value={leadEmail}
                                                         onChange={(e) => setLeadEmail(e.target.value)}
                                                         placeholder="e.g. john@example.com"
-                                                        className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-xl text-sm placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-primary/10 focus:border-primary transition-all hover:border-gray-200"
+                                                        className={`w-full px-4 py-3 border text-sm placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-primary/10 focus:border-primary transition-all hover:border-gray-200 ${
+                                                            isModern 
+                                                                ? 'bg-white/5 border-white/10 text-white rounded-xl' 
+                                                                : isMinimal 
+                                                                    ? 'bg-white border-gray-300 text-gray-900 rounded-none' 
+                                                                    : 'bg-gray-50 border border-gray-100 rounded-xl'
+                                                        }`}
                                                     />
                                                 </div>
                                                 <div>
@@ -629,7 +802,13 @@ const PropertyDetails = () => {
                                                     <select
                                                         value={preferredLanguage}
                                                         onChange={(e) => setPreferredLanguage(e.target.value)}
-                                                        className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary/10 focus:border-primary transition-all hover:border-gray-200"
+                                                        className={`w-full px-4 py-3 border text-sm focus:outline-none focus:ring-2 focus:ring-primary/10 focus:border-primary transition-all ${
+                                                            isModern 
+                                                                ? 'bg-[#080610] border-white/10 text-white rounded-xl' 
+                                                                : isMinimal 
+                                                                    ? 'bg-white border-gray-300 text-gray-900 rounded-none' 
+                                                                    : 'bg-gray-50 border border-gray-100 rounded-xl text-gray-800'
+                                                        }`}
                                                     >
                                                         <option value="English">English</option>
                                                         <option value="Hindi">Hindi (हिंदी)</option>

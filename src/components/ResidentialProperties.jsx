@@ -25,22 +25,39 @@ const PRICE_RANGES = [
     { label: 'Above ₹2 Cr', value: '20000000-999999999' },
 ];
 
-const FilterSelect = ({ label, value, onChange, options, defaultLabel }) => (
-    <div className="flex flex-col gap-1.5">
-        <label className="text-xs font-semibold text-gray-500 uppercase tracking-wider">{label}</label>
-        <select
-            value={value}
-            onChange={e => onChange(e.target.value)}
-            className="bg-white border border-gray-200 text-gray-800 text-sm py-2.5 px-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary cursor-pointer hover:border-gray-300 transition-colors w-full appearance-none"
-            style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%236b7280' stroke-width='2'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E")`, backgroundRepeat: 'no-repeat', backgroundPosition: 'right 10px center', paddingRight: '30px' }}
-        >
-            <option value="All">{defaultLabel || `All ${label}s`}</option>
-            {options.map(opt => (
-                <option key={opt.value ?? opt} value={opt.value ?? opt}>{opt.label ?? opt}</option>
-            ))}
-        </select>
-    </div>
-);
+const FilterSelect = ({ label, value, onChange, options, defaultLabel, templateId }) => {
+    const isModern = templateId === 'modern';
+    const isMinimal = templateId === 'minimal';
+    return (
+        <div className="flex flex-col gap-1.5">
+            <label className={`text-xs font-semibold uppercase tracking-wider ${isModern ? 'text-white/40' : 'text-gray-500'}`}>{label}</label>
+            <select
+                value={value}
+                onChange={e => onChange(e.target.value)}
+                className={`text-sm py-2.5 px-3 focus:outline-none w-full appearance-none transition-colors cursor-pointer ${
+                    isModern 
+                        ? 'bg-white/5 border border-white/10 text-white rounded-xl focus:ring-2 focus:ring-primary/45 hover:bg-white/10' 
+                        : isMinimal 
+                            ? 'bg-white border border-gray-300 text-gray-900 rounded-none focus:border-gray-900 hover:border-gray-900' 
+                            : 'bg-white border border-gray-200 text-gray-800 rounded-lg focus:ring-2 focus:ring-primary/30 focus:border-primary hover:border-gray-300'
+                }`}
+                style={{ 
+                    backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='${isModern ? '%23ffffff' : '%236b7280'}' stroke-width='2'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E")`, 
+                    backgroundRepeat: 'no-repeat', 
+                    backgroundPosition: 'right 10px center', 
+                    paddingRight: '30px' 
+                }}
+            >
+                <option value="All" className={isModern ? 'bg-[#080610] text-white' : ''}>{defaultLabel || `All ${label}s`}</option>
+                {options.map(opt => (
+                    <option key={opt.value ?? opt} value={opt.value ?? opt} className={isModern ? 'bg-[#080610] text-white' : ''}>
+                        {opt.label ?? opt}
+                    </option>
+                ))}
+            </select>
+        </div>
+    );
+};
 
 const ResidentialProperties = () => {
     const navigate = useNavigate();
@@ -156,22 +173,32 @@ const ResidentialProperties = () => {
         return Array.from(set).sort();
     }, [properties]);
 
+    const templateId = window.agencyConfig?.templateId || 'classic';
+    const isModern = templateId === 'modern';
+    const isMinimal = templateId === 'minimal';
+
     return (
-        <div className="min-h-screen bg-gray-50 pt-32 pb-20">
+        <div className={`min-h-screen pt-32 pb-20 transition-colors duration-300 ${
+            isModern ? 'bg-[#080610] text-white' : isMinimal ? 'bg-[#FAF9F6] text-gray-900 font-serif' : 'bg-gray-50 text-gray-900 font-sans'
+        }`}>
             <div className="max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-8">
 
                 {/* Breadcrumbs */}
-                <nav className="flex text-sm text-gray-500 mb-6">
+                <nav className={`flex text-sm mb-6 ${isModern ? 'text-white/40' : 'text-gray-500'}`}>
                     <a href="/" className="hover:text-primary transition-colors">Home</a>
                     <span className="mx-2">/</span>
-                    <span className="text-gray-900 font-medium">Residential Properties</span>
+                    <span className={isModern ? 'text-white font-medium' : 'text-gray-900 font-medium'}>Residential Properties</span>
                 </nav>
 
                 {/* Header */}
-                <div className="flex flex-col md:flex-row justify-between items-start md:items-end mb-6 border-b border-gray-200 pb-6">
+                <div className={`flex flex-col md:flex-row justify-between items-start md:items-end mb-6 border-b pb-6 ${
+                    isModern ? 'border-white/10' : 'border-gray-200'
+                }`}>
                     <div>
-                        <h1 className="text-3xl md:text-4xl font-bold text-[#1A1A1A] mb-2">Luxury Residential Homes &amp; Apartments</h1>
-                        <p className="text-gray-500">
+                        <h1 className={`text-3xl md:text-4xl font-bold mb-2 ${
+                            isModern ? 'text-white' : isMinimal ? 'text-gray-900 font-serif font-normal' : 'text-[#1A1A1A]'
+                        }`}>Luxury Residential Homes &amp; Apartments</h1>
+                        <p className={isModern ? 'text-white/40' : 'text-gray-500'}>
                             {isLoading ? 'Loading...' : `${filteredProperties.length} propert${filteredProperties.length !== 1 ? 'ies' : 'y'} found`}
                         </p>
                     </div>
@@ -179,12 +206,18 @@ const ResidentialProperties = () => {
                     {/* Filter toggle button */}
                     <button
                         onClick={() => setShowFilters(v => !v)}
-                        className="mt-4 md:mt-0 flex items-center gap-2 bg-white border border-gray-200 hover:border-primary text-gray-700 hover:text-primary px-4 py-2.5 rounded-lg text-sm font-semibold transition-all shadow-sm"
+                        className={`mt-4 md:mt-0 flex items-center gap-2 px-4 py-2.5 text-sm font-semibold transition-all shadow-sm border ${
+                            isModern 
+                                ? 'bg-white/5 border-white/10 hover:border-primary/55 text-white' 
+                                : isMinimal 
+                                    ? 'bg-white border-gray-300 hover:border-gray-900 text-gray-900 rounded-none' 
+                                    : 'bg-white border-gray-200 hover:border-primary text-gray-700 hover:text-primary rounded-lg'
+                        }`}
                     >
                         <SlidersHorizontal className="w-4 h-4" />
                         Filters
                         {activeFilterCount > 0 && (
-                            <span className="bg-primary text-white text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center">
+                            <span className="bg-primary text-white text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center animate-pulse">
                                 {activeFilterCount}
                             </span>
                         )}
@@ -202,7 +235,13 @@ const ResidentialProperties = () => {
                             transition={{ duration: 0.2 }}
                             className="overflow-hidden mb-8"
                         >
-                            <div className="bg-white border border-gray-100 rounded-2xl shadow-sm p-6">
+                            <div className={`border p-6 shadow-sm ${
+                                isModern 
+                                    ? 'bg-white/4 border-white/8 rounded-2xl shadow-xl' 
+                                    : isMinimal 
+                                        ? 'bg-white border-gray-300 rounded-none' 
+                                        : 'bg-white border-gray-100 rounded-2xl'
+                            }`}>
                                 <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-7 gap-4">
                                     <FilterSelect
                                         label="Type"
@@ -210,6 +249,7 @@ const ResidentialProperties = () => {
                                         onChange={v => setFilter('transactionType', v)}
                                         options={[{ label: 'For Sell', value: 'Sell' }, { label: 'For Rent', value: 'Rent' }]}
                                         defaultLabel="All Types"
+                                        templateId={templateId}
                                     />
                                     <FilterSelect
                                         label="BHK"
@@ -217,6 +257,7 @@ const ResidentialProperties = () => {
                                         onChange={v => setFilter('bhkType', v)}
                                         options={['1 BHK', '2 BHK', '3 BHK', '4+ BHK']}
                                         defaultLabel="All BHK"
+                                        templateId={templateId}
                                     />
                                     <FilterSelect
                                         label="Furnishing"
@@ -224,6 +265,7 @@ const ResidentialProperties = () => {
                                         onChange={v => setFilter('furnishing', v)}
                                         options={['Fully Furnished', 'Semi Furnished', 'Unfurnished']}
                                         defaultLabel="Any Furnishing"
+                                        templateId={templateId}
                                     />
                                     <FilterSelect
                                         label="City"
@@ -231,6 +273,7 @@ const ResidentialProperties = () => {
                                         onChange={v => setFilter('city', v)}
                                         options={cities}
                                         defaultLabel="All Cities"
+                                        templateId={templateId}
                                     />
                                     <FilterSelect
                                         label="Budget"
@@ -238,6 +281,7 @@ const ResidentialProperties = () => {
                                         onChange={v => setFilter('priceRange', v)}
                                         options={PRICE_RANGES.slice(1)}
                                         defaultLabel="Any Budget"
+                                        templateId={templateId}
                                     />
                                     {floors.length > 0 && (
                                         <FilterSelect
@@ -246,6 +290,7 @@ const ResidentialProperties = () => {
                                             onChange={v => setFilter('floor', v)}
                                             options={floors}
                                             defaultLabel="Any Floor"
+                                            templateId={templateId}
                                         />
                                     )}
                                     {tenantOptions.length > 0 && (
@@ -255,6 +300,7 @@ const ResidentialProperties = () => {
                                             onChange={v => setFilter('preferredTenant', v)}
                                             options={tenantOptions}
                                             defaultLabel="Any Tenant"
+                                            templateId={templateId}
                                         />
                                     )}
                                 </div>
