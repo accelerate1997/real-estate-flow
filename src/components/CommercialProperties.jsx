@@ -1,31 +1,63 @@
-import React, { useState, useEffect } from 'react';
-import { motion } from 'framer-motion';
-import { MapPin, Building2, Square, ArrowRight, Filter, Loader2, Home, Heart, Ruler, Search } from 'lucide-react';
+import React, { useState, useEffect, useMemo } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { MapPin, Building2, Square, ArrowRight, SlidersHorizontal, Loader2, Home, Heart, Search, X, ChevronDown, Tag } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import LeadModal from './LeadModal';
 import PropertyCard from './PropertyCard';
 import { pb } from '../services/pocketbase';
+
+const DEFAULT_FILTERS = {
+    transactionType: 'All',
+    propertyType: 'All',
+    washroomType: 'All',
+    city: 'All',
+    priceRange: 'All',
+    minArea: 'All',
+};
+
+const PRICE_RANGES = [
+    { label: 'All Budgets', value: 'All' },
+    { label: 'Under ₹50k/mo', value: '0-50000' },
+    { label: '₹50k – ₹2L/mo', value: '50000-200000' },
+    { label: '₹2L – ₹10L/mo', value: '200000-1000000' },
+    { label: 'Under ₹1 Cr', value: '0-10000000' },
+    { label: '₹1 Cr – ₹5 Cr', value: '10000000-50000000' },
+    { label: 'Above ₹5 Cr', value: '50000000-999999999' },
+];
+
+const FilterSelect = ({ label, value, onChange, options, defaultLabel }) => (
+    <div className="flex flex-col gap-1.5">
+        <label className="text-xs font-semibold text-gray-500 uppercase tracking-wider">{label}</label>
+        <select
+            value={value}
+            onChange={e => onChange(e.target.value)}
+            className="bg-white border border-gray-200 text-gray-800 text-sm py-2.5 px-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary cursor-pointer hover:border-gray-300 transition-colors w-full appearance-none"
+            style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%236b7280' stroke-width='2'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E")`, backgroundRepeat: 'no-repeat', backgroundPosition: 'right 10px center', paddingRight: '30px' }}
+        >
+            <option value="All">{defaultLabel || `All ${label}s`}</option>
+            {options.map(opt => (
+                <option key={opt.value ?? opt} value={opt.value ?? opt}>{opt.label ?? opt}</option>
+            ))}
+        </select>
+    </div>
+);
 
 const CommercialProperties = () => {
     const navigate = useNavigate();
     const [properties, setProperties] = useState([]);
     const [isLoading, setIsLoading] = useState(true);
     const [selectedProperty, setSelectedProperty] = useState(null);
-
-    // Filter states
-    const [typeFilter, setTypeFilter] = useState('Property Type');
-    const [areaFilter, setAreaFilter] = useState('Min Area (sqft)');
+    const [filters, setFilters] = useState(DEFAULT_FILTERS);
+    const [showFilters, setShowFilters] = useState(true);
 
     useEffect(() => {
         const fetchProperties = async () => {
             setIsLoading(true);
             try {
-                // Fetch only commercial properties
                 const records = await pb.collection('properties').getFullList({
                     filter: `propertyCategory = "Commercial"`,
                     sort: '-id'
                 });
-                console.log("CommercialProperties: Fetched records:", records.length, records);
                 setProperties(records);
             } catch (error) {
                 console.error("Error fetching commercial properties:", error);
@@ -33,54 +65,71 @@ const CommercialProperties = () => {
                 setIsLoading(false);
             }
         };
-
         fetchProperties();
     }, []);
 
-    // Helper Functions
-    const formatCurrency = (amount) => {
-        if (!amount) return 'Contact for Price';
-        return new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(amount);
-    };
-
-    const getImageUrl = (property) => {
-        const imageList = Array.isArray(property.images)
-            ? property.images
-            : (typeof property.images === 'string' && property.images.trim() !== '' ? [property.images] : []);
-
-        if (imageList.length > 0) {
-            const firstImg = imageList[0];
-            if (typeof firstImg === 'string' && firstImg.startsWith('http')) {
-                return firstImg;
+    // Derive unique cities
+    const cities = useMemo(() => {
+        const set = new Set();
+        properties.forEach(p => {
+            if (p.location) {
+                const city = p.location.split(', ').pop()?.trim();
+                if (city) set.add(city);
             }
-            return pb.files.getURL(property, firstImg);
-        }
-        return "https://images.unsplash.com/photo-1497366216548-37526070297c?q=80&w=2669&auto=format&fit=crop"; // Default fallback
-    };
+        });
+        return Array.from(set).sort();
+    }, [properties]);
+
+    // Derive unique property types (from bhkType or businessTypeSuitability)
+    const propertyTypes = useMemo(() => {
+        const set = new Set();
+        properties.forEach(p => {
+            if (p.bhkType) set.add(p.bhkType);
+        });
+        return Array.from(set).sort();
+    }, [properties]);
+
+    const setFilter = (key, value) => setFilters(prev => ({ ...prev, [key]: value }));
+    const resetFilters = () => setFilters(DEFAULT_FILTERS);
+
+    const activeFilterCount = Object.entries(filters).filter(([, v]) => v !== 'All').length;
 
     // Apply Filters
-    const filteredProperties = properties.filter(p => {
-        let matchesType = true;
-        let matchesArea = true;
-
-        if (typeFilter !== 'Property Type') {
-            // Rough match on business type suitability or tags since "Property Type" in the dropdown is generic (Office Space, Retail Shop, Warehouse)
-            const searchStr = `${p.businessTypeSuitability || ''} ${(p.tags || []).join(' ')}`.toLowerCase();
-            const filterStr = typeFilter.split(' ')[0].toLowerCase(); // e.g., "Office", "Retail", "Warehouse"
-            matchesType = searchStr.includes(filterStr);
-        }
-
-        if (areaFilter !== 'Min Area (sqft)') {
-            const minArea = parseInt(areaFilter.replace('+', ''), 10);
-            matchesArea = p.carpetArea >= minArea || p.builtUpArea >= minArea;
-        }
-
-        return matchesType && matchesArea;
-    });
-
-    const handlePropertyClick = (property) => {
-        setSelectedProperty(property);
-    };
+    const filteredProperties = useMemo(() => {
+        return properties.filter(p => {
+            // Transaction Type
+            if (filters.transactionType !== 'All') {
+                const tx = (p.transactionType || '').toLowerCase();
+                if (filters.transactionType.toLowerCase() !== tx) return false;
+            }
+            // Property Type
+            if (filters.propertyType !== 'All') {
+                if (p.bhkType !== filters.propertyType) return false;
+            }
+            // Washroom Type
+            if (filters.washroomType !== 'All') {
+                if (p.washroomType !== filters.washroomType) return false;
+            }
+            // City
+            if (filters.city !== 'All') {
+                const city = (p.location || '').split(', ').pop()?.trim();
+                if (city !== filters.city) return false;
+            }
+            // Price Range
+            if (filters.priceRange !== 'All') {
+                const [min, max] = filters.priceRange.split('-').map(Number);
+                const price = Number(p.price || 0);
+                if (price < min || price > max) return false;
+            }
+            // Min Area
+            if (filters.minArea !== 'All') {
+                const min = Number(filters.minArea);
+                const area = Number(p.carpetArea || p.builtUpArea || 0);
+                if (area < min) return false;
+            }
+            return true;
+        });
+    }, [properties, filters]);
 
     return (
         <div className="min-h-screen bg-gray-50 pt-32 pb-20">
@@ -93,35 +142,106 @@ const CommercialProperties = () => {
                 </nav>
 
                 {/* Header */}
-                <div className="flex flex-col md:flex-row justify-between items-end mb-10 border-b border-gray-200 pb-8">
+                <div className="flex flex-col md:flex-row justify-between items-start md:items-end mb-6 border-b border-gray-200 pb-6">
                     <div>
                         <h1 className="text-3xl md:text-4xl font-bold text-[#1A1A1A] mb-2">Premium Commercial Spaces & Offices</h1>
-                        <p className="text-gray-600">Strategic locations for your business growth.</p>
+                        <p className="text-gray-500">
+                            {isLoading ? 'Loading...' : `${filteredProperties.length} space${filteredProperties.length !== 1 ? 's' : ''} found`}
+                        </p>
                     </div>
-                    {/* Filters */}
-                    <div className="flex gap-4 mt-6 md:mt-0">
-                        <select
-                            value={typeFilter}
-                            onChange={(e) => setTypeFilter(e.target.value)}
-                            className="bg-white border border-gray-300 text-gray-700 py-2 px-4 rounded-none focus:outline-none focus:border-primary cursor-pointer hover:border-gray-400"
-                        >
-                            <option>Property Type</option>
-                            <option>Office Space</option>
-                            <option>Retail Shop</option>
-                            <option>Warehouse</option>
-                        </select>
-                        <select
-                            value={areaFilter}
-                            onChange={(e) => setAreaFilter(e.target.value)}
-                            className="bg-white border border-gray-300 text-gray-700 py-2 px-4 rounded-none focus:outline-none focus:border-primary cursor-pointer hover:border-gray-400"
-                        >
-                            <option>Min Area (sqft)</option>
-                            <option>1000+</option>
-                            <option>2500+</option>
-                            <option>5000+</option>
-                        </select>
-                    </div>
+
+                    {/* Filter toggle button */}
+                    <button
+                        onClick={() => setShowFilters(v => !v)}
+                        className="mt-4 md:mt-0 flex items-center gap-2 bg-white border border-gray-200 hover:border-primary text-gray-700 hover:text-primary px-4 py-2.5 rounded-lg text-sm font-semibold transition-all shadow-sm"
+                    >
+                        <SlidersHorizontal className="w-4 h-4" />
+                        Filters
+                        {activeFilterCount > 0 && (
+                            <span className="bg-primary text-white text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center">
+                                {activeFilterCount}
+                            </span>
+                        )}
+                        <ChevronDown className={`w-4 h-4 transition-transform ${showFilters ? 'rotate-180' : ''}`} />
+                    </button>
                 </div>
+
+                {/* Filter Panel */}
+                <AnimatePresence>
+                    {showFilters && (
+                        <motion.div
+                            initial={{ opacity: 0, height: 0 }}
+                            animate={{ opacity: 1, height: 'auto' }}
+                            exit={{ opacity: 0, height: 0 }}
+                            transition={{ duration: 0.2 }}
+                            className="overflow-hidden mb-8"
+                        >
+                            <div className="bg-white border border-gray-100 rounded-2xl shadow-sm p-6">
+                                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-4">
+                                    <FilterSelect
+                                        label="Type"
+                                        value={filters.transactionType}
+                                        onChange={v => setFilter('transactionType', v)}
+                                        options={[{ label: 'For Sell', value: 'Sell' }, { label: 'For Rent', value: 'Rent' }]}
+                                        defaultLabel="All Types"
+                                    />
+                                    <FilterSelect
+                                        label="Category"
+                                        value={filters.propertyType}
+                                        onChange={v => setFilter('propertyType', v)}
+                                        options={propertyTypes}
+                                        defaultLabel="All Categories"
+                                    />
+                                    <FilterSelect
+                                        label="Washroom"
+                                        value={filters.washroomType}
+                                        onChange={v => setFilter('washroomType', v)}
+                                        options={['Private', 'Shared', 'None']}
+                                        defaultLabel="Any Washroom"
+                                    />
+                                    <FilterSelect
+                                        label="City"
+                                        value={filters.city}
+                                        onChange={v => setFilter('city', v)}
+                                        options={cities}
+                                        defaultLabel="All Cities"
+                                    />
+                                    <FilterSelect
+                                        label="Budget"
+                                        value={filters.priceRange}
+                                        onChange={v => setFilter('priceRange', v)}
+                                        options={PRICE_RANGES.slice(1)}
+                                        defaultLabel="Any Budget"
+                                    />
+                                    <FilterSelect
+                                        label="Min Area"
+                                        value={filters.minArea}
+                                        onChange={v => setFilter('minArea', v)}
+                                        options={[
+                                            { label: '500+ sqft', value: '500' },
+                                            { label: '1,000+ sqft', value: '1000' },
+                                            { label: '2,500+ sqft', value: '2500' },
+                                            { label: '5,000+ sqft', value: '5000' },
+                                            { label: '10,000+ sqft', value: '10000' },
+                                        ]}
+                                        defaultLabel="Any Area"
+                                    />
+                                </div>
+
+                                {activeFilterCount > 0 && (
+                                    <div className="flex justify-end mt-4 border-t border-gray-550/10 pt-4">
+                                        <button
+                                            onClick={resetFilters}
+                                            className="flex items-center gap-1 text-xs font-bold text-primary hover:text-accent-red uppercase tracking-wider transition-colors"
+                                        >
+                                            <X className="w-3.5 h-3.5" /> Clear Filters
+                                        </button>
+                                    </div>
+                                )}
+                            </div>
+                        </motion.div>
+                    )}
+                </AnimatePresence>
 
                 {/* Grid */}
                 {isLoading ? (
@@ -129,20 +249,17 @@ const CommercialProperties = () => {
                         <Loader2 className="w-10 h-10 animate-spin text-primary" />
                     </div>
                 ) : filteredProperties.length === 0 ? (
-                    <div className="text-center py-20 bg-white border border-gray-200 p-8 shadow-sm">
+                    <div className="text-center py-20 bg-white rounded-2xl border border-gray-100 p-8 shadow-sm">
                         <Search className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-                        <h3 className="text-xl font-bold text-gray-900 mb-2">No Properties Found</h3>
-                        <p className="text-gray-500 max-w-md mx-auto">We couldn't find any commercial properties matching your criteria. Please adjust your filters.</p>
+                        <h3 className="text-xl font-bold text-gray-900 mb-2">No Spaces Found</h3>
+                        <p className="text-gray-500 max-w-md mx-auto">We couldn't find any commercial spaces matching your criteria. Try adjusting your filters.</p>
                     </div>
                 ) : (
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
                         {filteredProperties.map((property) => (
                             <PropertyCard 
                                 key={property.id} 
-                                property={{
-                                    ...property,
-                                    images: [getImageUrl(property)]
-                                }} 
+                                property={property} 
                                 onClick={() => navigate(`/property/${property.id}`)}
                             />
                         ))}

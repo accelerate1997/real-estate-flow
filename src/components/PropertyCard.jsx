@@ -139,7 +139,7 @@ const PropertyCard = ({ property, onClick }) => {
         }
 
         if (category === 'NewProjects') {
-            const isProjectComm = property.newProjectType === 'Commercial';
+            const isProjectComm = property.businessTypeSuitability === 'Commercial';
             return (
                 <div className="grid grid-cols-3 gap-4 py-4 border-y border-gray-50 mb-4">
                     <div className="flex flex-col gap-1 text-center">
@@ -148,7 +148,7 @@ const PropertyCard = ({ property, onClick }) => {
                             <span className="text-[10px] uppercase tracking-wider font-semibold">{isProjectComm ? 'Type' : 'Beds'}</span>
                         </div>
                         <span className="text-xs font-bold text-gray-900 truncate">
-                            {isProjectComm ? 'Commercial' : (property.bhkType || '—')}
+                            {isProjectComm ? (property.bhkType || 'Commercial') : (property.bhkType || '—')}
                         </span>
                     </div>
                     <div className="flex flex-col gap-1 text-center border-x border-gray-100 px-2">
@@ -156,7 +156,7 @@ const PropertyCard = ({ property, onClick }) => {
                             <Compass className="w-3.5 h-3.5 text-primary/70 shrink-0" />
                             <span className="text-[10px] uppercase tracking-wider font-semibold">Status</span>
                         </div>
-                        <span className="text-xs font-bold text-gray-900 truncate" title={property.constructionStatus || '—'}>
+                        <span className="text-[11px] font-bold text-gray-900 leading-tight" title={property.constructionStatus || '—'}>
                             {property.constructionStatus || '—'}
                         </span>
                     </div>
