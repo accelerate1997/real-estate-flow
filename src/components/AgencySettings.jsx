@@ -4,6 +4,7 @@ import {
     Check, Loader2, BrainCircuit, Key, Plus, Trash2, Clock, Edit2, Lock, Globe, Activity, Palette
 } from 'lucide-react';
 import { pb } from '../services/pocketbase';
+import TemplatePicker from './TemplatePicker';
 
 const AgencySettings = () => {
     const [activeSection, setActiveSection] = useState('profile');
@@ -507,120 +508,7 @@ const fetchSequences = async () => {
                                     />
                                     <p className="text-xs text-gray-500 mt-1">Points your custom domain to our system. Remember to add a CNAME record pointing to our main domain.</p>
                                 </div>
-                            </div>
-
-                            <div>
-                                <label className="dash-label block mb-3">Choose Portal Template</label>
-                                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                                    {[
-                                        {
-                                            id: 'classic',
-                                            name: 'Classic Elegance',
-                                            desc: 'A traditional and clean real estate template focusing on trust and grid layouts.',
-                                            renderPreview: () => (
-                                                <div className="w-full h-28 bg-white border border-gray-200 rounded-lg p-2.5 flex flex-col gap-1.5 overflow-hidden transition-all shadow-sm">
-                                                    {/* Mini header */}
-                                                    <div className="flex justify-between items-center border-b border-gray-150 pb-1">
-                                                        <div className="w-8 h-2 rounded-sm" style={{ backgroundColor: agencyData.primaryColor || '#DC2626' }} />
-                                                        <div className="flex gap-1.5">
-                                                            <div className="w-3 h-1 bg-gray-200 rounded-sm" />
-                                                            <div className="w-3 h-1 bg-gray-200 rounded-sm" />
-                                                        </div>
-                                                    </div>
-                                                    {/* Mini Hero */}
-                                                    <div className="h-10 rounded-sm flex items-center justify-center" style={{ backgroundColor: `${agencyData.primaryColor || '#DC2626'}12` }}>
-                                                        <div className="w-16 h-2 rounded-sm" style={{ backgroundColor: `${agencyData.primaryColor || '#DC2626'}35` }} />
-                                                    </div>
-                                                    {/* Mini Grid */}
-                                                    <div className="grid grid-cols-3 gap-1">
-                                                        <div className="h-6 bg-gray-50 border border-gray-150 rounded-sm" />
-                                                        <div className="h-6 bg-gray-50 border border-gray-150 rounded-sm" />
-                                                        <div className="h-6 bg-gray-50 border border-gray-150 rounded-sm" />
-                                                    </div>
-                                                </div>
-                                            )
-                                        },
-                                        {
-                                            id: 'modern',
-                                            name: 'Modern Vibrant',
-                                            desc: 'High-contrast colors, sharp buttons, bold borders, and sleek transitions.',
-                                            renderPreview: () => (
-                                                <div className="w-full h-28 bg-[#0C0B10] border border-gray-800 rounded-lg p-2.5 flex flex-col gap-1.5 overflow-hidden relative transition-all shadow-sm">
-                                                    {/* Mini blur blobs */}
-                                                    <div className="absolute top-1 left-1 w-10 h-10 rounded-full blur-sm opacity-20" style={{ backgroundColor: agencyData.primaryColor || '#DC2626' }} />
-                                                    <div className="absolute bottom-1 right-1 w-10 h-10 rounded-full blur-sm opacity-20" style={{ backgroundColor: agencyData.secondaryColor || '#1E293B' }} />
-                                                    {/* Mini glassy header */}
-                                                    <div className="flex justify-between items-center bg-white/5 backdrop-blur-md border border-white/10 rounded-md p-1.5 z-10">
-                                                        <div className="w-8 h-1.5 rounded-sm" style={{ backgroundColor: agencyData.secondaryColor || '#1E293B' }} />
-                                                        <div className="flex gap-1">
-                                                            <div className="w-2.5 h-1 bg-white/20 rounded-sm" />
-                                                            <div className="w-2.5 h-1 bg-white/20 rounded-sm" />
-                                                        </div>
-                                                    </div>
-                                                    {/* Mini Hero */}
-                                                    <div className="h-8 flex flex-col justify-center items-center gap-1 z-10">
-                                                        <div className="w-20 h-2 rounded-full bg-gradient-to-r" style={{ backgroundImage: `linear-gradient(to right, ${agencyData.primaryColor || '#DC2626'}, ${agencyData.secondaryColor || '#1E293B'})` }} />
-                                                        <div className="w-12 h-1 bg-white/20 rounded-full" />
-                                                    </div>
-                                                    {/* Mini Cards */}
-                                                    <div className="grid grid-cols-3 gap-1 z-10">
-                                                        <div className="h-6 bg-white/5 border border-white/10 rounded-md" />
-                                                        <div className="h-6 bg-white/5 border border-white/10 rounded-md" />
-                                                        <div className="h-6 bg-white/5 border border-white/10 rounded-md" />
-                                                    </div>
-                                                </div>
-                                            )
-                                        },
-                                        {
-                                            id: 'minimal',
-                                            name: 'Minimalist Clean',
-                                            desc: 'Spacious layouts, light gray dividers, and subtle outlines for premium properties.',
-                                            renderPreview: () => (
-                                                <div className="w-full h-28 bg-[#FAF9F6] border border-gray-250 rounded-lg p-2.5 flex flex-col gap-1.5 overflow-hidden transition-all shadow-sm">
-                                                    {/* Mini straight header */}
-                                                    <div className="flex justify-between items-center border-b border-gray-200 pb-1">
-                                                        <div className="w-10 h-1.5 bg-gray-900" />
-                                                        <div className="flex gap-1.5">
-                                                            <div className="w-2 h-0.5 bg-gray-400" />
-                                                            <div className="w-2 h-0.5 bg-gray-400" />
-                                                        </div>
-                                                    </div>
-                                                    {/* Mini Side-by-side Hero */}
-                                                    <div className="grid grid-cols-2 gap-2 py-0.5">
-                                                        <div className="flex flex-col gap-1.5 justify-center">
-                                                            <div className="w-14 h-1.5" style={{ backgroundColor: agencyData.primaryColor || '#DC2626' }} />
-                                                            <div className="w-8 h-0.5 bg-gray-400" />
-                                                        </div>
-                                                        <div className="h-8 bg-gray-200 border border-gray-300" />
-                                                    </div>
-                                                    {/* Mini Outline Cards */}
-                                                    <div className="grid grid-cols-3 gap-1">
-                                                        <div className="h-5 border border-gray-250 bg-white" />
-                                                        <div className="h-5 border border-gray-250 bg-white" />
-                                                        <div className="h-5 border border-gray-250 bg-white" />
-                                                    </div>
-                                                </div>
-                                            )
-                                        }
-                                    ].map((tpl) => (
-                                        <div
-                                            key={tpl.id}
-                                            onClick={() => setAgencyData({ ...agencyData, templateId: tpl.id })}
-                                            className={`cursor-pointer border-2 rounded-2xl p-4 transition-all flex flex-col gap-4 bg-white ${agencyData.templateId === tpl.id ? 'border-primary bg-primary/5 shadow-premium' : 'border-gray-150 hover:border-gray-200 shadow-sm'}`}
-                                        >
-                                            {tpl.renderPreview()}
-                                            <div className="space-y-1">
-                                                <div className="flex items-center justify-between">
-                                                    <span className="font-bold text-sm text-gray-900">{tpl.name}</span>
-                                                    {agencyData.templateId === tpl.id && (
-                                                        <span className="text-[9px] uppercase font-extrabold text-primary bg-primary/10 px-2 py-0.5 rounded-full">Active</span>
-                                                    )}
-                                                </div>
-                                                <p className="text-xs text-gray-500 leading-relaxed">{tpl.desc}</p>
-                                            </div>
-                                        </div>
-                                    ))}
-                                </div>
+                                <TemplatePicker agencyData={agencyData} setAgencyData={setAgencyData} />
                             </div>
 
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
