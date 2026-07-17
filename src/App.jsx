@@ -13,6 +13,7 @@ import AgentInviteRegister from './components/AgentInviteRegister';
 import PropertyDetails from './components/PropertyDetails';
 import PrivacyPolicy from './components/PrivacyPolicy';
 import PlotsLandProperties from './components/PlotsLandProperties';
+import MortgageCalculator from './components/MortgageCalculator';
 
 // New Redesign Components
 import Partners from './components/Partners';
@@ -204,6 +205,8 @@ function App() {
             <Route path="/agency-dashboard" element={<AgencyDashboard />} />
             <Route path="/privacy" element={<PrivacyPolicy />} />
             <Route path="/privacy-policy" element={<PrivacyPolicy />} />
+            <Route path="/calculator" element={<MortgageCalculator />} />
+            <Route path="/mortgage-calculator" element={<MortgageCalculator />} />
           </Routes>
         </Layout>
       </div>

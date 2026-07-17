@@ -180,7 +180,9 @@ const Header = () => {
                             {link.submenu ? (
                                 <button className={clsx(
                                     "flex items-center gap-1 font-bold text-sm tracking-wide transition-all py-2 focus:outline-none",
-                                    forceGlassy ? "text-text hover:text-primary" : "text-white hover:text-primary-light"
+                                    forceGlassy 
+                                        ? (isModern ? "text-white hover:text-primary" : "text-text hover:text-primary") 
+                                        : "text-white hover:text-primary-light"
                                 )}>
                                     {link.name}
                                     <ChevronDown className={clsx(
@@ -193,7 +195,9 @@ const Header = () => {
                                     to={link.href}
                                     className={clsx(
                                         "font-bold text-sm tracking-wide transition-all py-2",
-                                        forceGlassy ? "text-text hover:text-primary" : "text-white hover:text-primary-light"
+                                        forceGlassy 
+                                            ? (isModern ? "text-white hover:text-primary" : "text-text hover:text-primary") 
+                                            : "text-white hover:text-primary-light"
                                     )}
                                 >
                                     {link.name}

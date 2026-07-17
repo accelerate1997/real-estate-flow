@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence, useScroll, useTransform } from 'framer-motion';
 import {
     Sparkles, ArrowRight, MapPin, BedDouble, Bath, Square,
-    Heart, Mic, ShieldCheck, Building2, Star, Quote, Loader2,
+    Heart, Calculator, ShieldCheck, Building2, Star, Quote, Loader2,
     ChevronDown, Search, Zap, Globe, Phone
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
@@ -213,7 +213,7 @@ const ModernPropertySection = () => {
 
 const features = [
     { icon: ShieldCheck, title: 'Verified Premium',   desc: 'Every listing is physically verified, RERA registered, and legally cleared by our expert team.', accent: 'text-emerald-400 bg-emerald-400/10 border-emerald-400/20' },
-    { icon: Mic,         title: 'AI-Powered Search',  desc: 'Saathi, our 24/7 voice AI, understands your needs and matches you with the perfect property instantly.', accent: 'text-primary bg-primary/10 border-primary/20' },
+    { icon: Calculator,  title: 'Mortgage Calculator', desc: 'Estimate home loan monthly installments and interest payouts instantly with our smart calculator.', accent: 'text-primary bg-primary/10 border-primary/20' },
     { icon: Zap,         title: 'Instant Connect',    desc: 'WhatsApp-first approach: your lead reaches the right agent in under 10 seconds, any time of day.', accent: 'text-amber-400 bg-amber-400/10 border-amber-400/20' },
 ];
 
@@ -226,7 +226,7 @@ const FeaturesSection = () => (
                     Built for the Future
                 </h2>
                 <p className="text-white/40 mt-4 max-w-xl mx-auto text-sm">
-                    Combining AI, instant communication, and verified listings for the most reliable real estate platform in India.
+                    Combining instant communication, verified listings, and premium calculators for the most reliable real estate platform in India.
                 </p>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -307,42 +307,45 @@ const ModernTestimonials = () => (
 
 // ─── CTA ─────────────────────────────────────────────────────────────────────
 
-const ModernCTA = () => (
-    <section className="py-24 relative z-10">
-        <div className="max-w-5xl mx-auto px-6 text-center">
-            <div className="relative rounded-3xl p-12 md:p-20 border border-white/8 overflow-hidden"
-                style={{ background: 'rgba(255,255,255,0.04)' }}>
-                <div className="absolute -top-40 -right-40 w-96 h-96 rounded-full bg-primary/20 blur-[120px]" />
-                <div className="absolute -bottom-40 -left-40 w-96 h-96 rounded-full bg-accent-teal/15 blur-[120px]" />
-                <div className="relative z-10">
-                    <Sparkles className="w-10 h-10 text-primary mx-auto mb-6 animate-pulse" />
-                    <h2 className="text-4xl md:text-5xl font-black text-white mb-5 leading-tight">
-                        Ready to Find Your <br />
-                        <span className="text-transparent bg-clip-text bg-gradient-to-r from-primary via-rose-300 to-orange-300">Perfect Space?</span>
-                    </h2>
-                    <p className="text-white/50 mb-10 text-base max-w-lg mx-auto">
-                        Let Saathi AI guide you or explore our verified collection of ultra-premium properties.
-                    </p>
-                    <div className="flex flex-col sm:flex-row gap-4 justify-center">
-                        <button
-                            onClick={() => document.getElementById('modern-properties')?.scrollIntoView({ behavior: 'smooth' })}
-                            className="bg-primary hover:bg-primary-dark text-white font-bold px-10 py-4 rounded-xl transition-all duration-300 shadow-lg shadow-primary/30 hover:-translate-y-0.5"
-                        >
-                            Explore Properties
-                        </button>
-                        <button
-                            onClick={() => window.dispatchEvent(new CustomEvent('openVoiceAgent'))}
-                            className="flex items-center justify-center gap-2 bg-white/5 border border-white/10 hover:bg-white/10 hover:border-white/20 text-white font-bold px-10 py-4 rounded-xl transition-all duration-300"
-                        >
-                            <Mic className="w-5 h-5 text-accent-teal" />
-                            Talk to Saathi AI
-                        </button>
+const ModernCTA = () => {
+    const navigate = useNavigate();
+    return (
+        <section className="py-24 relative z-10">
+            <div className="max-w-5xl mx-auto px-6 text-center">
+                <div className="relative rounded-3xl p-12 md:p-20 border border-white/8 overflow-hidden"
+                    style={{ background: 'rgba(255,255,255,0.04)' }}>
+                    <div className="absolute -top-40 -right-40 w-96 h-96 rounded-full bg-primary/20 blur-[120px]" />
+                    <div className="absolute -bottom-40 -left-40 w-96 h-96 rounded-full bg-accent-teal/15 blur-[120px]" />
+                    <div className="relative z-10">
+                        <Sparkles className="w-10 h-10 text-primary mx-auto mb-6 animate-pulse" />
+                        <h2 className="text-4xl md:text-5xl font-black text-white mb-5 leading-tight">
+                            Ready to Find Your <br />
+                            <span className="text-transparent bg-clip-text bg-gradient-to-r from-primary via-rose-300 to-orange-300">Perfect Space?</span>
+                        </h2>
+                        <p className="text-white/50 mb-10 text-base max-w-lg mx-auto">
+                            Estimate your loan installments or explore our verified collection of ultra-premium properties.
+                        </p>
+                        <div className="flex flex-col sm:flex-row gap-4 justify-center">
+                            <button
+                                onClick={() => document.getElementById('modern-properties')?.scrollIntoView({ behavior: 'smooth' })}
+                                className="bg-primary hover:bg-primary-dark text-white font-bold px-10 py-4 rounded-xl transition-all duration-300 shadow-lg shadow-primary/30 hover:-translate-y-0.5"
+                            >
+                                Explore Properties
+                            </button>
+                            <button
+                                onClick={() => navigate('/calculator')}
+                                className="flex items-center justify-center gap-2 bg-white/5 border border-white/10 hover:bg-white/10 hover:border-white/20 text-white font-bold px-10 py-4 rounded-xl transition-all duration-300"
+                            >
+                                <Calculator className="w-5 h-5 text-accent-teal" />
+                                Mortgage Calculator
+                            </button>
+                        </div>
                     </div>
                 </div>
             </div>
-        </div>
-    </section>
-);
+        </section>
+    );
+};
 
 // ─── Main Export ─────────────────────────────────────────────────────────────
 
@@ -392,7 +395,7 @@ const ThemeModern = () => {
                                 transition={{ duration: 0.8, delay: 0.2 }}
                                 className="text-white/50 text-lg leading-relaxed max-w-md"
                             >
-                                Ultra-premium properties matched to you by AI. Verified listings, instant connect, zero compromise.
+                                Ultra-premium properties verified physically, instant connect, and zero compromise.
                             </motion.p>
 
                             {/* Stats Row */}
@@ -424,11 +427,11 @@ const ThemeModern = () => {
                                     <ArrowRight className="w-5 h-5" />
                                 </button>
                                 <button
-                                    onClick={() => window.dispatchEvent(new CustomEvent('openVoiceAgent'))}
+                                    onClick={() => navigate('/calculator')}
                                     className="flex items-center justify-center gap-2 bg-white/5 border border-white/10 hover:bg-white/10 text-white font-bold px-9 py-4 rounded-xl transition-all duration-300"
                                 >
-                                    <Mic className="w-5 h-5 text-accent-teal" />
-                                    Talk to Saathi AI
+                                    <Calculator className="w-5 h-5 text-accent-teal" />
+                                    Mortgage Calculator
                                 </button>
                             </motion.div>
                         </div>

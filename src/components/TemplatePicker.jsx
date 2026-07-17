@@ -26,7 +26,7 @@ const ClassicPreview = ({ primary, agencyName }) => (
                 <div style={{ color: 'rgba(255,255,255,0.75)', fontSize: 15 }}>Exclusive properties in prime locations.</div>
                 <div style={{ display: 'flex', gap: 12, marginTop: 6 }}>
                     <div style={{ background: '#fff', color: '#111', padding: '11px 24px', borderRadius: 50, fontWeight: 700, fontSize: 13 }}>Browse Properties</div>
-                    <div style={{ border: '2px solid rgba(255,255,255,0.55)', color: '#fff', padding: '11px 24px', borderRadius: 50, fontWeight: 700, fontSize: 13 }}>Talk to Saathi AI</div>
+                    <div style={{ border: '2px solid rgba(255,255,255,0.55)', color: '#fff', padding: '11px 24px', borderRadius: 50, fontWeight: 700, fontSize: 13 }}>Mortgage Calculator</div>
                 </div>
             </div>
         </div>
@@ -67,10 +67,10 @@ const ModernPreview = ({ primary, secondary, agencyName }) => (
                 The Future of<br />
                 <span style={{ background: `linear-gradient(to right, ${primary}, ${secondary})`, WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text' }}>Living is Here.</span>
             </div>
-            <div style={{ fontSize: 14, color: 'rgba(255,255,255,0.4)', textAlign: 'center', maxWidth: 420, marginBottom: 26 }}>Find ultra-luxury properties with AI-powered guidance from Saathi.</div>
+            <div style={{ fontSize: 14, color: 'rgba(255,255,255,0.4)', textAlign: 'center', maxWidth: 420, marginBottom: 26 }}>Find ultra-luxury properties with premium mortgage estimators.</div>
             <div style={{ display: 'flex', gap: 14 }}>
                 <div style={{ background: primary, color: '#fff', padding: '12px 28px', borderRadius: 10, fontWeight: 700, fontSize: 14 }}>Explore Spaces</div>
-                <div style={{ border: '1px solid rgba(255,255,255,0.12)', color: 'rgba(255,255,255,0.75)', padding: '12px 28px', borderRadius: 10, fontWeight: 700, fontSize: 14 }}>Talk to AI</div>
+                <div style={{ border: '1px solid rgba(255,255,255,0.12)', color: 'rgba(255,255,255,0.75)', padding: '12px 28px', borderRadius: 10, fontWeight: 700, fontSize: 14 }}>Calculator</div>
             </div>
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 14, padding: '0 40px 28px', position: 'relative', zIndex: 10 }}>

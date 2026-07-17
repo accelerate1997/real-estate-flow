@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { MapPin, Building2, Square, ArrowRight, SlidersHorizontal, Loader2, Home, Heart, Search, X, ChevronDown, Tag } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import LeadModal from './LeadModal';
 import PropertyCard from './PropertyCard';
 import { pb } from '../services/pocketbase';
@@ -67,6 +67,32 @@ const CommercialProperties = () => {
     const [filters, setFilters] = useState(DEFAULT_FILTERS);
     const [showFilters, setShowFilters] = useState(true);
 
+    const locationState = useLocation();
+    const [searchQuery, setSearchQuery] = useState('');
+
+    useEffect(() => {
+        const queryParams = new URLSearchParams(locationState.search);
+        const loc = queryParams.get('location') || '';
+        const bud = queryParams.get('budget') || '';
+        
+        if (loc) {
+            setSearchQuery(loc);
+        }
+        
+        if (bud) {
+            let priceRangeValue = 'All';
+            if (bud.includes('Under ₹30L')) priceRangeValue = '0-2500000';
+            else if (bud.includes('₹30L')) priceRangeValue = '2500000-5000000';
+            else if (bud.includes('₹80L')) priceRangeValue = '5000000-10000000';
+            else if (bud.includes('₹2Cr')) priceRangeValue = '20000000-999999999';
+            
+            setFilters(prev => ({
+                ...prev,
+                priceRange: priceRangeValue
+            }));
+        }
+    }, [locationState.search]);
+
     useEffect(() => {
         const fetchProperties = async () => {
             setIsLoading(true);
@@ -114,6 +140,13 @@ const CommercialProperties = () => {
     // Apply Filters
     const filteredProperties = useMemo(() => {
         return properties.filter(p => {
+            // Search Query keyword matching
+            if (searchQuery) {
+                const query = searchQuery.toLowerCase();
+                const titleMatch = (p.title || '').toLowerCase().includes(query);
+                const locMatch = (p.location || '').toLowerCase().includes(query);
+                if (!titleMatch && !locMatch) return false;
+            }
             // Transaction Type
             if (filters.transactionType !== 'All') {
                 const tx = (p.transactionType || '').toLowerCase();
@@ -163,6 +196,23 @@ const CommercialProperties = () => {
                     <span className="mx-2">/</span>
                     <span className={isModern ? 'text-white font-medium' : 'text-gray-900 font-medium'}>Commercial Properties</span>
                 </nav>
+
+                {/* Search query banner */}
+                {searchQuery && (
+                    <div className={`mb-6 p-4 rounded-xl flex items-center justify-between border ${
+                        isModern ? 'bg-white/5 border-white/10 text-white' : 'bg-gray-100 border-gray-250 text-gray-800'
+                    }`}>
+                        <span className="text-sm font-semibold">
+                            Showing properties matching "<span className="text-primary font-black">{searchQuery}</span>"
+                        </span>
+                        <button 
+                            onClick={() => setSearchQuery('')}
+                            className="text-xs text-red-500 font-bold uppercase tracking-wider hover:underline"
+                        >
+                            Clear Search
+                        </button>
+                    </div>
+                )}
 
                 {/* Header */}
                 <div className={`flex flex-col md:flex-row justify-between items-start md:items-end mb-6 border-b pb-6 ${

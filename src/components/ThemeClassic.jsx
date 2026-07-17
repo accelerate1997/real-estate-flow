@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
     Search, MapPin, Home, Building2, Layers, ChevronDown, ArrowRight,
-    BedDouble, Bath, Square, Heart, Phone, Mic, ShieldCheck,
+    BedDouble, Bath, Square, Heart, Phone, Calculator, ShieldCheck,
     Star, Quote, Loader2, Compass, Zap, Droplets, Tag
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
@@ -77,23 +77,23 @@ const SearchBar = ({ onSearch }) => {
             initial={{ opacity: 0, y: 30 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.7, delay: 0.5 }}
-            className="bg-white rounded-2xl shadow-2xl shadow-black/20 flex flex-col md:flex-row items-stretch md:items-center overflow-visible"
+            className="bg-white rounded-2xl md:rounded-full shadow-2xl shadow-black/20 flex flex-col md:flex-row items-stretch md:items-center overflow-visible p-2 gap-2 border border-gray-150"
             onClick={() => { setTypeOpen(false); setBudgetOpen(false); }}
         >
             {/* Location Input */}
-            <div className="flex items-center gap-3 px-5 py-3.5 flex-1 border-b md:border-b-0 md:border-r border-gray-100">
+            <div className="flex items-center gap-3 px-4 py-2 flex-1 md:border-r border-gray-100">
                 <MapPin className="w-5 h-5 text-primary shrink-0" />
                 <input
                     value={location}
                     onChange={e => setLocation(e.target.value)}
                     placeholder="City, locality, or project name..."
-                    className="flex-1 text-sm font-medium text-gray-700 placeholder-gray-400 outline-none bg-transparent"
+                    className="flex-1 text-sm font-semibold text-gray-700 placeholder-gray-400 outline-none bg-transparent"
                 />
             </div>
 
             {/* Type Dropdown */}
             <div
-                className="border-b md:border-b-0 md:border-r border-gray-100"
+                className="md:border-r border-gray-100 flex items-center"
                 onClick={e => e.stopPropagation()}
             >
                 <Dropdown
@@ -107,7 +107,7 @@ const SearchBar = ({ onSearch }) => {
             </div>
 
             {/* Budget Dropdown */}
-            <div onClick={e => e.stopPropagation()}>
+            <div className="flex items-center" onClick={e => e.stopPropagation()}>
                 <Dropdown
                     label="Budget"
                     value={budget}
@@ -119,10 +119,10 @@ const SearchBar = ({ onSearch }) => {
             </div>
 
             {/* Search Button */}
-            <div className="p-2">
+            <div className="shrink-0">
                 <button
                     onClick={() => onSearch && onSearch({ location, type, budget })}
-                    className="flex items-center gap-2 bg-primary hover:bg-primary-dark text-white font-bold px-7 py-3.5 rounded-xl transition-all duration-300 hover:-translate-y-0.5 shadow-lg shadow-primary/30 w-full md:w-auto justify-center"
+                    className="flex items-center gap-2 bg-primary hover:bg-primary-dark text-white font-bold px-8 py-3.5 rounded-xl md:rounded-full transition-all duration-300 hover:-translate-y-0.5 shadow-lg shadow-primary/30 w-full md:w-auto justify-center"
                 >
                     <Search className="w-4 h-4" />
                     Search
@@ -362,10 +362,11 @@ const whyUs = [
         color: 'from-emerald-500 to-teal-500',
     },
     {
-        icon: Mic,
-        title: 'Saathi AI Assistant',
-        desc: 'Talk to Saathi — our 24/7 voice AI — and get instant property recommendations in Hindi or English.',
+        icon: Calculator,
+        title: 'Mortgage Calculator',
+        desc: 'Estimate your monthly home loan installments and interest payouts instantly with our smart tool.',
         color: 'from-primary to-rose-400',
+        onClickRoute: '/calculator',
     },
     {
         icon: Phone,
@@ -375,42 +376,48 @@ const whyUs = [
     },
 ];
 
-const WhySection = () => (
-    <section className="py-24 bg-white">
-        <div className="max-w-6xl mx-auto px-6 lg:px-8">
-            <div className="text-center mb-16">
-                <span className="text-primary font-bold text-xs uppercase tracking-widest">Why Us</span>
-                <h2 className="text-4xl md:text-5xl font-display font-black text-gray-900 mt-2">
-                    The Smart Way to Buy Property
-                </h2>
-                <p className="text-gray-500 mt-4 max-w-xl mx-auto">
-                    We combine technology with local expertise to deliver the best real estate experience in India.
-                </p>
+const WhySection = () => {
+    const navigate = useNavigate();
+    return (
+        <section className="py-24 bg-white">
+            <div className="max-w-6xl mx-auto px-6 lg:px-8">
+                <div className="text-center mb-16">
+                    <span className="text-primary font-bold text-xs uppercase tracking-widest">Why Us</span>
+                    <h2 className="text-4xl md:text-5xl font-display font-black text-gray-900 mt-2">
+                        The Smart Way to Buy Property
+                    </h2>
+                    <p className="text-gray-500 mt-4 max-w-xl mx-auto">
+                        We combine technology with local expertise to deliver the best real estate experience in India.
+                    </p>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+                    {whyUs.map((item, i) => (
+                        <motion.div
+                            key={i}
+                            initial={{ opacity: 0, y: 30 }}
+                            whileInView={{ opacity: 1, y: 0 }}
+                            viewport={{ once: true }}
+                            transition={{ delay: i * 0.15 }}
+                            onClick={() => item.onClickRoute && navigate(item.onClickRoute)}
+                            className={`group relative bg-gray-50 hover:bg-white rounded-3xl p-8 border border-gray-100 hover:border-primary/20 hover:shadow-xl hover:shadow-primary/5 transition-all duration-400 ${
+                                item.onClickRoute ? 'cursor-pointer' : ''
+                            }`}
+                        >
+                            <div className={`w-14 h-14 rounded-2xl bg-gradient-to-br ${item.color} flex items-center justify-center mb-6 shadow-lg`}>
+                                <item.icon className="w-7 h-7 text-white" />
+                            </div>
+                            <h3 className="text-xl font-bold text-gray-900 mb-3">{item.title}</h3>
+                            <p className="text-gray-500 text-sm leading-relaxed">{item.desc}</p>
+                            <div className="absolute bottom-8 right-8 w-9 h-9 rounded-full border border-gray-200 flex items-center justify-center group-hover:bg-primary group-hover:border-primary transition-all duration-300">
+                                <ArrowRight className="w-4 h-4 text-gray-400 group-hover:text-white transition-colors" />
+                            </div>
+                        </motion.div>
+                    ))}
+                </div>
             </div>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-                {whyUs.map((item, i) => (
-                    <motion.div
-                        key={i}
-                        initial={{ opacity: 0, y: 30 }}
-                        whileInView={{ opacity: 1, y: 0 }}
-                        viewport={{ once: true }}
-                        transition={{ delay: i * 0.15 }}
-                        className="group relative bg-gray-50 hover:bg-white rounded-3xl p-8 border border-gray-100 hover:border-primary/20 hover:shadow-xl hover:shadow-primary/5 transition-all duration-400"
-                    >
-                        <div className={`w-14 h-14 rounded-2xl bg-gradient-to-br ${item.color} flex items-center justify-center mb-6 shadow-lg`}>
-                            <item.icon className="w-7 h-7 text-white" />
-                        </div>
-                        <h3 className="text-xl font-bold text-gray-900 mb-3">{item.title}</h3>
-                        <p className="text-gray-500 text-sm leading-relaxed">{item.desc}</p>
-                        <div className="absolute bottom-8 right-8 w-9 h-9 rounded-full border border-gray-200 flex items-center justify-center group-hover:bg-primary group-hover:border-primary transition-all duration-300">
-                            <ArrowRight className="w-4 h-4 text-gray-400 group-hover:text-white transition-colors" />
-                        </div>
-                    </motion.div>
-                ))}
-            </div>
-        </div>
-    </section>
-);
+        </section>
+    );
+};
 
 // ─── Testimonials ────────────────────────────────────────────────────────────
 
@@ -418,7 +425,7 @@ const testimonials = [
     {
         name: 'Priya Sharma',
         role: 'Homeowner',
-        content: 'RR Estate made buying our first home a completely stress-free experience. The Saathi AI was incredibly helpful at 2 AM when we had questions!',
+        content: 'RR Estate made buying our first home a completely stress-free experience. The mortgage calculator was incredibly helpful to estimate budgets!',
         rating: 5,
         property: 'Residential Villa, Baner Pune'
     },
@@ -483,44 +490,47 @@ const TestimonialsSection = () => (
 
 // ─── CTA Banner ──────────────────────────────────────────────────────────────
 
-const CTABanner = () => (
-    <section
-        className="relative py-24 overflow-hidden"
-        style={{ backgroundImage: "url('https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?auto=format&fit=crop&q=80&w=2000')", backgroundSize: 'cover', backgroundPosition: 'center' }}
-    >
-        <div className="absolute inset-0 bg-gradient-to-r from-gray-900/90 via-gray-900/70 to-gray-900/50" />
-        <div className="relative z-10 max-w-3xl mx-auto px-6 text-center">
-            <motion.div
-                initial={{ opacity: 0, y: 30 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true }}
-            >
-                <span className="text-primary font-bold text-xs uppercase tracking-widest">Ready to Begin?</span>
-                <h2 className="text-4xl md:text-5xl font-display font-black text-white mt-3 mb-5 leading-tight">
-                    Find Your Dream Property Today
-                </h2>
-                <p className="text-white/70 mb-10 text-lg">
-                    Talk to our AI assistant Saathi or browse 500+ verified listings.
-                </p>
-                <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
-                    <button
-                        onClick={() => { const el = document.getElementById('classic-properties'); el?.scrollIntoView({ behavior: 'smooth' }); }}
-                        className="bg-white text-gray-900 font-bold px-9 py-4 rounded-full hover:bg-primary hover:text-white transition-all duration-300 shadow-2xl"
-                    >
-                        Browse Properties
-                    </button>
-                    <button
-                        onClick={() => window.dispatchEvent(new CustomEvent('openVoiceAgent'))}
-                        className="flex items-center gap-2 bg-white/10 backdrop-blur-md border border-white/30 text-white font-bold px-9 py-4 rounded-full hover:bg-white/20 transition-all duration-300"
-                    >
-                        <Mic className="w-5 h-5" />
-                        Talk to Saathi AI
-                    </button>
-                </div>
-            </motion.div>
-        </div>
-    </section>
-);
+const CTABanner = () => {
+    const navigate = useNavigate();
+    return (
+        <section
+            className="relative py-24 overflow-hidden"
+            style={{ backgroundImage: "url('https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?auto=format&fit=crop&q=80&w=2000')", backgroundSize: 'cover', backgroundPosition: 'center' }}
+        >
+            <div className="absolute inset-0 bg-gradient-to-r from-gray-900/90 via-gray-900/70 to-gray-900/50" />
+            <div className="relative z-10 max-w-3xl mx-auto px-6 text-center">
+                <motion.div
+                    initial={{ opacity: 0, y: 30 }}
+                    whileInView={{ opacity: 1, y: 0 }}
+                    viewport={{ once: true }}
+                >
+                    <span className="text-primary font-bold text-xs uppercase tracking-widest">Ready to Begin?</span>
+                    <h2 className="text-4xl md:text-5xl font-display font-black text-white mt-3 mb-5 leading-tight">
+                        Find Your Dream Property Today
+                    </h2>
+                    <p className="text-white/70 mb-10 text-lg">
+                        Browse 500+ verified listings or estimate your payments with our smart calculator.
+                    </p>
+                    <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
+                        <button
+                            onClick={() => { const el = document.getElementById('classic-properties'); el?.scrollIntoView({ behavior: 'smooth' }); }}
+                            className="bg-white text-gray-900 font-bold px-9 py-4 rounded-full hover:bg-primary hover:text-white transition-all duration-300 shadow-2xl"
+                        >
+                            Browse Properties
+                        </button>
+                        <button
+                            onClick={() => navigate('/calculator')}
+                            className="flex items-center gap-2 bg-white/10 backdrop-blur-md border border-white/30 text-white font-bold px-9 py-4 rounded-full hover:bg-white/20 transition-all duration-300"
+                        >
+                            <Calculator className="w-5 h-5" />
+                            Mortgage Calculator
+                        </button>
+                    </div>
+                </motion.div>
+            </div>
+        </section>
+    );
+};
 
 // ─── Main Export ─────────────────────────────────────────────────────────────
 
@@ -534,14 +544,14 @@ const ThemeClassic = () => {
             <section
                 className="relative min-h-[92vh] flex items-center overflow-hidden"
                 style={{
-                    backgroundImage: "url('https://images.unsplash.com/photo-1600585154526-990dced4de0d?auto=format&fit=crop&q=80&w=2000')",
+                    backgroundImage: "url('https://images.unsplash.com/photo-1600585154340-be6191dae10c?auto=format&fit=crop&w=1920&q=80')",
                     backgroundSize: 'cover',
                     backgroundPosition: 'center 30%',
                 }}
             >
                 {/* Gradient overlays */}
-                <div className="absolute inset-0 bg-gradient-to-r from-gray-950/85 via-gray-900/60 to-gray-900/30" />
-                <div className="absolute inset-0 bg-gradient-to-t from-gray-950/60 via-transparent to-transparent" />
+                <div className="absolute inset-0 bg-gradient-to-r from-gray-950/70 via-gray-900/40 to-gray-900/10" />
+                <div className="absolute inset-0 bg-gradient-to-t from-gray-950/40 via-transparent to-transparent" />
 
                 {/* Ticker at bottom */}
                 <div className="absolute bottom-0 left-0 right-0 bg-primary/90 backdrop-blur-sm py-3 overflow-hidden z-10">
@@ -599,8 +609,16 @@ const ThemeClassic = () => {
 
                         {/* Search Bar */}
                         <div className="max-w-2xl">
-                            <SearchBar onSearch={({ location, type }) => {
-                                navigate('/properties/residential');
+                            <SearchBar onSearch={({ location, type, budget }) => {
+                                let targetRoute = '/properties/residential';
+                                if (type === 'Commercial') targetRoute = '/properties/commercial';
+                                else if (type === 'Plots & Land') targetRoute = '/properties/plots-land';
+                                else if (type === 'New Projects') targetRoute = '/properties/under-development';
+                                
+                                const params = new URLSearchParams();
+                                if (location) params.append('location', location);
+                                if (budget && budget !== 'Any Budget') params.append('budget', budget);
+                                navigate(`${targetRoute}?${params.toString()}`);
                             }} />
                         </div>
 

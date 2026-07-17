@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import {
     ArrowRight, MapPin, BedDouble, Bath, Square, Heart,
-    Mic, ShieldCheck, Star, ArrowUpRight, Search, ChevronRight
+    Calculator, ShieldCheck, Star, ArrowUpRight, Search, ChevronRight
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { pb } from '../services/pocketbase';
@@ -331,44 +331,47 @@ const MinimalTestimonials = () => (
 
 // ─── CTA ─────────────────────────────────────────────────────────────────────
 
-const MinimalCTA = () => (
-    <section
-        className="relative py-24 overflow-hidden"
-        style={{ backgroundImage: "url('https://images.unsplash.com/photo-1600047509807-ba8f99d2cdde?auto=format&fit=crop&q=80&w=2000')", backgroundSize: 'cover', backgroundPosition: 'center' }}
-    >
-        <div className="absolute inset-0 bg-gray-900/85" />
-        <div className="relative z-10 max-w-3xl mx-auto px-6 text-center font-sans">
-            <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true }}
-            >
-                <span className="text-xs uppercase tracking-widest text-primary font-bold">Begin Your Search</span>
-                <h2 className="text-4xl md:text-5xl font-serif font-normal text-white mt-4 mb-5 leading-tight">
-                    Are You Looking to<br />Buy a Property?
-                </h2>
-                <p className="text-white/60 mb-10 text-sm font-sans">
-                    Browse our curated catalogue or speak with Saathi AI to find exactly what you're looking for.
-                </p>
-                <div className="flex flex-col sm:flex-row gap-4 justify-center">
-                    <button
-                        onClick={() => document.getElementById('minimal-properties')?.scrollIntoView({ behavior: 'smooth' })}
-                        className="bg-white text-gray-900 font-semibold px-10 py-4 hover:bg-gray-100 transition-colors text-sm tracking-wide uppercase"
-                    >
-                        Browse Catalogue
-                    </button>
-                    <button
-                        onClick={() => window.dispatchEvent(new CustomEvent('openVoiceAgent'))}
-                        className="flex items-center justify-center gap-2 border border-white/30 text-white font-semibold px-10 py-4 hover:bg-white/10 transition-colors text-sm tracking-wide uppercase"
-                    >
-                        <Mic className="w-4 h-4" />
-                        Inquire with Saathi
-                    </button>
-                </div>
-            </motion.div>
-        </div>
-    </section>
-);
+const MinimalCTA = () => {
+    const navigate = useNavigate();
+    return (
+        <section
+            className="relative py-24 overflow-hidden"
+            style={{ backgroundImage: "url('https://images.unsplash.com/photo-1600047509807-ba8f99d2cdde?auto=format&fit=crop&q=80&w=2000')", backgroundSize: 'cover', backgroundPosition: 'center' }}
+        >
+            <div className="absolute inset-0 bg-gray-900/85" />
+            <div className="relative z-10 max-w-3xl mx-auto px-6 text-center font-sans">
+                <motion.div
+                    initial={{ opacity: 0, y: 20 }}
+                    whileInView={{ opacity: 1, y: 0 }}
+                    viewport={{ once: true }}
+                >
+                    <span className="text-xs uppercase tracking-widest text-primary font-bold">Begin Your Search</span>
+                    <h2 className="text-4xl md:text-5xl font-serif font-normal text-white mt-4 mb-5 leading-tight">
+                        Are You Looking to<br />Buy a Property?
+                    </h2>
+                    <p className="text-white/60 mb-10 text-sm font-sans">
+                        Browse our curated catalogue or use our mortgage calculator to find your budget.
+                    </p>
+                    <div className="flex flex-col sm:flex-row gap-4 justify-center">
+                        <button
+                            onClick={() => document.getElementById('minimal-properties')?.scrollIntoView({ behavior: 'smooth' })}
+                            className="bg-white text-gray-900 font-semibold px-10 py-4 hover:bg-gray-100 transition-colors text-sm tracking-wide uppercase"
+                        >
+                            Browse Catalogue
+                        </button>
+                        <button
+                            onClick={() => navigate('/calculator')}
+                            className="flex items-center justify-center gap-2 border border-white/30 text-white font-semibold px-10 py-4 hover:bg-white/10 transition-colors text-sm tracking-wide uppercase"
+                        >
+                            <Calculator className="w-4 h-4" />
+                            Mortgage Calculator
+                        </button>
+                    </div>
+                </motion.div>
+            </div>
+        </section>
+    );
+};
 
 // ─── Main Export ─────────────────────────────────────────────────────────────
 
@@ -444,10 +447,10 @@ const ThemeMinimal = () => {
                                     Browse Catalogue
                                 </button>
                                 <button
-                                    onClick={() => window.dispatchEvent(new CustomEvent('openVoiceAgent'))}
+                                    onClick={() => navigate('/calculator')}
                                     className="border border-gray-300 text-gray-700 font-semibold px-8 py-3.5 hover:border-gray-900 hover:text-gray-900 transition-all text-sm tracking-wide uppercase flex items-center gap-2"
                                 >
-                                    Inquire with Saathi AI
+                                    Mortgage Calculator
                                     <ArrowRight className="w-4 h-4" />
                                 </button>
                             </motion.div>
@@ -458,10 +461,10 @@ const ThemeMinimal = () => {
                             initial={{ opacity: 0, x: 30 }}
                             animate={{ opacity: 1, x: 0 }}
                             transition={{ duration: 1, delay: 0.2 }}
-                            className="relative hidden lg:block"
+                            className="relative hidden lg:block w-full h-full min-h-[550px]"
                         >
                             {/* Main tall image */}
-                            <div className="absolute inset-y-0 left-0 right-0 overflow-hidden">
+                            <div className="absolute inset-0 overflow-hidden">
                                 <img
                                     src="https://images.unsplash.com/photo-1600585154340-be6191dae10c?auto=format&fit=crop&q=80&w=1200"
                                     alt="Luxury estate"
