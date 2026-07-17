@@ -480,24 +480,28 @@ app.post('/api/collections/:collection', upload.fields([{ name: 'images' }, { na
             const recordUploadDir = path.join(uploadsDir, collection, newId);
             fs.mkdirSync(recordUploadDir, { recursive: true });
 
+            const uploadPromises = [];
+
             for (const file of imageFiles) {
                 const destPath = path.join(recordUploadDir, file.filename);
                 fs.renameSync(file.path, destPath);
                 imageNames.push(file.filename);
                 
-                // Upload to Cloudflare R2
+                // Upload to Cloudflare R2 in parallel
                 const r2Key = `${collection}/${newId}/${file.filename}`;
-                await uploadToR2(destPath, r2Key);
+                uploadPromises.push(uploadToR2(destPath, r2Key));
             }
             for (const file of videoFiles) {
                 const destPath = path.join(recordUploadDir, file.filename);
                 fs.renameSync(file.path, destPath);
                 videoNames.push(file.filename);
                 
-                // Upload to Cloudflare R2
+                // Upload to Cloudflare R2 in parallel
                 const r2Key = `${collection}/${newId}/${file.filename}`;
-                await uploadToR2(destPath, r2Key);
+                uploadPromises.push(uploadToR2(destPath, r2Key));
             }
+
+            await Promise.all(uploadPromises);
         }
 
         // Add special columns
@@ -607,20 +611,24 @@ app.patch('/api/collections/:collection/:id', upload.fields([{ name: 'images' },
             let newImageNames = existingImages.filter(img => !deletedImagesList.includes(img));
             let newVideoNames = existingVideos.filter(vid => !deletedVideosList.includes(vid));
 
+            const uploadPromises = [];
+
             for (const file of imageFiles) {
                 const destPath = path.join(recordUploadDir, file.filename);
                 fs.renameSync(file.path, destPath);
                 newImageNames.push(file.filename);
                 const r2Key = `${collection}/${id}/${file.filename}`;
-                await uploadToR2(destPath, r2Key);
+                uploadPromises.push(uploadToR2(destPath, r2Key));
             }
             for (const file of videoFiles) {
                 const destPath = path.join(recordUploadDir, file.filename);
                 fs.renameSync(file.path, destPath);
                 newVideoNames.push(file.filename);
                 const r2Key = `${collection}/${id}/${file.filename}`;
-                await uploadToR2(destPath, r2Key);
+                uploadPromises.push(uploadToR2(destPath, r2Key));
             }
+
+            await Promise.all(uploadPromises);
 
             body.images = JSON.stringify(newImageNames);
             body.videos = JSON.stringify(newVideoNames);
