@@ -28,8 +28,19 @@ async function initDB() {
         console.log('🔄 [Database] Initializing schema from schema.sql...');
         await pool.query(schemaSql);
         console.log('✅ [Database] Schema successfully initialized!');
+        
+        // Dynamic migration for white-label columns
+        console.log('🔄 [Database] Checking and running schema migrations...');
+        await pool.query(`
+            ALTER TABLE users ADD COLUMN IF NOT EXISTS subdomain VARCHAR(100) UNIQUE;
+            ALTER TABLE users ADD COLUMN IF NOT EXISTS "customDomain" VARCHAR(255) UNIQUE;
+            ALTER TABLE users ADD COLUMN IF NOT EXISTS "templateId" VARCHAR(50) DEFAULT 'classic';
+            ALTER TABLE users ADD COLUMN IF NOT EXISTS "primaryColor" VARCHAR(50) DEFAULT '#DC2626';
+            ALTER TABLE users ADD COLUMN IF NOT EXISTS "secondaryColor" VARCHAR(50) DEFAULT '#1E293B';
+        `);
+        console.log('✅ [Database] Schema migrations completed successfully!');
     } catch (err) {
-        console.error('❌ [Database] Failed to initialize schema:', err.message);
+        console.error('❌ [Database] Failed to initialize schema or migrations:', err.message);
         throw err;
     }
 }

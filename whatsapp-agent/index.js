@@ -368,6 +368,47 @@ app.post('/api/auth/sync', async (req, res) => {
 
 // --- Generic Collections REST API Routes ---
 
+// Showcase configuration endpoint for white-label SaaS mapping
+app.get('/api/public/showcase-config', async (req, res) => {
+    try {
+        const { host, subdomain } = req.query;
+        let agency = null;
+
+        // 1. Try custom domain matching
+        if (host && !host.includes('localhost') && !host.includes('31.97.231.139') && !host.includes('rr-estate') && !host.includes('render.com')) {
+            const domainRes = await pool.query('SELECT id, name, "agencyName", subdomain, "customDomain", "templateId", "primaryColor", "secondaryColor", metadata FROM users WHERE "customDomain" = $1 AND role = \'owner\' LIMIT 1', [host]);
+            if (domainRes.rows.length > 0) {
+                agency = domainRes.rows[0];
+            }
+        }
+
+        // 2. Try subdomain matching
+        if (!agency && subdomain && subdomain !== 'www' && subdomain !== 'All') {
+            const subRes = await pool.query('SELECT id, name, "agencyName", subdomain, "customDomain", "templateId", "primaryColor", "secondaryColor", metadata FROM users WHERE subdomain = $1 AND role = \'owner\' LIMIT 1', [subdomain]);
+            if (subRes.rows.length > 0) {
+                agency = subRes.rows[0];
+            }
+        }
+
+        // 3. Fallback to primary default owner/agency
+        if (!agency) {
+            const ownerRes = await pool.query('SELECT id, name, "agencyName", subdomain, "customDomain", "templateId", "primaryColor", "secondaryColor", metadata FROM users WHERE role = \'owner\' ORDER BY created_at ASC LIMIT 1');
+            if (ownerRes.rows.length > 0) {
+                agency = ownerRes.rows[0];
+            }
+        }
+
+        if (!agency) {
+            return res.status(404).json({ message: 'No agency profile configured in the system.' });
+        }
+
+        res.json({ agency });
+    } catch (err) {
+        console.error('Error fetching showcase configuration:', err);
+        res.status(500).json({ message: err.message });
+    }
+});
+
 // 1. GET List / Full List
 app.get('/api/collections/:collection', async (req, res) => {
     try {

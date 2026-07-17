@@ -1,4 +1,13 @@
 /** @type {import('tailwindcss').Config} */
+function withOpacity(variableName) {
+    return ({ opacityValue }) => {
+        if (opacityValue !== undefined) {
+            return `rgba(var(${variableName}), ${opacityValue})`;
+        }
+        return `rgb(var(${variableName}))`;
+    };
+}
+
 export default {
     content: [
         "./index.html",
@@ -8,14 +17,14 @@ export default {
         extend: {
             colors: {
                 primary: {
-                    DEFAULT: '#CC0000',
-                    dark: '#990000',
-                    light: '#ff3333',
+                    DEFAULT: withOpacity('--color-primary'),
+                    dark: withOpacity('--color-primary-dark'),
+                    light: withOpacity('--color-primary-light'),
                 },
                 accent: {
-                    teal: '#008080',
-                    'teal-dark': '#006666',
-                    'teal-light': '#339999',
+                    teal: withOpacity('--color-secondary'),
+                    'teal-dark': withOpacity('--color-secondary-dark'),
+                    'teal-light': withOpacity('--color-secondary-light'),
                 },
                 secondary: '#FFFFFF',
                 text: {

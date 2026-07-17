@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import {
     Save, Building, Bell, Shield, CreditCard, ChevronRight, MessageSquare,
-    Check, Loader2, BrainCircuit, Key, Plus, Trash2, Clock, Edit2, Lock, Globe, Activity
+    Check, Loader2, BrainCircuit, Key, Plus, Trash2, Clock, Edit2, Lock, Globe, Activity, Palette
 } from 'lucide-react';
 import { pb } from '../services/pocketbase';
 
@@ -115,7 +115,12 @@ const AgencySettings = () => {
         whatsappPhoneNumberId: currentUser?.metadata?.whatsappPhoneNumberId || '',
         whatsappBusinessAccountId: currentUser?.metadata?.whatsappBusinessAccountId || '',
         googleTagId: currentUser?.metadata?.googleTagId || '',
-        metaPixelId: currentUser?.metadata?.metaPixelId || ''
+        metaPixelId: currentUser?.metadata?.metaPixelId || '',
+        subdomain: currentUser?.subdomain || '',
+        customDomain: currentUser?.customDomain || '',
+        templateId: currentUser?.templateId || 'classic',
+        primaryColor: currentUser?.primaryColor || '#DC2626',
+        secondaryColor: currentUser?.secondaryColor || '#1E293B'
     });
 
     const fetchWhatsAppStatus = async () => {
@@ -303,6 +308,11 @@ const fetchSequences = async () => {
                     phone: agencyData.phone,
                     geminiKey: agencyData.geminiKey,
                     agentEnabled: agencyData.agentEnabled,
+                    subdomain: agencyData.subdomain || null,
+                    customDomain: agencyData.customDomain || null,
+                    templateId: agencyData.templateId || 'classic',
+                    primaryColor: agencyData.primaryColor || '#DC2626',
+                    secondaryColor: agencyData.secondaryColor || '#1E293B',
                     metadata: {
                         ...currentUser.metadata,
                         whatsappToken: agencyData.whatsappToken,
@@ -386,7 +396,8 @@ const fetchSequences = async () => {
         { id: 'whatsapp',      name: 'Connect WhatsApp',     icon: MessageSquare, description: 'Connect your agency WhatsApp number to assign the AI Agent.' },
         { id: 'brain',         name: 'Brain Keys',           icon: BrainCircuit,  description: 'Configure your custom LLM API keys to power your AI Agent.' },
         { id: 'tracking',      name: 'Tracking & Pixels',    icon: Activity,      description: 'Configure Google Tags and Meta Pixels to track visits and run remarketing.' },
-        { id: 'integrations',  name: 'Portal Integrations',  icon: Globe,         description: 'Connect third-party real estate portals like Magicbricks, 99acres, etc.' },
+        { id: 'showcase',      name: 'Showcase Portal',      icon: Globe,         description: 'Configure your white-label public website template, colors, and domains.' },
+        { id: 'integrations',  name: 'Portal Integrations',  icon: Plus,          description: 'Connect third-party real estate portals like Magicbricks, 99acres, etc.' },
         { id: 'security',      name: 'Security & Access',    icon: Shield,        description: 'Manage passwords and two-factor authentication.' },
         { id: 'billing',       name: 'Billing & Plan',       icon: CreditCard,    description: 'Manage your subscription and payment methods.' },
         { id: 'sequences',     name: 'Follow-up Sequences',  icon: MessageSquare, description: 'Design automated WhatsApp follow-up messages for your leads.' },
@@ -462,6 +473,113 @@ const fetchSequences = async () => {
                                         placeholder="123 Street, City"
                                     />
                                 </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Showcase Portal Settings */}
+                    {activeSection === 'showcase' && (
+                        <div className="space-y-6">
+                            <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 text-sm text-blue-800">
+                                💡 <strong>SaaS White-Labeling Info:</strong> You can choose your agency's public portal design (template), set your own primary and secondary brand colors, and configure a custom subdomain or custom domain so your clients see your personalized branding.
+                            </div>
+
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                                <div>
+                                    <label className="dash-label">Subdomain (e.g. <code>rahul</code> for <code>rahul.yourdomain.com</code>)</label>
+                                    <input
+                                        type="text"
+                                        value={agencyData.subdomain || ''}
+                                        onChange={(e) => setAgencyData({ ...agencyData, subdomain: e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, '') })}
+                                        className="dash-input"
+                                        placeholder="e.g. rahul-properties"
+                                    />
+                                    <p className="text-xs text-gray-500 mt-1">Only lowercase letters, numbers, and dashes are allowed.</p>
+                                </div>
+                                <div>
+                                    <label className="dash-label">Custom Domain (e.g. <code>properties.agentrahul.com</code>)</label>
+                                    <input
+                                        type="text"
+                                        value={agencyData.customDomain || ''}
+                                        onChange={(e) => setAgencyData({ ...agencyData, customDomain: e.target.value.toLowerCase().trim() })}
+                                        className="dash-input"
+                                        placeholder="e.g. properties.myagency.com"
+                                    />
+                                    <p className="text-xs text-gray-500 mt-1">Points your custom domain to our system. Remember to add a CNAME record pointing to our main domain.</p>
+                                </div>
+                            </div>
+
+                            <div>
+                                <label className="dash-label block mb-3">Choose Portal Template</label>
+                                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                    {[
+                                        { id: 'classic', name: 'Classic Elegance', desc: 'A traditional and clean real estate template focusing on trust and grid layouts.' },
+                                        { id: 'modern', name: 'Modern Vibrant', desc: 'High-contrast colors, sharp buttons, bold borders, and sleek transitions.' },
+                                        { id: 'minimal', name: 'Minimalist Clean', desc: 'Spacious layouts, light gray dividers, and subtle outlines for premium properties.' }
+                                    ].map((tpl) => (
+                                        <div
+                                            key={tpl.id}
+                                            onClick={() => setAgencyData({ ...agencyData, templateId: tpl.id })}
+                                            className={`cursor-pointer border-2 rounded-xl p-4 transition-all flex flex-col gap-2 ${agencyData.templateId === tpl.id ? 'border-primary bg-primary/5 shadow-sm' : 'border-gray-200 hover:border-gray-300 bg-white'}`}
+                                        >
+                                            <span className="font-bold text-sm text-gray-900">{tpl.name}</span>
+                                            <p className="text-xs text-gray-500 flex-1">{tpl.desc}</p>
+                                            {agencyData.templateId === tpl.id && (
+                                                <span className="text-[10px] uppercase font-bold text-primary self-start bg-primary/10 px-2 py-0.5 rounded-full mt-2">Selected</span>
+                                            )}
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                                <div>
+                                    <label className="dash-label">Primary Brand Color</label>
+                                    <div className="flex gap-3">
+                                        <input
+                                            type="color"
+                                            value={agencyData.primaryColor || '#DC2626'}
+                                            onChange={(e) => setAgencyData({ ...agencyData, primaryColor: e.target.value })}
+                                            className="w-12 h-10 border border-gray-200 rounded-lg cursor-pointer p-0.5"
+                                        />
+                                        <input
+                                            type="text"
+                                            value={agencyData.primaryColor || ''}
+                                            onChange={(e) => setAgencyData({ ...agencyData, primaryColor: e.target.value })}
+                                            className="dash-input flex-1"
+                                            placeholder="#DC2626"
+                                        />
+                                    </div>
+                                </div>
+                                <div>
+                                    <label className="dash-label">Secondary Brand Color</label>
+                                    <div className="flex gap-3">
+                                        <input
+                                            type="color"
+                                            value={agencyData.secondaryColor || '#1E293B'}
+                                            onChange={(e) => setAgencyData({ ...agencyData, secondaryColor: e.target.value })}
+                                            className="w-12 h-10 border border-gray-200 rounded-lg cursor-pointer p-0.5"
+                                        />
+                                        <input
+                                            type="text"
+                                            value={agencyData.secondaryColor || ''}
+                                            onChange={(e) => setAgencyData({ ...agencyData, secondaryColor: e.target.value })}
+                                            className="dash-input flex-1"
+                                            placeholder="#1E293B"
+                                        />
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div className="flex justify-end pt-4 border-t border-gray-100">
+                                <button
+                                    onClick={handleSave}
+                                    disabled={isSaving}
+                                    className="btn-primary flex items-center gap-2"
+                                >
+                                    {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+                                    Save Portal Settings
+                                </button>
                             </div>
                         </div>
                     )}

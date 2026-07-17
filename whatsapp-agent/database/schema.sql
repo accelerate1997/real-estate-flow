@@ -15,6 +15,11 @@ CREATE TABLE IF NOT EXISTS users (
     verified BOOLEAN DEFAULT FALSE,
     "agentEnabled" BOOLEAN DEFAULT TRUE,
     "isActive" BOOLEAN DEFAULT TRUE,
+    subdomain VARCHAR(100) UNIQUE,
+    "customDomain" VARCHAR(255) UNIQUE,
+    "templateId" VARCHAR(50) DEFAULT 'classic',
+    "primaryColor" VARCHAR(50) DEFAULT '#DC2626',
+    "secondaryColor" VARCHAR(50) DEFAULT '#1E293B',
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );

@@ -93,7 +93,15 @@ class Collection {
 
     async getFullList(options = {}) {
         const queryParams = new URLSearchParams();
-        if (options.filter) queryParams.append('filter', options.filter);
+        let filter = options.filter || '';
+        if (this.name === 'properties' && window.agencyId) {
+            if (filter) {
+                filter = `(${filter}) && agencyId = "${window.agencyId}"`;
+            } else {
+                filter = `agencyId = "${window.agencyId}"`;
+            }
+        }
+        if (filter) queryParams.append('filter', filter);
         if (options.sort) queryParams.append('sort', options.sort);
         if (options.expand) queryParams.append('expand', options.expand);
 
@@ -106,7 +114,15 @@ class Collection {
             page: page.toString(),
             perPage: perPage.toString()
         });
-        if (options.filter) queryParams.append('filter', options.filter);
+        let filter = options.filter || '';
+        if (this.name === 'properties' && window.agencyId) {
+            if (filter) {
+                filter = `(${filter}) && agencyId = "${window.agencyId}"`;
+            } else {
+                filter = `agencyId = "${window.agencyId}"`;
+            }
+        }
+        if (filter) queryParams.append('filter', filter);
         if (options.sort) queryParams.append('sort', options.sort);
         if (options.expand) queryParams.append('expand', options.expand);
 

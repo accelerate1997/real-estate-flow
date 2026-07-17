@@ -387,3 +387,28 @@
 .animate-marquee:hover {
   animation-play-state: paused;
 }
+
+/* Template Specific Customizations */
+.template-modern {
+  font-family: 'Outfit', sans-serif !important;
+}
+.template-modern .btn-primary {
+  border-radius: 12px !important;
+}
+.template-modern .glass-card {
+  border-radius: 24px !important;
+  background: rgba(255, 255, 255, 0.85) !important;
+}
+
+.template-minimal {
+  font-family: 'Inter', sans-serif !important;
+}
+.template-minimal .btn-primary {
+  border-radius: 0px !important;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+}
+.template-minimal .glass-card {
+  border-radius: 0px !important;
+  border-color: #E5E7EB !important;
+}
