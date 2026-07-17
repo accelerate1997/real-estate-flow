@@ -508,7 +508,9 @@ const fetchSequences = async () => {
                                     />
                                     <p className="text-xs text-gray-500 mt-1">Points your custom domain to our system. Remember to add a CNAME record pointing to our main domain.</p>
                                 </div>
-                                <TemplatePicker agencyData={agencyData} setAgencyData={setAgencyData} />
+                                <div className="md:col-span-2">
+                                    <TemplatePicker agencyData={agencyData} setAgencyData={setAgencyData} />
+                                </div>
                             </div>
 
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
