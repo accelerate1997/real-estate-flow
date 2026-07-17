@@ -1,6 +1,6 @@
 import React from 'react';
 import { motion } from 'framer-motion';
-import { MapPin, BedDouble, Bath, Square, Heart, ArrowRight, Tag } from 'lucide-react';
+import { MapPin, BedDouble, Bath, Square, Heart, ArrowRight, Tag, Droplets, Zap, Compass, Building2 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import clsx from 'clsx';
 import { pb } from '../services/pocketbase';
@@ -65,6 +65,146 @@ const PropertyCard = ({ property, onClick }) => {
         }
     };
 
+    const renderFeatures = () => {
+        const category = property.propertyCategory || 'Residential';
+
+        if (category === 'Commercial') {
+            return (
+                <div className="grid grid-cols-3 gap-4 py-4 border-y border-gray-50 mb-4">
+                    <div className="flex flex-col gap-1 text-center">
+                        <div className="flex items-center justify-center gap-1.5 text-gray-400">
+                            <Droplets className="w-3.5 h-3.5 text-primary/70 shrink-0" />
+                            <span className="text-[10px] uppercase tracking-wider font-semibold">Washroom</span>
+                        </div>
+                        <span className="text-xs font-bold text-gray-900 truncate" title={property.washroomType || '—'}>
+                            {property.washroomType || '—'}
+                        </span>
+                    </div>
+                    <div className="flex flex-col gap-1 text-center border-x border-gray-100 px-2">
+                        <div className="flex items-center justify-center gap-1.5 text-gray-400">
+                            <Zap className="w-3.5 h-3.5 text-primary/70 shrink-0" />
+                            <span className="text-[10px] uppercase tracking-wider font-semibold">Power</span>
+                        </div>
+                        <span className="text-xs font-bold text-gray-900 truncate">
+                            {property.powerAmps ? `${property.powerAmps}A` : '—'}
+                        </span>
+                    </div>
+                    <div className="flex flex-col gap-1 text-center">
+                        <div className="flex items-center justify-center gap-1.5 text-gray-400">
+                            <Square className="w-3.5 h-3.5 text-primary/70 shrink-0" />
+                            <span className="text-[10px] uppercase tracking-wider font-semibold">Area</span>
+                        </div>
+                        <span className="text-xs font-bold text-gray-900 truncate">
+                            {property.carpetArea || property.builtUpArea || '—'}
+                            <span className="text-[9px] font-normal text-gray-400"> sqft</span>
+                        </span>
+                    </div>
+                </div>
+            );
+        }
+
+        if (category === 'PlotsLand') {
+            return (
+                <div className="grid grid-cols-3 gap-4 py-4 border-y border-gray-50 mb-4">
+                    <div className="flex flex-col gap-1 text-center">
+                        <div className="flex items-center justify-center gap-1.5 text-gray-400">
+                            <Compass className="w-3.5 h-3.5 text-primary/70 shrink-0" />
+                            <span className="text-[10px] uppercase tracking-wider font-semibold">Type</span>
+                        </div>
+                        <span className="text-xs font-bold text-gray-900 truncate" title={property.plotType || 'Plot'}>
+                            {property.plotType || 'Plot'}
+                        </span>
+                    </div>
+                    <div className="flex flex-col gap-1 text-center border-x border-gray-100 px-2">
+                        <div className="flex items-center justify-center gap-1.5 text-gray-400">
+                            <Building2 className="w-3.5 h-3.5 text-primary/70 shrink-0" />
+                            <span className="text-[10px] uppercase tracking-wider font-semibold">Road Width</span>
+                        </div>
+                        <span className="text-xs font-bold text-gray-900 truncate" title={property.floorDetails || '—'}>
+                            {property.floorDetails || '—'}
+                        </span>
+                    </div>
+                    <div className="flex flex-col gap-1 text-center">
+                        <div className="flex items-center justify-center gap-1.5 text-gray-400">
+                            <Square className="w-3.5 h-3.5 text-primary/70 shrink-0" />
+                            <span className="text-[10px] uppercase tracking-wider font-semibold">Area</span>
+                        </div>
+                        <span className="text-xs font-bold text-gray-900 truncate">
+                            {property.carpetArea || property.builtUpArea || '—'}
+                            <span className="text-[9px] font-normal text-gray-400"> sqft</span>
+                        </span>
+                    </div>
+                </div>
+            );
+        }
+
+        if (category === 'NewProjects') {
+            const isProjectComm = property.newProjectType === 'Commercial';
+            return (
+                <div className="grid grid-cols-3 gap-4 py-4 border-y border-gray-50 mb-4">
+                    <div className="flex flex-col gap-1 text-center">
+                        <div className="flex items-center justify-center gap-1.5 text-gray-400">
+                            {isProjectComm ? <Building2 className="w-3.5 h-3.5 text-primary/70 shrink-0" /> : <BedDouble className="w-3.5 h-3.5 text-primary/70 shrink-0" />}
+                            <span className="text-[10px] uppercase tracking-wider font-semibold">{isProjectComm ? 'Type' : 'Beds'}</span>
+                        </div>
+                        <span className="text-xs font-bold text-gray-900 truncate">
+                            {isProjectComm ? 'Commercial' : (property.bhkType || '—')}
+                        </span>
+                    </div>
+                    <div className="flex flex-col gap-1 text-center border-x border-gray-100 px-2">
+                        <div className="flex items-center justify-center gap-1.5 text-gray-400">
+                            <Compass className="w-3.5 h-3.5 text-primary/70 shrink-0" />
+                            <span className="text-[10px] uppercase tracking-wider font-semibold">Status</span>
+                        </div>
+                        <span className="text-xs font-bold text-gray-900 truncate" title={property.constructionStatus || '—'}>
+                            {property.constructionStatus || '—'}
+                        </span>
+                    </div>
+                    <div className="flex flex-col gap-1 text-center">
+                        <div className="flex items-center justify-center gap-1.5 text-gray-400">
+                            <Square className="w-3.5 h-3.5 text-primary/70 shrink-0" />
+                            <span className="text-[10px] uppercase tracking-wider font-semibold">Area</span>
+                        </div>
+                        <span className="text-xs font-bold text-gray-900 truncate">
+                            {property.carpetArea || property.builtUpArea || '—'}
+                            <span className="text-[9px] font-normal text-gray-400"> sqft</span>
+                        </span>
+                    </div>
+                </div>
+            );
+        }
+
+        // Default: Residential
+        return (
+            <div className="grid grid-cols-3 gap-4 py-4 border-y border-gray-50 mb-4">
+                <div className="flex flex-col gap-1 text-center">
+                    <div className="flex items-center justify-center gap-1.5 text-gray-400">
+                        <BedDouble className="w-3.5 h-3.5 text-primary/70 shrink-0" />
+                        <span className="text-[10px] uppercase tracking-wider font-semibold">Beds</span>
+                    </div>
+                    <span className="text-xs font-bold text-gray-900 truncate">{property.bhkType || '—'}</span>
+                </div>
+                <div className="flex flex-col gap-1 text-center border-x border-gray-100 px-2">
+                    <div className="flex items-center justify-center gap-1.5 text-gray-400">
+                        <Bath className="w-3.5 h-3.5 text-primary/70 shrink-0" />
+                        <span className="text-[10px] uppercase tracking-wider font-semibold">Baths</span>
+                    </div>
+                    <span className="text-xs font-bold text-gray-900 truncate">{property.bathrooms || '—'}</span>
+                </div>
+                <div className="flex flex-col gap-1 text-center">
+                    <div className="flex items-center justify-center gap-1.5 text-gray-400">
+                        <Square className="w-3.5 h-3.5 text-primary/70 shrink-0" />
+                        <span className="text-[10px] uppercase tracking-wider font-semibold">Area</span>
+                    </div>
+                    <span className="text-xs font-bold text-gray-900 truncate">
+                        {property.carpetArea || property.builtUpArea || '—'}
+                        <span className="text-[9px] font-normal text-gray-400"> sqft</span>
+                    </span>
+                </div>
+            </div>
+        );
+    };
+
     return (
         <motion.article
             layout
@@ -123,32 +263,7 @@ const PropertyCard = ({ property, onClick }) => {
                 </div>
 
                 {/* Property Features Grid */}
-                <div className="grid grid-cols-3 gap-4 py-4 border-y border-gray-50 mb-4">
-                    <div className="flex flex-col gap-1 text-center">
-                        <div className="flex items-center justify-center gap-1.5 text-gray-400">
-                            <BedDouble className="w-3.5 h-3.5" />
-                            <span className="text-[10px] uppercase tracking-wider font-semibold">Beds</span>
-                        </div>
-                        <span className="text-sm font-bold text-gray-900">{property.bhkType || '—'}</span>
-                    </div>
-                    <div className="flex flex-col gap-1 text-center border-x border-gray-100 px-4">
-                        <div className="flex items-center justify-center gap-1.5 text-gray-400">
-                            <Bath className="w-3.5 h-3.5" />
-                            <span className="text-[10px] uppercase tracking-wider font-semibold">Baths</span>
-                        </div>
-                        <span className="text-sm font-bold text-gray-900">{property.bathrooms || '—'}</span>
-                    </div>
-                    <div className="flex flex-col gap-1 text-center">
-                        <div className="flex items-center justify-center gap-1.5 text-gray-400">
-                            <Square className="w-3.5 h-3.5" />
-                            <span className="text-[10px] uppercase tracking-wider font-semibold">Area</span>
-                        </div>
-                        <span className="text-sm font-bold text-gray-900 truncate">
-                            {property.carpetArea || property.builtUpArea || '—'}
-                            <span className="text-[10px] font-normal text-gray-400"> sqft</span>
-                        </span>
-                    </div>
-                </div>
+                {renderFeatures()}
 
                 {/* Footer - Price & Arrow */}
                 <div className="mt-auto flex items-center justify-between">
