@@ -466,9 +466,12 @@ const ThemeMinimal = () => {
                             {/* Main tall image */}
                             <div className="absolute inset-0 overflow-hidden">
                                 <img
-                                    src="https://images.unsplash.com/photo-1600585154340-be6191dae10c?auto=format&fit=crop&q=80&w=1200"
+                                    src="https://images.unsplash.com/photo-1600607687939-ce8a6c25118c?auto=format&fit=crop&q=80&w=1200"
                                     alt="Luxury estate"
                                     className="w-full h-full object-cover"
+                                    onError={e => {
+                                        e.target.src = 'https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?auto=format&fit=crop&q=80&w=1200';
+                                    }}
                                 />
                                 <div className="absolute inset-0 bg-gradient-to-r from-[#FAF9F6]/40 to-transparent" />
 

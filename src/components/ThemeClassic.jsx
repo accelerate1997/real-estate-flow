@@ -538,7 +538,7 @@ const ThemeClassic = () => {
     const navigate = useNavigate();
 
     return (
-        <div className="bg-white text-gray-900 min-h-screen font-sans pt-16">
+        <div className="bg-white text-gray-900 min-h-screen font-sans pt-0">
 
             {/* ── HERO ── */}
             <section
