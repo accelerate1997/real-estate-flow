@@ -28,6 +28,7 @@ COPY --from=build /app/dist /usr/share/nginx/html
 # Add custom nginx config for React Router fallback and PocketBase proxy
 RUN echo 'server { \
     listen 80; \
+    client_max_body_size 100M; \
     location / { \
     root   /usr/share/nginx/html; \
     index  index.html index.htm; \
