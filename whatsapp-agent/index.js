@@ -104,7 +104,15 @@ const storage = multer.diskStorage({
     },
     filename: function (req, file, cb) {
         const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-        cb(null, uniqueSuffix + path.extname(file.originalname));
+        let ext = path.extname(file.originalname);
+        if (!ext && file.mimetype) {
+            const mime = require('mime-types');
+            const mimeExt = mime.extension(file.mimetype);
+            if (mimeExt) {
+                ext = '.' + mimeExt;
+            }
+        }
+        cb(null, uniqueSuffix + ext);
     }
 });
 const upload = multer({ storage });
@@ -563,11 +571,27 @@ app.patch('/api/collections/:collection/:id', upload.fields([{ name: 'images' },
         const { collection, id } = req.params;
         const body = { ...req.body };
 
-        // Handle newly uploaded files and merge with existing ones
+        // Retrieve deleted files lists from body
+        // FormData append with same key will create an array or a single string
+        const getDeletedList = (key) => {
+            const val = body[key];
+            if (!val) return [];
+            if (Array.isArray(val)) return val;
+            return [val];
+        };
+
+        const deletedImagesList = getDeletedList('-images');
+        const deletedVideosList = getDeletedList('-videos');
+        
+        // Remove the delete keys so they don't get saved as normal fields in PostgreSQL
+        delete body['-images'];
+        delete body['-videos'];
+
+        // Handle newly uploaded files and merge with existing ones (respecting deletions)
         const imageFiles = req.files && req.files['images'] ? req.files['images'] : [];
         const videoFiles = req.files && req.files['videos'] ? req.files['videos'] : [];
 
-        if (imageFiles.length > 0 || videoFiles.length > 0) {
+        if (imageFiles.length > 0 || videoFiles.length > 0 || deletedImagesList.length > 0 || deletedVideosList.length > 0) {
             const recordUploadDir = path.join(uploadsDir, collection, id);
             fs.mkdirSync(recordUploadDir, { recursive: true });
 
@@ -579,8 +603,9 @@ app.patch('/api/collections/:collection/:id', upload.fields([{ name: 'images' },
             try { existingImages = typeof existingRow.images === 'string' ? JSON.parse(existingRow.images) : (existingRow.images || []); } catch(e) {}
             try { existingVideos = typeof existingRow.videos === 'string' ? JSON.parse(existingRow.videos) : (existingRow.videos || []); } catch(e) {}
 
-            const newImageNames = [...existingImages];
-            const newVideoNames = [...existingVideos];
+            // Remove deleted ones
+            let newImageNames = existingImages.filter(img => !deletedImagesList.includes(img));
+            let newVideoNames = existingVideos.filter(vid => !deletedVideosList.includes(vid));
 
             for (const file of imageFiles) {
                 const destPath = path.join(recordUploadDir, file.filename);

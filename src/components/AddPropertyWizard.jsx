@@ -77,8 +77,33 @@ const AddPropertyWizard = ({ onClose, onSuccess, targetAgencyId, currentUserId, 
         highlight_hospital: initHighlights.hospital
     });
 
-    const [images, setImages] = useState([]);
-    const [videos, setVideos] = useState([]);
+    const getInitialImages = () => {
+        if (!initialData?.images) return [];
+        const imgs = Array.isArray(initialData.images) ? initialData.images : (typeof initialData.images === 'string' && initialData.images.trim() !== '' ? [initialData.images] : []);
+        return imgs.map(filename => ({
+            file: null,
+            preview: pb.files.getURL(initialData, filename),
+            isExisting: true,
+            filename: filename
+        }));
+    };
+
+    const getInitialVideos = () => {
+        if (!initialData?.videos) return [];
+        const vids = Array.isArray(initialData.videos) ? initialData.videos : (typeof initialData.videos === 'string' && initialData.videos.trim() !== '' ? [initialData.videos] : []);
+        return vids.map(filename => ({
+            file: null,
+            preview: pb.files.getURL(initialData, filename),
+            isExisting: true,
+            filename: filename
+        }));
+    };
+
+    const [images, setImages] = useState(getInitialImages());
+    const [videos, setVideos] = useState(getInitialVideos());
+    const [deletedImages, setDeletedImages] = useState([]);
+    const [deletedVideos, setDeletedVideos] = useState([]);
+
     const fileInputRef = useRef(null);
     const videoInputRef = useRef(null);
     const [customAmenityInput, setCustomAmenityInput] = useState('');
@@ -136,9 +161,12 @@ const AddPropertyWizard = ({ onClose, onSuccess, targetAgencyId, currentUserId, 
             const compressedPromises = files.map(async (file) => {
                 try {
                     const compressedFile = await imageCompression(file, options);
+                    const originalName = file.name || 'image.jpg';
+                    const baseName = originalName.substring(0, originalName.lastIndexOf('.')) || originalName;
+                    const finalFile = new File([compressedFile], `${baseName}.webp`, { type: 'image/webp' });
                     return {
-                        file: compressedFile,
-                        preview: URL.createObjectURL(compressedFile)
+                        file: finalFile,
+                        preview: URL.createObjectURL(finalFile)
                     };
                 } catch (error) {
                     console.error("Compression specific file error:", error);
@@ -167,8 +195,12 @@ const AddPropertyWizard = ({ onClose, onSuccess, targetAgencyId, currentUserId, 
     const removeImage = (indexToRemove) => {
         setImages(prev => {
             const newArray = [...prev];
-            URL.revokeObjectURL(newArray[indexToRemove].preview);
-            newArray.splice(indexToRemove, 1);
+            const removed = newArray.splice(indexToRemove, 1)[0];
+            if (removed.isExisting) {
+                setDeletedImages(d => [...d, removed.filename]);
+            } else {
+                URL.revokeObjectURL(removed.preview);
+            }
             return newArray;
         });
     };
@@ -230,8 +262,12 @@ const AddPropertyWizard = ({ onClose, onSuccess, targetAgencyId, currentUserId, 
     const removeVideo = (indexToRemove) => {
         setVideos(prev => {
             const newArray = [...prev];
-            URL.revokeObjectURL(newArray[indexToRemove].preview);
-            newArray.splice(indexToRemove, 1);
+            const removed = newArray.splice(indexToRemove, 1)[0];
+            if (removed.isExisting) {
+                setDeletedVideos(d => [...d, removed.filename]);
+            } else {
+                URL.revokeObjectURL(removed.preview);
+            }
             return newArray;
         });
     };
@@ -372,13 +408,27 @@ const AddPropertyWizard = ({ onClose, onSuccess, targetAgencyId, currentUserId, 
 
             // Append images array
             images.forEach((img) => {
-                pbData.append('images', img.file);
+                if (img.file) {
+                    pbData.append('images', img.file);
+                }
             });
 
             // Append videos array
             videos.forEach((vid) => {
-                pbData.append('videos', vid.file);
+                if (vid.file) {
+                    pbData.append('videos', vid.file);
+                }
             });
+
+            // Track deleted images/videos for PocketBase
+            if (initialData?.id) {
+                deletedImages.forEach((filename) => {
+                    pbData.append('-images', filename);
+                });
+                deletedVideos.forEach((filename) => {
+                    pbData.append('-videos', filename);
+                });
+            }
 
             if (initialData?.id) {
                 await pb.collection('properties').update(initialData.id, pbData);

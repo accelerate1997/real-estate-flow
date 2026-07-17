@@ -3,6 +3,7 @@ import { motion } from 'framer-motion';
 import { MapPin, BedDouble, Bath, Square, Heart, ArrowRight, Tag } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import clsx from 'clsx';
+import { pb } from '../services/pocketbase';
 
 const PropertyCard = ({ property, onClick }) => {
     const navigate = useNavigate();
@@ -26,7 +27,7 @@ const PropertyCard = ({ property, onClick }) => {
 
         if (firstImage && typeof firstImage === 'string') {
             if (firstImage.startsWith('http')) return firstImage;
-            return firstImage;
+            return pb.files.getURL(property, firstImage);
         }
 
         return "https://placehold.co/600x400/f3f4f6/9ca3af?text=No+Image+Available";
