@@ -69,26 +69,36 @@ const Layout = ({ children }) => {
 };
 
 // Home Page Component
-const Home = () => (
-  <>
-    <Hero />
-    <Partners />
-    <Features />
-    <div className="section-padding bg-white">
-      <div className="container-custom">
-        <div className="mb-12">
-          <span className="text-primary font-bold tracking-widest uppercase text-sm">Featured</span>
-          <h2 className="text-4xl md:text-5xl font-bold mt-2">Latest <span className="text-accent-teal">Properties</span></h2>
+import ThemeModern from './components/ThemeModern';
+import ThemeMinimal from './components/ThemeMinimal';
+
+// Home Page Component
+const Home = () => {
+  const template = window.agencyConfig?.templateId || 'classic';
+  if (template === 'modern') return <ThemeModern />;
+  if (template === 'minimal') return <ThemeMinimal />;
+  
+  return (
+    <>
+      <Hero />
+      <Partners />
+      <Features />
+      <div className="section-padding bg-white">
+        <div className="container-custom">
+          <div className="mb-12">
+            <span className="text-primary font-bold tracking-widest uppercase text-sm">Featured</span>
+            <h2 className="text-4xl md:text-5xl font-bold mt-2">Latest <span className="text-accent-teal">Properties</span></h2>
+          </div>
+          <PropertyGrid />
         </div>
-        <PropertyGrid />
       </div>
-    </div>
-    <Newsletter />
-    <Neighborhoods />
-    <Testimonials />
-    <Team />
-  </>
-);
+      <Newsletter />
+      <Neighborhoods />
+      <Testimonials />
+      <Team />
+    </>
+  );
+};
 
 function App() {
   const [isConfigLoaded, setIsConfigLoaded] = React.useState(false);

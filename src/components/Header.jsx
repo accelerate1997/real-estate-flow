@@ -35,8 +35,119 @@ const Header = () => {
         { name: 'Contact', href: '/#contact' },
     ];
 
+    const template = window.agencyConfig?.templateId || 'classic';
     const isHomePage = pathname === '/';
     const forceGlassy = !isHomePage || scrolled;
+
+    if (template === 'minimal') {
+        return (
+            <header className="fixed left-0 right-0 top-0 z-50 bg-white border-b border-gray-150 py-4 px-6 md:px-12 flex justify-between items-center text-gray-900 shadow-sm transition-all duration-300">
+                <div className="flex items-center justify-between w-full max-w-7xl mx-auto">
+                    {/* Logo Area */}
+                    <Link to="/" className="text-2xl font-display font-extrabold tracking-tight text-gray-900" aria-label="Agency Home">
+                        {window.agencyConfig?.agencyName || 'RR Estate'}
+                    </Link>
+
+                    {/* Center Navigation */}
+                    <nav className="hidden md:flex space-x-8 items-center">
+                        {navLinks.map((link, index) => (
+                            <div
+                                key={link.name}
+                                className="relative group"
+                                onMouseEnter={() => setActiveDropdown(index)}
+                                onMouseLeave={() => setActiveDropdown(null)}
+                            >
+                                {link.submenu ? (
+                                    <button className="flex items-center gap-1 font-semibold text-sm hover:text-primary transition-all py-2">
+                                        {link.name}
+                                        <ChevronDown className={clsx("w-4 h-4 transition-transform duration-300", activeDropdown === index ? "rotate-180" : "")} />
+                                    </button>
+                                ) : (
+                                    <Link to={link.href} className="font-semibold text-sm hover:text-primary transition-all py-2">
+                                        {link.name}
+                                    </Link>
+                                )}
+
+                                <AnimatePresence>
+                                    {link.submenu && activeDropdown === index && (
+                                        <motion.div
+                                            initial={{ opacity: 0, y: 5 }}
+                                            animate={{ opacity: 1, y: 0 }}
+                                            exit={{ opacity: 0, y: 5 }}
+                                            className="absolute left-0 pt-2 w-52 z-50"
+                                        >
+                                            <div className="bg-white rounded-lg shadow-lg border border-gray-100 overflow-hidden py-1">
+                                                {link.submenu.map((subItem) => (
+                                                    <Link key={subItem.name} to={subItem.href} className="block px-4 py-2 text-sm text-gray-700 hover:text-primary hover:bg-gray-50 font-medium">
+                                                        {subItem.name}
+                                                    </Link>
+                                                ))}
+                                            </div>
+                                        </motion.div>
+                                    )}
+                                </AnimatePresence>
+                            </div>
+                        ))}
+                    </nav>
+
+                    {/* Right Area */}
+                    <div className="flex items-center gap-4">
+                        <Link to="/login" className="hidden md:inline-block border border-gray-900 text-gray-900 px-6 py-2 hover:bg-gray-900 hover:text-white font-medium text-sm transition-all">
+                            Post Property
+                        </Link>
+                        <button onClick={() => setIsOpen(!isOpen)} className="md:hidden text-gray-900">
+                            {isOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
+                        </button>
+                    </div>
+                </div>
+
+                {/* Mobile Nav */}
+                <AnimatePresence>
+                    {isOpen && (
+                        <motion.div
+                            initial={{ opacity: 0, height: 0 }}
+                            animate={{ opacity: 1, height: 'auto' }}
+                            exit={{ opacity: 0, height: 0 }}
+                            className="absolute left-0 right-0 top-full bg-white border-b border-gray-150 shadow-lg md:hidden overflow-hidden"
+                        >
+                            <div className="px-6 py-4 space-y-2">
+                                {navLinks.map((link, index) => (
+                                    <div key={link.name}>
+                                        {link.submenu ? (
+                                            <>
+                                                <button onClick={() => setMobileExpanded(mobileExpanded === index ? null : index)} className="w-full flex justify-between items-center py-3 text-gray-800 font-semibold text-sm">
+                                                    {link.name}
+                                                    <ChevronDown className={clsx("w-4 h-4", mobileExpanded === index ? "rotate-180" : "")} />
+                                                </button>
+                                                {mobileExpanded === index && (
+                                                    <div className="bg-gray-50 rounded-lg px-4 py-1">
+                                                        {link.submenu.map(sub => (
+                                                            <Link key={sub.name} to={sub.href} onClick={() => setIsOpen(false)} className="block py-2 text-xs text-gray-600 font-medium">
+                                                                {sub.name}
+                                                            </Link>
+                                                        ))}
+                                                    </div>
+                                                )}
+                                            </>
+                                        ) : (
+                                            <Link to={link.href} onClick={() => setIsOpen(false)} className="block py-3 text-gray-800 font-semibold text-sm">
+                                                {link.name}
+                                            </Link>
+                                        )}
+                                    </div>
+                                ))}
+                                <Link to="/login" onClick={() => setIsOpen(false)} className="block text-center border border-gray-900 text-gray-900 py-3 font-semibold mt-4">
+                                    Post Property
+                                </Link>
+                            </div>
+                        </motion.div>
+                    )}
+                </AnimatePresence>
+            </header>
+        );
+    }
+
+    const isModern = template === 'modern';
 
     return (
         <header className={clsx(
@@ -45,13 +156,15 @@ const Header = () => {
         )}>
             <div className={clsx(
                 "rounded-2xl transition-all duration-300 px-6 py-4 flex justify-between items-center",
-                forceGlassy ? "glass-panel bg-white/90 shadow-premium text-text" : "bg-transparent text-white"
+                forceGlassy 
+                    ? (isModern ? "glass-panel bg-black/65 backdrop-blur-xl border border-white/10 text-white shadow-2xl" : "glass-panel bg-white/90 shadow-premium text-text")
+                    : "bg-transparent text-white"
             )}>
                 {/* Logo Area */}
                 <div className="flex-1 flex justify-start">
                     <Link to="/" className="text-3xl font-black italic tracking-tighter" aria-label="Rajesh Real Estate Home">
-                        <span className={clsx(forceGlassy ? "text-primary" : "text-white")}>RR</span>
-                        <span className={clsx(forceGlassy ? "text-text" : "text-white/80")}> Estate</span>
+                        <span className={clsx(forceGlassy && !isModern ? "text-primary" : "text-white")}>RR</span>
+                        <span className={clsx(forceGlassy && !isModern ? "text-text" : "text-white/80")}> Estate</span>
                     </Link>
                 </div>
 
