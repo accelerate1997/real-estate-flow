@@ -241,8 +241,7 @@ const LeadManagement = () => {
                                             onClick={async (e) => {
                                                 e.stopPropagation();
                                                 try {
-                                                    const agentApiUrl = import.meta.env.VITE_AGENT_API_URL || 'http://localhost:3000';
-                                                    const res = await fetch(`${agentApiUrl}/api/leads/match`, {
+                                                    const res = await fetch(`/api/leads/match`, {
                                                         method: 'POST',
                                                         headers: { 'Content-Type': 'application/json' },
                                                         body: JSON.stringify({ leadId: lead.id })

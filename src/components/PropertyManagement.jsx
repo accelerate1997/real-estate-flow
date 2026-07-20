@@ -367,8 +367,7 @@ const PropertyManagement = () => {
                                         <button
                                             onClick={async () => {
                                                 try {
-                                                    const agentApiUrl = import.meta.env.VITE_AGENT_API_URL || 'http://localhost:3000';
-                                                    const res = await fetch(`${agentApiUrl}/api/properties/match`, {
+                                                    const res = await fetch(`/api/properties/match`, {
                                                         method: 'POST',
                                                         headers: { 'Content-Type': 'application/json' },
                                                         body: JSON.stringify({ propertyId: property.id })

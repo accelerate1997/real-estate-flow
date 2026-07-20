@@ -455,8 +455,7 @@ const AddPropertyWizard = ({ onClose, onSuccess, targetAgencyId, currentUserId, 
 
                 const newRecord = await pb.collection('properties').create(pbData);
                 // Trigger Smart Match Backend
-                const agentApiUrl = import.meta.env.VITE_AGENT_API_URL || 'http://localhost:3000';
-                fetch(`${agentApiUrl}/api/properties/match`, {
+                fetch(`/api/properties/match`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ propertyId: newRecord.id })
