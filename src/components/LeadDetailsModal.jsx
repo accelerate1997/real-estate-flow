@@ -95,7 +95,7 @@ const LeadDetailsModal = ({ isOpen, onClose, lead }) => {
                 </button>
 
                 {/* LEFT SIDE: Lead Data */}
-                <div className="w-full md:w-1/3 bg-gray-50 flex flex-col border-r border-gray-100 overflow-y-auto">
+                <div className="w-full md:w-1/3 bg-gray-50 flex flex-col border-r border-gray-100 overflow-y-auto max-h-[40vh] md:max-h-none shrink-0">
                     <div className="p-6 bg-white border-b border-gray-100">
                         <div className="flex justify-between items-start mb-2">
                             <h2 className="text-xl font-bold text-gray-900">{lead.name}</h2>
@@ -228,7 +228,7 @@ const LeadDetailsModal = ({ isOpen, onClose, lead }) => {
                 </div>
 
                 {/* RIGHT SIDE: AI Chat Log */}
-                <div className="w-full md:w-2/3 bg-[#efeae2] flex flex-col h-full relative">
+                <div className="w-full md:w-2/3 bg-[#efeae2] flex flex-col flex-1 min-h-0 relative">
 
                     {/* Chat Header */}
                     <div className="bg-white px-6 py-4 flex justify-between items-center shadow-sm z-10 sticky top-0">

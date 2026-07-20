@@ -411,16 +411,16 @@ const fetchSequences = async () => {
         <div className="flex flex-col lg:flex-row gap-6">
             {/* Settings Sidebar Nav */}
             <div className="w-full lg:w-60 shrink-0">
-                <nav className="bg-white rounded-2xl shadow-sm border border-gray-100 p-2 flex flex-col gap-0.5">
+                <nav className="bg-white rounded-2xl shadow-sm border border-gray-100 p-2 flex flex-row lg:flex-col gap-1 overflow-x-auto lg:overflow-x-visible whitespace-nowrap scrollbar-none">
                     {sections.map((section) => (
                         <button
                             key={section.id}
                             onClick={() => setActiveSection(section.id)}
-                            className={`settings-nav-item ${activeSection === section.id ? 'settings-nav-item-active' : ''}`}
+                            className={`settings-nav-item shrink-0 w-auto lg:w-full ${activeSection === section.id ? 'settings-nav-item-active' : ''}`}
                         >
                             <section.icon className={`w-4 h-4 shrink-0 ${activeSection === section.id ? 'text-primary' : 'text-gray-400'}`} />
-                            <span className="flex-1 text-left">{section.name}</span>
-                            <ChevronRight className={`w-3.5 h-3.5 transition-all ${activeSection === section.id ? 'text-primary opacity-100 translate-x-0.5' : 'opacity-0'}`} />
+                            <span className="text-left">{section.name}</span>
+                            <ChevronRight className={`hidden lg:block w-3.5 h-3.5 ml-auto transition-all ${activeSection === section.id ? 'text-primary opacity-100 translate-x-0.5' : 'opacity-0'}`} />
                         </button>
                     ))}
                 </nav>

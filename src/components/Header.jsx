@@ -259,7 +259,7 @@ const Header = () => {
                         initial={{ opacity: 0, height: 0 }}
                         animate={{ opacity: 1, height: 'auto' }}
                         exit={{ opacity: 0, height: 0 }}
-                        className="md:hidden mt-4 bg-white rounded-2xl shadow-2xl overflow-hidden"
+                        className="md:hidden mt-4 bg-white rounded-2xl shadow-2xl overflow-y-auto max-h-[75vh] scrollbar-none"
                     >
                         <div className="px-6 py-6 space-y-2">
                             {navLinks.map((link, index) => (

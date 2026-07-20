@@ -143,7 +143,7 @@ const LeadManagement = () => {
             const colLeads = searchedLeads.filter(l => l.status === colName);
 
             return (
-                <div key={colName} className="kanban-col lg:h-[calc(100vh-200px)]">
+                <div key={colName} className="kanban-col h-[calc(100vh-230px)] lg:h-[calc(100vh-200px)] snap-align-start shrink-0 w-[85vw] sm:w-[320px]">
                     {/* Column Header */}
                     <div className="kanban-col-header">
                         <div className="flex items-center gap-2">
@@ -284,8 +284,8 @@ const LeadManagement = () => {
             </div>
 
             {/* Kanban Board */}
-            <div className="flex-1 pb-4">
-                <div className="flex flex-col lg:flex-row gap-4 h-full items-start overflow-x-auto">
+            <div className="flex-1 pb-4 overflow-x-auto scrollbar-none">
+                <div className="flex flex-row gap-4 h-full items-start select-none snap-x snap-mandatory">
                     {renderColumns()}
                 </div>
             </div>

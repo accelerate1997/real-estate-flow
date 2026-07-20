@@ -40,10 +40,10 @@ const SearchBar = ({ onSearch }) => {
     const [budgetOpen, setBudgetOpen] = useState(false);
 
     const Dropdown = ({ label, value, options, open, setOpen, onChange }) => (
-        <div className="relative">
+        <div className="relative w-full md:w-auto">
             <button
                 onClick={() => setOpen(!open)}
-                className="flex items-center gap-2 px-5 py-3.5 text-gray-700 font-semibold text-sm whitespace-nowrap hover:text-primary transition-colors"
+                className="flex items-center justify-between md:justify-start gap-2 px-5 py-3.5 text-gray-700 font-semibold text-sm whitespace-nowrap hover:text-primary transition-colors w-full md:w-auto"
             >
                 {value}
                 <ChevronDown className={`w-4 h-4 transition-transform ${open ? 'rotate-180' : ''}`} />
@@ -55,7 +55,7 @@ const SearchBar = ({ onSearch }) => {
                         animate={{ opacity: 1, y: 0 }}
                         exit={{ opacity: 0, y: 8 }}
                         transition={{ duration: 0.15 }}
-                        className="absolute top-full left-0 mt-2 bg-white border border-gray-100 rounded-xl shadow-2xl shadow-black/10 z-50 min-w-[180px] overflow-hidden"
+                        className="absolute top-full left-0 right-0 md:right-auto mt-2 bg-white border border-gray-100 rounded-xl shadow-2xl shadow-black/10 z-50 min-w-[180px] overflow-hidden"
                     >
                         {options.map(o => (
                             <button
@@ -81,7 +81,7 @@ const SearchBar = ({ onSearch }) => {
             onClick={() => { setTypeOpen(false); setBudgetOpen(false); }}
         >
             {/* Location Input */}
-            <div className="flex items-center gap-3 px-4 py-2 flex-1 md:border-r border-gray-100">
+            <div className="flex items-center gap-3 px-4 py-2 flex-1 border-b md:border-b-0 md:border-r border-gray-100">
                 <MapPin className="w-5 h-5 text-primary shrink-0" />
                 <input
                     value={location}
@@ -93,7 +93,7 @@ const SearchBar = ({ onSearch }) => {
 
             {/* Type Dropdown */}
             <div
-                className="md:border-r border-gray-100 flex items-center"
+                className="border-b md:border-b-0 md:border-r border-gray-100 flex items-center w-full md:w-auto"
                 onClick={e => e.stopPropagation()}
             >
                 <Dropdown
@@ -107,7 +107,7 @@ const SearchBar = ({ onSearch }) => {
             </div>
 
             {/* Budget Dropdown */}
-            <div className="flex items-center" onClick={e => e.stopPropagation()}>
+            <div className="border-b md:border-b-0 border-gray-100 flex items-center w-full md:w-auto" onClick={e => e.stopPropagation()}>
                 <Dropdown
                     label="Budget"
                     value={budget}
@@ -119,7 +119,7 @@ const SearchBar = ({ onSearch }) => {
             </div>
 
             {/* Search Button */}
-            <div className="shrink-0">
+            <div className="shrink-0 w-full md:w-auto">
                 <button
                     onClick={() => onSearch && onSearch({ location, type, budget })}
                     className="flex items-center gap-2 bg-primary hover:bg-primary-dark text-white font-bold px-8 py-3.5 rounded-xl md:rounded-full transition-all duration-300 hover:-translate-y-0.5 shadow-lg shadow-primary/30 w-full md:w-auto justify-center"
