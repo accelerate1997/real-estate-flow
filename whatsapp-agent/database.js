@@ -80,10 +80,11 @@ module.exports = {
             }
 
             if (requirements.budget && parseFloat(requirements.budget) > 0) {
-                filters.push(`price <= $${paramIndex}`);
-                // Allow a 15% flexibility buffer on max budget
+                // Allow a ±15% flexibility buffer on the budget
+                filters.push(`(price >= $${paramIndex} AND price <= $${paramIndex + 1})`);
+                params.push(parseFloat(requirements.budget) * 0.85);
                 params.push(parseFloat(requirements.budget) * 1.15);
-                paramIndex++;
+                paramIndex += 2;
             }
 
             const filterString = filters.length > 0 ? 'WHERE ' + filters.join(' AND ') : '';
@@ -339,11 +340,46 @@ module.exports = {
                 }
             }
 
+            if (property.propertyCategory) {
+                if (property.propertyCategory === 'Residential' || property.propertyCategory === 'NewProjects') {
+                    filters.push(`requirement ILIKE '%residential%'`);
+                } else if (property.propertyCategory === 'Commercial') {
+                    filters.push(`requirement ILIKE '%commercial%'`);
+                } else if (property.propertyCategory === 'PlotsLand') {
+                    filters.push(`(requirement ILIKE '%plot%' OR requirement ILIKE '%land%')`);
+                }
+            }
+
+            // Identify property sub-type keyword to filter leads
+            let propType = null;
+            const textToTest = `${property.title} ${property.description || ''}`.toLowerCase();
+            if (/apartment|flat/i.test(textToTest)) propType = 'apartment';
+            else if (/villa/i.test(textToTest)) propType = 'villa';
+            else if (/bungalow/i.test(textToTest)) propType = 'bungalow';
+            else if (/shop/i.test(textToTest)) propType = 'shop';
+            else if (/office/i.test(textToTest)) propType = 'office';
+            else if (/plot/i.test(textToTest)) propType = 'plot';
+            else if (/land/i.test(textToTest)) propType = 'land';
+
+            if (propType) {
+                if (propType === 'apartment') {
+                    filters.push(`(requirement ILIKE '%apartment%' OR requirement ILIKE '%flat%')`);
+                } else {
+                    filters.push(`requirement ILIKE $${paramIndex}`);
+                    params.push(`%${propType}%`);
+                    paramIndex++;
+                }
+            }
+
             if (property.price && property.price > 0) {
-                // Lead's max_budget * 1.15 >= property.price  ==>  max_budget >= property.price / 1.15
-                filters.push(`(max_budget IS NULL OR max_budget = 0 OR max_budget >= $${paramIndex})`);
+                // ±15% price matching range:
+                // Property price must be between max_budget * 0.85 and max_budget * 1.15
+                // max_budget * 1.15 >= price  ==>  max_budget >= price / 1.15
+                // max_budget * 0.85 <= price  ==>  max_budget <= price / 0.85
+                filters.push(`(max_budget IS NULL OR max_budget = 0 OR (max_budget >= $${paramIndex} AND max_budget <= $${paramIndex + 1}))`);
                 params.push(parseFloat(property.price) / 1.15);
-                paramIndex++;
+                params.push(parseFloat(property.price) / 0.85);
+                paramIndex += 2;
             }
             
             const filterString = filters.join(' AND ');
@@ -413,6 +449,44 @@ module.exports = {
                 paramIndex++;
             }
 
+            // Property Category matching (Residential / Commercial / Plots)
+            let leadCategory = null;
+            if (lead.requirement) {
+                if (/residential/i.test(lead.requirement)) leadCategory = 'Residential';
+                else if (/commercial/i.test(lead.requirement)) leadCategory = 'Commercial';
+                else if (/plot|land/i.test(lead.requirement)) leadCategory = 'PlotsLand';
+            }
+            if (leadCategory) {
+                if (leadCategory === 'Residential') {
+                    filters.push(`("propertyCategory" = 'Residential' OR "propertyCategory" = 'NewProjects')`);
+                } else {
+                    filters.push(`"propertyCategory" = $${paramIndex}`);
+                    params.push(leadCategory);
+                    paramIndex++;
+                }
+            }
+
+            // Property Sub-type matching (Apartment, Villa, Bungalow, Shop, Office, Plot, etc.)
+            let propertyTypeKeywords = [];
+            if (lead.requirement) {
+                if (/apartment|flat/i.test(lead.requirement)) propertyTypeKeywords.push('apartment', 'flat');
+                else if (/villa/i.test(lead.requirement)) propertyTypeKeywords.push('villa');
+                else if (/bungalow/i.test(lead.requirement)) propertyTypeKeywords.push('bungalow');
+                else if (/shop/i.test(lead.requirement)) propertyTypeKeywords.push('shop');
+                else if (/office/i.test(lead.requirement)) propertyTypeKeywords.push('office');
+                else if (/plot/i.test(lead.requirement)) propertyTypeKeywords.push('plot');
+                else if (/land/i.test(lead.requirement)) propertyTypeKeywords.push('land');
+            }
+            if (propertyTypeKeywords.length > 0) {
+                const typeFilters = [];
+                for (const kw of propertyTypeKeywords) {
+                    typeFilters.push(`(title ILIKE $${paramIndex} OR description ILIKE $${paramIndex})`);
+                    params.push(`%${kw}%`);
+                    paramIndex++;
+                }
+                filters.push(`(${typeFilters.join(' OR ')})`);
+            }
+
             if (lead.target_bhk) {
                  const match = lead.target_bhk.match(/\d+/);
                  const cleanBhk = match ? match[0] : lead.target_bhk;
@@ -439,10 +513,11 @@ module.exports = {
                 }
             }
             if (lead.max_budget && parseFloat(lead.max_budget) > 0) {
-                // Allow a 15% budget buffer for matching properties
-                filters.push(`(price IS NULL OR price = 0 OR price <= $${paramIndex})`);
+                // ±15% price matching range
+                filters.push(`(price IS NULL OR price = 0 OR (price >= $${paramIndex} AND price <= $${paramIndex + 1}))`);
+                params.push(parseFloat(lead.max_budget) * 0.85);
                 params.push(parseFloat(lead.max_budget) * 1.15);
-                paramIndex++;
+                paramIndex += 2;
             }
 
             const filterString = filters.join(' AND ');
