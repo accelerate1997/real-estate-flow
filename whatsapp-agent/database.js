@@ -353,7 +353,7 @@ module.exports = {
             // Identify property sub-type keyword to filter leads
             let propType = null;
             const textToTest = `${property.title} ${property.description || ''}`.toLowerCase();
-            if (/apartment|flat/i.test(textToTest)) propType = 'apartment';
+            if (/apartment|flat|condo/i.test(textToTest)) propType = 'apartment';
             else if (/villa/i.test(textToTest)) propType = 'villa';
             else if (/bungalow/i.test(textToTest)) propType = 'bungalow';
             else if (/shop/i.test(textToTest)) propType = 'shop';
@@ -363,7 +363,11 @@ module.exports = {
 
             if (propType) {
                 if (propType === 'apartment') {
-                    filters.push(`(requirement ILIKE '%apartment%' OR requirement ILIKE '%flat%')`);
+                    filters.push(`(requirement ILIKE '%apartment%' OR requirement ILIKE '%flat%' OR requirement ILIKE '%condo%')`);
+                } else if (propType === 'villa') {
+                    filters.push(`(requirement ILIKE '%villa%' OR requirement ILIKE '%bungalow%' OR requirement ILIKE '%house%')`);
+                } else if (propType === 'bungalow') {
+                    filters.push(`(requirement ILIKE '%bungalow%' OR requirement ILIKE '%villa%' OR requirement ILIKE '%house%')`);
                 } else {
                     filters.push(`requirement ILIKE $${paramIndex}`);
                     params.push(`%${propType}%`);
@@ -469,13 +473,22 @@ module.exports = {
             // Property Sub-type matching (Apartment, Villa, Bungalow, Shop, Office, Plot, etc.)
             let propertyTypeKeywords = [];
             if (lead.requirement) {
-                if (/apartment|flat/i.test(lead.requirement)) propertyTypeKeywords.push('apartment', 'flat');
-                else if (/villa/i.test(lead.requirement)) propertyTypeKeywords.push('villa');
-                else if (/bungalow/i.test(lead.requirement)) propertyTypeKeywords.push('bungalow');
-                else if (/shop/i.test(lead.requirement)) propertyTypeKeywords.push('shop');
-                else if (/office/i.test(lead.requirement)) propertyTypeKeywords.push('office');
-                else if (/plot/i.test(lead.requirement)) propertyTypeKeywords.push('plot');
-                else if (/land/i.test(lead.requirement)) propertyTypeKeywords.push('land');
+                const reqLower = lead.requirement.toLowerCase();
+                if (/apartment|flat|condo/i.test(reqLower)) {
+                    propertyTypeKeywords.push('apartment', 'flat', 'condo', 'condominium', 'residence');
+                } else if (/villa/i.test(reqLower)) {
+                    propertyTypeKeywords.push('villa', 'bungalow', 'house', 'row house');
+                } else if (/bungalow/i.test(reqLower)) {
+                    propertyTypeKeywords.push('bungalow', 'villa', 'house');
+                } else if (/shop/i.test(reqLower)) {
+                    propertyTypeKeywords.push('shop', 'showroom', 'retail');
+                } else if (/office/i.test(reqLower)) {
+                    propertyTypeKeywords.push('office', 'workspace', 'cowork');
+                } else if (/plot/i.test(reqLower)) {
+                    propertyTypeKeywords.push('plot', 'land');
+                } else if (/land/i.test(reqLower)) {
+                    propertyTypeKeywords.push('land', 'plot');
+                }
             }
             if (propertyTypeKeywords.length > 0) {
                 const typeFilters = [];
