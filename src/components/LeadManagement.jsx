@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, MessageCircle, Calendar, Search, Clock, Mail, UploadCloud, Loader2, Trash2, X, User } from 'lucide-react';
+import { Plus, MessageCircle, Calendar, Search, Clock, Mail, UploadCloud, Loader2, Trash2, X, User, Target } from 'lucide-react';
 import { pb } from '../services/pocketbase';
 import BulkLeadUploadWizard from './BulkLeadUploadWizard';
 import LeadDetailsModal from './LeadDetailsModal';
@@ -237,6 +237,28 @@ const LeadManagement = () => {
                                                 <MessageCircle className="w-3.5 h-3.5" />
                                             </button>
                                         )}
+                                        <button
+                                            onClick={async (e) => {
+                                                e.stopPropagation();
+                                                try {
+                                                    const agentApiUrl = import.meta.env.VITE_AGENT_API_URL || 'http://localhost:3000';
+                                                    const res = await fetch(`${agentApiUrl}/api/leads/match`, {
+                                                        method: 'POST',
+                                                        headers: { 'Content-Type': 'application/json' },
+                                                        body: JSON.stringify({ leadId: lead.id })
+                                                    });
+                                                    const data = await res.json();
+                                                    alert(`Matching engine successfully executed! Found ${data.matchesFound || 0} match(es). Check the "Smart Matches" tab.`);
+                                                } catch (err) {
+                                                    console.error(err);
+                                                    alert("Failed to run matching engine.");
+                                                }
+                                            }}
+                                            className="p-1.5 bg-amber-50 hover:bg-amber-100 text-amber-600 rounded-lg transition-colors"
+                                            title="Find matches for this lead"
+                                        >
+                                            <Target className="w-3.5 h-3.5" />
+                                        </button>
                                         <button
                                             onClick={(e) => handleDeleteLead(e, lead.id)}
                                             className="p-1.5 bg-red-50 hover:bg-red-100 text-red-500 rounded-lg transition-colors"

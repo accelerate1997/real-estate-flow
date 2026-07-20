@@ -23,6 +23,13 @@ dbEvents.on('lead_created', async (lead) => {
     try {
         console.log(`📡 [Instant Outreach] Triggered for lead ID: ${lead.id} (${lead.phone})`);
         
+        // Auto-run matching engine for new leads
+        try {
+            await db.matchLead(lead.id);
+        } catch (matchErr) {
+            console.error("Auto-matching failed on lead_created event:", matchErr.message);
+        }
+        
         // 1. Check if AI Agent is enabled for the agency
         const isEnabled = await db.isAgentEnabled(lead.agencyId);
         if (!isEnabled) {
@@ -716,6 +723,16 @@ app.patch('/api/collections/:collection/:id', upload.fields([{ name: 'images' },
         }
 
         const expanded = await expandRecords(collection, updateRes.rows);
+
+        // Auto-run matching engine if a lead's requirements are updated
+        if (collection === 'leads') {
+            try {
+                await db.matchLead(id);
+            } catch (matchErr) {
+                console.error("Auto-matching failed on lead PATCH update:", matchErr.message);
+            }
+        }
+
         res.json(expanded[0]);
     } catch (err) {
         console.error(`Error updating record in ${req.params.collection}:`, err);
@@ -1727,6 +1744,14 @@ app.post('/api/properties/match', async (req, res) => {
     try {
         const { propertyId } = req.body;
         const matchCount = await db.matchProperty(propertyId);
+        res.json({ success: true, matchesFound: matchCount });
+    } catch(err) { res.status(500).json({ error: "Match engine error" }); }
+});
+
+app.post('/api/leads/match', async (req, res) => {
+    try {
+        const { leadId } = req.body;
+        const matchCount = await db.matchLead(leadId);
         res.json({ success: true, matchesFound: matchCount });
     } catch(err) { res.status(500).json({ error: "Match engine error" }); }
 });

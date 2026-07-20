@@ -201,6 +201,14 @@ module.exports = {
                 if (!params.isChatUpdate) {
                     dbEvents.emit('lead_created', updatedLead);
                 }
+
+                // Run matching engine for updated lead
+                try {
+                    await this.matchLead(updatedLead.id);
+                } catch (matchErr) {
+                    console.error("Auto-matching failed on lead update:", matchErr.message);
+                }
+
                 return updatedLead;
             } else {
                 // Insert new lead
@@ -241,6 +249,14 @@ module.exports = {
                 } catch (e) {
                     console.error("Sequence enrollment error:", e.message);
                 }
+
+                // Run matching engine for new lead
+                try {
+                    await this.matchLead(newLead.id);
+                } catch (matchErr) {
+                    console.error("Auto-matching failed on lead create:", matchErr.message);
+                }
+
                 return newLead;
             }
 
@@ -343,6 +359,92 @@ module.exports = {
             return matchCount;
         } catch(e) {
              console.error("Match Engine Error:", e.message);
+             return 0;
+        }
+    },
+
+    /**
+     * Finds and creates matches for a new/updated lead against existing properties.
+     */
+    async matchLead(leadId) {
+        try {
+            const leadRes = await pool.query('SELECT * FROM leads WHERE id = $1', [leadId]);
+            if (leadRes.rows.length === 0) return 0;
+            const lead = leadRes.rows[0];
+            const agencyId = lead.agencyId;
+            if (!agencyId) return 0;
+
+            // If the lead has no parameters specified yet, don't generate matches to avoid spam
+            if (!lead.target_bhk && !lead.target_location && (!lead.max_budget || lead.max_budget === 0)) {
+                console.log(`[DB] Lead ${leadId} has no requirements set yet. Skipping match generation.`);
+                return 0;
+            }
+
+            const filters = ['"agencyId" = $1'];
+            const params = [agencyId];
+            let paramIndex = 2;
+
+            if (lead.target_bhk) {
+                 const match = lead.target_bhk.match(/\d+/);
+                 const cleanBhk = match ? match[0] : lead.target_bhk;
+                 if (cleanBhk && cleanBhk.toLowerCase() !== 'any') {
+                     filters.push(`("bhkType" LIKE $${paramIndex})`);
+                     params.push(`%${cleanBhk}%`);
+                     paramIndex++;
+                 }
+            }
+            if (lead.target_location && lead.target_location.toLowerCase() !== 'any') {
+                const locKeywords = lead.target_location.split(/[\s,]+/).filter(k => k.length > 3);
+                if (locKeywords.length > 0) {
+                    const locFilters = [];
+                    for (const kw of locKeywords) {
+                        locFilters.push(`location LIKE $${paramIndex}`);
+                        params.push(`%${kw}%`);
+                        paramIndex++;
+                    }
+                    filters.push(`(${locFilters.join(' OR ')})`);
+                } else if (lead.target_location.trim().length > 0) {
+                    filters.push(`location LIKE $${paramIndex}`);
+                    params.push(`%${lead.target_location.trim()}%`);
+                    paramIndex++;
+                }
+            }
+            if (lead.max_budget && parseFloat(lead.max_budget) > 0) {
+                filters.push(`(price IS NULL OR price = 0 OR price <= $${paramIndex})`);
+                params.push(parseFloat(lead.max_budget));
+                paramIndex++;
+            }
+
+            const filterString = filters.join(' AND ');
+            const propsQuery = `SELECT * FROM properties WHERE ${filterString}`;
+            console.log(`[DB] Matching Properties for Lead ${leadId}. Filter: ${filterString}`);
+            
+            const propsRes = await pool.query(propsQuery, params);
+            
+            let matchCount = 0;
+            for (const prop of propsRes.rows) {
+                try {
+                    // Check de-duplication
+                    const existQuery = 'SELECT * FROM matches WHERE lead_id = $1 AND property_id = $2 LIMIT 1';
+                    const existRes = await pool.query(existQuery, [lead.id, prop.id]);
+                    
+                    if (existRes.rows.length === 0) {
+                        const newMatchId = generateId();
+                        await pool.query(
+                            `INSERT INTO matches (id, lead_id, property_id, agency_id, status, created_at, updated_at)
+                             VALUES ($1, $2, $3, $4, $5, NOW(), NOW())`,
+                            [newMatchId, lead.id, prop.id, agencyId, 'Pending Review']
+                        );
+                        matchCount++;
+                        console.log(`[DB] Created Match: Lead ${lead.name} <-> Property ${prop.title}`);
+                    }
+                } catch(e) {
+                    console.error("Error creating match:", e.message);
+                }
+            }
+            return matchCount;
+        } catch(e) {
+             console.error("Match Lead Engine Error:", e.message);
              return 0;
         }
     },

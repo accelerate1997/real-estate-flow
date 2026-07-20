@@ -365,7 +365,21 @@ const PropertyManagement = () => {
                                 {(isOwner || currentUser.id === property.createdBy) && (
                                     <div className="flex items-center gap-2 shrink-0">
                                         <button
-                                            onClick={() => alert("Matching engine triggered for this property. Check Smart Matches tab.")}
+                                            onClick={async () => {
+                                                try {
+                                                    const agentApiUrl = import.meta.env.VITE_AGENT_API_URL || 'http://localhost:3000';
+                                                    const res = await fetch(`${agentApiUrl}/api/properties/match`, {
+                                                        method: 'POST',
+                                                        headers: { 'Content-Type': 'application/json' },
+                                                        body: JSON.stringify({ propertyId: property.id })
+                                                    });
+                                                    const data = await res.json();
+                                                    alert(`Matching engine successfully executed! Found ${data.matchesFound || 0} match(es). Check the "Smart Matches" tab.`);
+                                                } catch (err) {
+                                                    console.error(err);
+                                                    alert("Failed to run matching engine.");
+                                                }
+                                            }}
                                             className="p-2 rounded-lg text-gray-400 hover:text-amber-500 hover:bg-amber-50 transition-colors"
                                             title="Find Smart Matches"
                                         >
