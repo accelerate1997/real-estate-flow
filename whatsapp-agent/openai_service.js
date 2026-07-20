@@ -141,7 +141,8 @@ async function processMessage(userInput, phone, agencyId) {
             const properties = await db.findProperties({
                 budget: params.budget_in_rupees,
                 bhk: params.bhk,
-                location: params.location
+                location: params.location,
+                buy_or_rent: params.buy_or_rent
             });
 
             if (properties.length === 0) {

@@ -72,9 +72,17 @@ module.exports = {
                 paramIndex++;
             }
 
+            if (requirements.buy_or_rent) {
+                const txType = requirements.buy_or_rent.toLowerCase() === 'rent' ? 'Rent' : 'Sale';
+                filters.push(`"transactionType" = $${paramIndex}`);
+                params.push(txType);
+                paramIndex++;
+            }
+
             if (requirements.budget && parseFloat(requirements.budget) > 0) {
                 filters.push(`price <= $${paramIndex}`);
-                params.push(parseFloat(requirements.budget));
+                // Allow a 15% flexibility buffer on max budget
+                params.push(parseFloat(requirements.budget) * 1.15);
                 paramIndex++;
             }
 
@@ -323,9 +331,18 @@ module.exports = {
                     filters.push(`(${locFilters.join(' OR ')})`);
                 }
             }
+            if (property.transactionType) {
+                if (property.transactionType === 'Rent') {
+                    filters.push(`requirement ILIKE '%rent%'`);
+                } else {
+                    filters.push(`(requirement ILIKE '%buy%' OR requirement ILIKE '%sale%' OR requirement IS NULL OR requirement = '')`);
+                }
+            }
+
             if (property.price && property.price > 0) {
+                // Lead's max_budget * 1.15 >= property.price  ==>  max_budget >= property.price / 1.15
                 filters.push(`(max_budget IS NULL OR max_budget = 0 OR max_budget >= $${paramIndex})`);
-                params.push(property.price);
+                params.push(parseFloat(property.price) / 1.15);
                 paramIndex++;
             }
             
@@ -384,6 +401,18 @@ module.exports = {
             const params = [agencyId];
             let paramIndex = 2;
 
+            let leadTxType = null;
+            if (lead.requirement) {
+                if (/rent/i.test(lead.requirement)) leadTxType = 'Rent';
+                else if (/buy|sale/i.test(lead.requirement)) leadTxType = 'Sale';
+            }
+            
+            if (leadTxType) {
+                filters.push(`"transactionType" = $${paramIndex}`);
+                params.push(leadTxType);
+                paramIndex++;
+            }
+
             if (lead.target_bhk) {
                  const match = lead.target_bhk.match(/\d+/);
                  const cleanBhk = match ? match[0] : lead.target_bhk;
@@ -410,8 +439,9 @@ module.exports = {
                 }
             }
             if (lead.max_budget && parseFloat(lead.max_budget) > 0) {
+                // Allow a 15% budget buffer for matching properties
                 filters.push(`(price IS NULL OR price = 0 OR price <= $${paramIndex})`);
-                params.push(parseFloat(lead.max_budget));
+                params.push(parseFloat(lead.max_budget) * 1.15);
                 paramIndex++;
             }
 
