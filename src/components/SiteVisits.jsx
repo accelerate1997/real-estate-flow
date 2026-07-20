@@ -164,12 +164,38 @@ const SiteVisits = () => {
 
                                 {/* Card Footer */}
                                 <div className="px-5 py-3 bg-gray-50/60 border-t border-gray-100 flex gap-3">
-                                    <button className="flex-1 flex items-center justify-center gap-2 bg-white border border-gray-200 text-gray-700 font-semibold py-2 rounded-xl text-xs hover:bg-gray-50 transition-colors shadow-sm">
-                                        <Phone className="w-3.5 h-3.5" /> Call Lead
-                                    </button>
-                                    <button className="flex-1 flex items-center justify-center gap-2 bg-accent-teal/10 border border-accent-teal/20 text-accent-teal font-semibold py-2 rounded-xl text-xs hover:bg-accent-teal/20 transition-colors">
-                                        <Share2 className="w-3.5 h-3.5" /> Share Location
-                                    </button>
+                                    {visit.expand?.lead?.phone ? (
+                                        <a
+                                            href={`tel:${visit.expand.lead.phone}`}
+                                            className="flex-1 flex items-center justify-center gap-2 bg-white border border-gray-200 text-gray-700 font-semibold py-2 rounded-xl text-xs hover:bg-gray-50 transition-colors shadow-sm"
+                                        >
+                                            <Phone className="w-3.5 h-3.5" /> Call Lead
+                                        </a>
+                                    ) : (
+                                        <button
+                                            disabled
+                                            className="flex-1 flex items-center justify-center gap-2 bg-white border border-gray-150 text-gray-400 font-semibold py-2 rounded-xl text-xs cursor-not-allowed opacity-50"
+                                        >
+                                            <Phone className="w-3.5 h-3.5" /> No Phone
+                                        </button>
+                                    )}
+                                    {visit.expand?.property?.location ? (
+                                        <a
+                                            href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(visit.expand.property.location)}`}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="flex-1 flex items-center justify-center gap-2 bg-accent-teal/10 border border-accent-teal/20 text-accent-teal font-semibold py-2 rounded-xl text-xs hover:bg-accent-teal/20 transition-colors"
+                                        >
+                                            <Share2 className="w-3.5 h-3.5" /> View Map
+                                        </a>
+                                    ) : (
+                                        <button
+                                            disabled
+                                            className="flex-1 flex items-center justify-center gap-2 bg-accent-teal/5 border border-accent-teal/10 text-accent-teal/50 font-semibold py-2 rounded-xl text-xs cursor-not-allowed opacity-50"
+                                        >
+                                            <Share2 className="w-3.5 h-3.5" /> No Location
+                                        </button>
+                                    )}
                                 </div>
                             </motion.div>
                         );
