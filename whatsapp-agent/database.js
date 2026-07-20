@@ -116,7 +116,12 @@ module.exports = {
 
             // Combine details into a requirement overview
             const reqParts = [];
-            if (params.bhk) reqParts.push(`Looking for ${params.bhk}`);
+            if (params.buy_or_rent) reqParts.push(`Looking to ${params.buy_or_rent}`);
+            if (params.property_category) reqParts.push(`a ${params.property_category} property`);
+            if (params.property_type) reqParts.push(`(${params.property_type})`);
+            if (params.construction_status) reqParts.push(`[${params.construction_status}]`);
+            if (params.size) reqParts.push(`of size ${params.size}`);
+            if (params.bhk && !params.size) reqParts.push(`(${params.bhk})`);
             if (params.location) reqParts.push(`in ${params.location}`);
             if (params.budget_in_rupees) {
                 const budgetNum = parseFloat(params.budget_in_rupees);
@@ -128,10 +133,11 @@ module.exports = {
                     reqParts.push(`with a budget of ₹${budgetNum.toLocaleString('en-IN')}`);
                 }
             }
-            if (params.timeframe) reqParts.push(`Target timeframe: ${params.timeframe}`);
-            if (params.purpose) reqParts.push(`Purpose: ${params.purpose}`);
+            if (params.purpose) reqParts.push(`for ${params.purpose} purpose`);
+            if (params.urgency) reqParts.push(`[Urgency: ${params.urgency}]`);
+            if (params.timeframe) reqParts.push(`[Timeframe: ${params.timeframe}]`);
 
-            const requirementText = reqParts.length > 0 ? reqParts.join('. ') + '.' : (params.requirement || '');
+            const requirementText = reqParts.length > 0 ? reqParts.join(' ') + '.' : (params.requirement || '');
 
             const targetBhk = params.bhk || "";
             const targetLocation = params.location || "";
@@ -284,15 +290,10 @@ module.exports = {
 
             if (property.bhkType) {
                  const match = property.bhkType.match(/\d+/);
-                 if (match) {
-                     filters.push(`target_bhk LIKE $${paramIndex}`);
-                     params.push(`%${match[0]}%`);
-                     paramIndex++;
-                 } else {
-                     filters.push(`target_bhk LIKE $${paramIndex}`);
-                     params.push(`%${property.bhkType}%`);
-                     paramIndex++;
-                 }
+                 const cleanBhk = match ? match[0] : property.bhkType;
+                 filters.push(`(target_bhk IS NULL OR target_bhk = '' OR target_bhk ILIKE 'any' OR target_bhk LIKE $${paramIndex})`);
+                 params.push(`%${cleanBhk}%`);
+                 paramIndex++;
             }
             if (property.location) {
                 const locKeywords = property.location.split(/[\s,]+/).filter(k => k.length > 3);
@@ -307,7 +308,7 @@ module.exports = {
                 }
             }
             if (property.price && property.price > 0) {
-                filters.push(`max_budget >= $${paramIndex}`);
+                filters.push(`(max_budget IS NULL OR max_budget = 0 OR max_budget >= $${paramIndex})`);
                 params.push(property.price);
                 paramIndex++;
             }
