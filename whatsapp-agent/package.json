@@ -4,8 +4,7 @@
     "description": "WhatsApp AI Real Estate Assistant",
     "main": "index.js",
     "scripts": {
-        "start": "node index.js",
-        "test-local": "node test-local.js"
+        "start": "node index.js"
     },
     "dependencies": {
         "@aws-sdk/client-s3": "^3.1081.0",
