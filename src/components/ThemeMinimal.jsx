@@ -145,23 +145,23 @@ const MinimalPropertySection = () => {
     const displayed = (tab === 'all' ? properties : properties.filter(p => (p.propertyCategory || '').toLowerCase() === tab.toLowerCase())).slice(0, 8);
 
     return (
-        <section id="minimal-properties" className="py-24 bg-[#FAF9F6] border-t border-gray-200">
-            <div className="max-w-7xl mx-auto px-6 lg:px-12">
+        <section id="minimal-properties" className="py-16 sm:py-24 bg-[#FAF9F6] border-t border-gray-200">
+            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-12">
                 {/* Header */}
-                <div className="flex flex-col md:flex-row md:items-end justify-between gap-8 mb-14">
+                <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-10 sm:mb-14">
                     <div>
                         <span className="text-xs uppercase tracking-widest text-primary font-sans font-bold">Showcase</span>
-                        <h2 className="text-4xl md:text-5xl font-serif font-normal text-gray-900 mt-2 leading-tight">
+                        <h2 className="text-3xl sm:text-4xl md:text-5xl font-serif font-normal text-gray-900 mt-2 leading-tight">
                             Available Estates
                         </h2>
                     </div>
-                    {/* Tabs — minimal pill style */}
-                    <div className="flex items-center gap-3 font-sans self-start md:self-auto">
+                    {/* Tabs — scrollable on mobile */}
+                    <div className="flex items-center gap-2 sm:gap-3 font-sans self-start md:self-auto overflow-x-auto scrollbar-none pb-1 max-w-full">
                         {tabs.map(t => (
                             <button
                                 key={t.id}
                                 onClick={() => setTab(t.id)}
-                                className={`px-5 py-2 text-xs font-semibold uppercase tracking-wider transition-all duration-200 border ${
+                                className={`shrink-0 px-3 sm:px-5 py-2 text-xs font-semibold uppercase tracking-wider transition-all duration-200 border ${
                                     tab === t.id
                                         ? 'bg-gray-900 text-white border-gray-900'
                                         : 'bg-transparent text-gray-500 border-gray-300 hover:border-gray-900 hover:text-gray-900'
@@ -234,16 +234,16 @@ const philosophy = [
 ];
 
 const PhilosophySection = () => (
-    <section className="py-24 bg-white border-t border-gray-200">
-        <div className="max-w-6xl mx-auto px-6 lg:px-12">
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-16 items-start">
+    <section className="py-16 sm:py-24 bg-white border-t border-gray-200">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-12">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-10 lg:gap-16 items-start">
                 {/* Left */}
                 <div>
                     <span className="text-xs uppercase tracking-widest text-primary font-sans font-bold">Philosophy</span>
-                    <h2 className="text-4xl md:text-5xl font-serif font-normal text-gray-900 mt-3 leading-tight">
+                    <h2 className="text-3xl sm:text-4xl md:text-5xl font-serif font-normal text-gray-900 mt-3 leading-tight">
                         Bespoke estate curation built on transparency and clarity.
                     </h2>
-                    <div className="mt-10 relative h-72 overflow-hidden">
+                    <div className="mt-8 sm:mt-10 relative h-56 sm:h-72 overflow-hidden">
                         <img
                             src="https://images.unsplash.com/photo-1600585154340-be6191dae10c?auto=format&fit=crop&q=80&w=800"
                             alt=""
@@ -291,11 +291,11 @@ const testimonials = [
 ];
 
 const MinimalTestimonials = () => (
-    <section className="py-24 bg-[#FAF9F6] border-t border-gray-200">
-        <div className="max-w-6xl mx-auto px-6 lg:px-12">
-            <div className="mb-14">
+    <section className="py-16 sm:py-24 bg-[#FAF9F6] border-t border-gray-200">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-12">
+            <div className="mb-10 sm:mb-14">
                 <span className="text-xs uppercase tracking-widest text-primary font-sans font-bold">Testimonials</span>
-                <h2 className="text-4xl font-serif font-normal text-gray-900 mt-2">What Our Clients Say</h2>
+                <h2 className="text-3xl sm:text-4xl font-serif font-normal text-gray-900 mt-2">What Our Clients Say</h2>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
                 {testimonials.map((t, i) => (
@@ -335,33 +335,33 @@ const MinimalCTA = () => {
     const navigate = useNavigate();
     return (
         <section
-            className="relative py-24 overflow-hidden"
+            className="relative py-16 sm:py-24 overflow-hidden"
             style={{ backgroundImage: "url('https://images.unsplash.com/photo-1600047509807-ba8f99d2cdde?auto=format&fit=crop&q=80&w=2000')", backgroundSize: 'cover', backgroundPosition: 'center' }}
         >
             <div className="absolute inset-0 bg-gray-900/85" />
-            <div className="relative z-10 max-w-3xl mx-auto px-6 text-center font-sans">
+            <div className="relative z-10 max-w-3xl mx-auto px-4 sm:px-6 text-center font-sans">
                 <motion.div
                     initial={{ opacity: 0, y: 20 }}
                     whileInView={{ opacity: 1, y: 0 }}
                     viewport={{ once: true }}
                 >
                     <span className="text-xs uppercase tracking-widest text-primary font-bold">Begin Your Search</span>
-                    <h2 className="text-4xl md:text-5xl font-serif font-normal text-white mt-4 mb-5 leading-tight">
+                    <h2 className="text-3xl sm:text-4xl md:text-5xl font-serif font-normal text-white mt-4 mb-5 leading-tight">
                         Are You Looking to<br />Buy a Property?
                     </h2>
-                    <p className="text-white/60 mb-10 text-sm font-sans">
+                    <p className="text-white/60 mb-8 sm:mb-10 text-sm font-sans">
                         Browse our curated catalogue or use our mortgage calculator to find your budget.
                     </p>
                     <div className="flex flex-col sm:flex-row gap-4 justify-center">
                         <button
                             onClick={() => document.getElementById('minimal-properties')?.scrollIntoView({ behavior: 'smooth' })}
-                            className="bg-white text-gray-900 font-semibold px-10 py-4 hover:bg-gray-100 transition-colors text-sm tracking-wide uppercase"
+                            className="w-full sm:w-auto bg-white text-gray-900 font-semibold px-10 py-4 hover:bg-gray-100 transition-colors text-sm tracking-wide uppercase"
                         >
                             Browse Catalogue
                         </button>
                         <button
                             onClick={() => navigate('/calculator')}
-                            className="flex items-center justify-center gap-2 border border-white/30 text-white font-semibold px-10 py-4 hover:bg-white/10 transition-colors text-sm tracking-wide uppercase"
+                            className="w-full sm:w-auto flex items-center justify-center gap-2 border border-white/30 text-white font-semibold px-10 py-4 hover:bg-white/10 transition-colors text-sm tracking-wide uppercase"
                         >
                             <Calculator className="w-4 h-4" />
                             Mortgage Calculator
@@ -379,15 +379,15 @@ const ThemeMinimal = () => {
     const navigate = useNavigate();
 
     return (
-        <div className="bg-[#FAF9F6] text-gray-900 min-h-screen selection:bg-primary/10 pt-16">
+        <div className="bg-[#FAF9F6] text-gray-900 min-h-screen selection:bg-primary/10 pt-16 overflow-x-hidden">
 
             {/* ── HERO — Split Layout ── */}
             <section className="border-b border-gray-200 relative min-h-[88vh] flex items-center">
-                <div className="max-w-7xl mx-auto px-6 lg:px-12 w-full">
-                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-0 items-stretch min-h-[80vh]">
+                <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-12 w-full">
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-0 items-stretch">
 
                         {/* Left: Text */}
-                        <div className="flex flex-col justify-center py-20 pr-0 lg:pr-16">
+                        <div className="flex flex-col justify-center py-12 sm:py-16 lg:py-20 pr-0 lg:pr-16">
 
                             <motion.div
                                 initial={{ opacity: 0, y: 15 }}
@@ -402,7 +402,7 @@ const ThemeMinimal = () => {
                                 initial={{ opacity: 0, y: 25 }}
                                 animate={{ opacity: 1, y: 0 }}
                                 transition={{ duration: 0.8, delay: 0.1 }}
-                                className="text-5xl sm:text-6xl md:text-7xl font-serif font-normal leading-tight tracking-tight text-gray-900 mb-8"
+                                className="text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-serif font-normal leading-tight tracking-tight text-gray-900 mb-8"
                             >
                                 Find Your<br />
                                 Perfect Home<br />
@@ -424,11 +424,11 @@ const ThemeMinimal = () => {
                                 initial={{ opacity: 0, y: 10 }}
                                 animate={{ opacity: 1, y: 0 }}
                                 transition={{ delay: 0.3 }}
-                                className="flex items-center gap-8 mb-10 font-sans"
+                                className="flex items-center gap-6 sm:gap-8 mb-10 font-sans flex-wrap"
                             >
                                 {[{ v: '500+', l: 'Properties' }, { v: '10+', l: 'Years' }, { v: '95%', l: 'Satisfaction' }].map((s, i) => (
                                     <div key={i} className="text-center">
-                                        <div className="text-2xl font-bold text-gray-900">{s.v}</div>
+                                        <div className="text-xl sm:text-2xl font-bold text-gray-900">{s.v}</div>
                                         <div className="text-xs text-gray-400 mt-0.5 uppercase tracking-wide">{s.l}</div>
                                     </div>
                                 ))}

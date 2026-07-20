@@ -141,23 +141,23 @@ const ModernPropertySection = () => {
     const displayed = (tab === 'all' ? properties : properties.filter(p => (p.propertyCategory || '').toLowerCase() === tab.toLowerCase())).slice(0, 9);
 
     return (
-        <section id="modern-properties" className="py-24 relative z-10">
-            <div className="max-w-7xl mx-auto px-6 lg:px-8">
+        <section id="modern-properties" className="py-16 sm:py-24 relative z-10">
+            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                 {/* Header */}
-                <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-12">
+                <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-10 sm:mb-12">
                     <div>
                         <span className="text-primary uppercase tracking-widest font-bold text-xs">Portfolio</span>
-                        <h2 className="text-4xl md:text-5xl font-black text-white mt-2 leading-tight">
+                        <h2 className="text-3xl sm:text-4xl md:text-5xl font-black text-white mt-2 leading-tight">
                             Premium <span className="text-transparent bg-clip-text bg-gradient-to-r from-primary to-rose-400">Spaces</span>
                         </h2>
                     </div>
-                    {/* Filter Tabs */}
-                    <div className="flex items-center gap-1 bg-white/5 border border-white/10 rounded-xl p-1.5 backdrop-blur-md self-start md:self-auto">
+                    {/* Filter Tabs - scrollable on mobile */}
+                    <div className="flex items-center gap-1 bg-white/5 border border-white/10 rounded-xl p-1.5 backdrop-blur-md self-start md:self-auto overflow-x-auto scrollbar-none max-w-full">
                         {tabs.map(t => (
                             <button
                                 key={t.id}
                                 onClick={() => setTab(t.id)}
-                                className={`px-4 py-2 rounded-lg text-xs font-bold uppercase tracking-wide transition-all duration-200 ${
+                                className={`shrink-0 px-3 sm:px-4 py-2 rounded-lg text-xs font-bold uppercase tracking-wide transition-all duration-200 ${
                                     tab === t.id
                                         ? 'bg-primary text-white shadow-lg shadow-primary/30'
                                         : 'text-white/50 hover:text-white'
@@ -218,11 +218,11 @@ const features = [
 ];
 
 const FeaturesSection = () => (
-    <section className="py-24 relative z-10 border-t border-white/5">
-        <div className="max-w-6xl mx-auto px-6 lg:px-8">
-            <div className="text-center mb-16">
+    <section className="py-16 sm:py-24 relative z-10 border-t border-white/5">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div className="text-center mb-12 sm:mb-16">
                 <span className="text-accent-teal uppercase tracking-widest font-bold text-xs">Why We're Different</span>
-                <h2 className="text-4xl md:text-5xl font-black text-white mt-3">
+                <h2 className="text-3xl sm:text-4xl md:text-5xl font-black text-white mt-3">
                     Built for the Future
                 </h2>
                 <p className="text-white/40 mt-4 max-w-xl mx-auto text-sm">
@@ -264,11 +264,11 @@ const testimonials = [
 ];
 
 const ModernTestimonials = () => (
-    <section className="py-24 relative z-10 border-t border-white/5">
-        <div className="max-w-6xl mx-auto px-6 lg:px-8">
-            <div className="mb-14">
+    <section className="py-16 sm:py-24 relative z-10 border-t border-white/5">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div className="mb-10 sm:mb-14">
                 <span className="text-primary uppercase tracking-widest font-bold text-xs">Client Stories</span>
-                <h2 className="text-4xl md:text-5xl font-black text-white mt-3">
+                <h2 className="text-3xl sm:text-4xl md:text-5xl font-black text-white mt-3">
                     Trusted by <span className="text-transparent bg-clip-text bg-gradient-to-r from-primary to-rose-400">2000+ Families</span>
                 </h2>
             </div>
@@ -310,31 +310,31 @@ const ModernTestimonials = () => (
 const ModernCTA = () => {
     const navigate = useNavigate();
     return (
-        <section className="py-24 relative z-10">
-            <div className="max-w-5xl mx-auto px-6 text-center">
-                <div className="relative rounded-3xl p-12 md:p-20 border border-white/8 overflow-hidden"
+        <section className="py-16 sm:py-24 relative z-10">
+            <div className="max-w-5xl mx-auto px-4 sm:px-6 text-center">
+                <div className="relative rounded-3xl p-8 sm:p-12 md:p-20 border border-white/8 overflow-hidden"
                     style={{ background: 'rgba(255,255,255,0.04)' }}>
                     <div className="absolute -top-40 -right-40 w-96 h-96 rounded-full bg-primary/20 blur-[120px]" />
                     <div className="absolute -bottom-40 -left-40 w-96 h-96 rounded-full bg-accent-teal/15 blur-[120px]" />
                     <div className="relative z-10">
                         <Sparkles className="w-10 h-10 text-primary mx-auto mb-6 animate-pulse" />
-                        <h2 className="text-4xl md:text-5xl font-black text-white mb-5 leading-tight">
+                        <h2 className="text-3xl sm:text-4xl md:text-5xl font-black text-white mb-5 leading-tight">
                             Ready to Find Your <br />
                             <span className="text-transparent bg-clip-text bg-gradient-to-r from-primary via-rose-300 to-orange-300">Perfect Space?</span>
                         </h2>
-                        <p className="text-white/50 mb-10 text-base max-w-lg mx-auto">
+                        <p className="text-white/50 mb-8 sm:mb-10 text-base max-w-lg mx-auto">
                             Estimate your loan installments or explore our verified collection of ultra-premium properties.
                         </p>
                         <div className="flex flex-col sm:flex-row gap-4 justify-center">
                             <button
                                 onClick={() => document.getElementById('modern-properties')?.scrollIntoView({ behavior: 'smooth' })}
-                                className="bg-primary hover:bg-primary-dark text-white font-bold px-10 py-4 rounded-xl transition-all duration-300 shadow-lg shadow-primary/30 hover:-translate-y-0.5"
+                                className="w-full sm:w-auto bg-primary hover:bg-primary-dark text-white font-bold px-10 py-4 rounded-xl transition-all duration-300 shadow-lg shadow-primary/30 hover:-translate-y-0.5"
                             >
                                 Explore Properties
                             </button>
                             <button
                                 onClick={() => navigate('/calculator')}
-                                className="flex items-center justify-center gap-2 bg-white/5 border border-white/10 hover:bg-white/10 hover:border-white/20 text-white font-bold px-10 py-4 rounded-xl transition-all duration-300"
+                                className="w-full sm:w-auto flex items-center justify-center gap-2 bg-white/5 border border-white/10 hover:bg-white/10 hover:border-white/20 text-white font-bold px-10 py-4 rounded-xl transition-all duration-300"
                             >
                                 <Calculator className="w-5 h-5 text-accent-teal" />
                                 Mortgage Calculator
@@ -361,8 +361,8 @@ const ThemeModern = () => {
 
             {/* ── HERO ── */}
             <section className="relative min-h-screen flex items-center pt-20 z-10">
-                <div className="max-w-7xl mx-auto px-6 lg:px-8 w-full">
-                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center min-h-[80vh]">
+                <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 w-full">
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
 
                         {/* Left: Text */}
                         <div className="space-y-8">
@@ -380,7 +380,7 @@ const ThemeModern = () => {
                                 initial={{ opacity: 0, y: 40 }}
                                 animate={{ opacity: 1, y: 0 }}
                                 transition={{ duration: 0.9, delay: 0.1 }}
-                                className="text-5xl sm:text-6xl lg:text-7xl font-black leading-[1.05] tracking-tight"
+                                className="text-4xl sm:text-5xl lg:text-6xl xl:text-7xl font-black leading-[1.05] tracking-tight"
                             >
                                 Discover Homes<br />
                                 <span className="text-transparent bg-clip-text bg-gradient-to-r from-primary via-rose-300 to-orange-200">
@@ -403,7 +403,7 @@ const ThemeModern = () => {
                                 initial={{ opacity: 0, y: 20 }}
                                 animate={{ opacity: 1, y: 0 }}
                                 transition={{ delay: 0.3 }}
-                                className="flex items-center gap-8"
+                                className="flex items-center gap-6 sm:gap-8 flex-wrap"
                             >
                                 {[{ v: '98%', l: 'Satisfaction' }, { v: '15+', l: 'Years Active' }, { v: '500+', l: 'Properties' }].map((s, i) => (
                                     <div key={i} className="text-center">

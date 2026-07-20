@@ -283,23 +283,23 @@ const PropertySection = () => {
     const displayed = filtered.slice(0, 8);
 
     return (
-        <section id="classic-properties" className="py-24 bg-gray-50">
-            <div className="max-w-7xl mx-auto px-6 lg:px-8">
+        <section id="classic-properties" className="py-16 sm:py-24 bg-gray-50">
+            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                 {/* Header */}
-                <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-12">
+                <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-10 sm:mb-12">
                     <div>
                         <span className="text-primary font-bold text-xs uppercase tracking-widest">Our Portfolio</span>
-                        <h2 className="text-4xl md:text-5xl font-display font-black text-gray-900 mt-2 leading-tight">
+                        <h2 className="text-3xl sm:text-4xl md:text-5xl font-display font-black text-gray-900 mt-2 leading-tight">
                             Premium <span className="text-primary">Properties</span>
                         </h2>
                     </div>
-                    {/* Tabs */}
-                    <div className="flex items-center gap-2 bg-white rounded-xl p-1.5 border border-gray-100 shadow-sm self-start md:self-auto">
+                    {/* Tabs - scrollable on mobile */}
+                    <div className="flex items-center gap-1 sm:gap-2 bg-white rounded-xl p-1.5 border border-gray-100 shadow-sm self-start md:self-auto overflow-x-auto scrollbar-none max-w-full">
                         {tabs.map(t => (
                             <button
                                 key={t.id}
                                 onClick={() => setActiveTab(t.id)}
-                                className={`px-4 py-2 rounded-lg text-sm font-semibold transition-all duration-200 whitespace-nowrap ${
+                                className={`shrink-0 px-3 sm:px-4 py-2 rounded-lg text-sm font-semibold transition-all duration-200 whitespace-nowrap ${
                                     activeTab === t.id
                                         ? 'bg-primary text-white shadow-md shadow-primary/20'
                                         : 'text-gray-600 hover:text-primary'
@@ -379,11 +379,11 @@ const whyUs = [
 const WhySection = () => {
     const navigate = useNavigate();
     return (
-        <section className="py-24 bg-white">
-            <div className="max-w-6xl mx-auto px-6 lg:px-8">
-                <div className="text-center mb-16">
+        <section className="py-16 sm:py-24 bg-white">
+            <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+                <div className="text-center mb-12 sm:mb-16">
                     <span className="text-primary font-bold text-xs uppercase tracking-widest">Why Us</span>
-                    <h2 className="text-4xl md:text-5xl font-display font-black text-gray-900 mt-2">
+                    <h2 className="text-3xl sm:text-4xl md:text-5xl font-display font-black text-gray-900 mt-2">
                         The Smart Way to Buy Property
                     </h2>
                     <p className="text-gray-500 mt-4 max-w-xl mx-auto">
@@ -446,11 +446,11 @@ const testimonials = [
 ];
 
 const TestimonialsSection = () => (
-    <section className="py-24 bg-gray-50">
-        <div className="max-w-6xl mx-auto px-6 lg:px-8">
-            <div className="text-center mb-14">
+    <section className="py-16 sm:py-24 bg-gray-50">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div className="text-center mb-10 sm:mb-14">
                 <span className="text-primary font-bold text-xs uppercase tracking-widest">Reviews</span>
-                <h2 className="text-4xl md:text-5xl font-display font-black text-gray-900 mt-2">
+                <h2 className="text-3xl sm:text-4xl md:text-5xl font-display font-black text-gray-900 mt-2">
                     What Our Clients Say
                 </h2>
             </div>
@@ -494,33 +494,33 @@ const CTABanner = () => {
     const navigate = useNavigate();
     return (
         <section
-            className="relative py-24 overflow-hidden"
+            className="relative py-16 sm:py-24 overflow-hidden"
             style={{ backgroundImage: "url('https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?auto=format&fit=crop&q=80&w=2000')", backgroundSize: 'cover', backgroundPosition: 'center' }}
         >
             <div className="absolute inset-0 bg-gradient-to-r from-gray-900/90 via-gray-900/70 to-gray-900/50" />
-            <div className="relative z-10 max-w-3xl mx-auto px-6 text-center">
+            <div className="relative z-10 max-w-3xl mx-auto px-4 sm:px-6 text-center">
                 <motion.div
                     initial={{ opacity: 0, y: 30 }}
                     whileInView={{ opacity: 1, y: 0 }}
                     viewport={{ once: true }}
                 >
                     <span className="text-primary font-bold text-xs uppercase tracking-widest">Ready to Begin?</span>
-                    <h2 className="text-4xl md:text-5xl font-display font-black text-white mt-3 mb-5 leading-tight">
+                    <h2 className="text-3xl sm:text-4xl md:text-5xl font-display font-black text-white mt-3 mb-5 leading-tight">
                         Find Your Dream Property Today
                     </h2>
-                    <p className="text-white/70 mb-10 text-lg">
+                    <p className="text-white/70 mb-8 sm:mb-10 text-base sm:text-lg">
                         Browse 500+ verified listings or estimate your payments with our smart calculator.
                     </p>
                     <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
                         <button
                             onClick={() => { const el = document.getElementById('classic-properties'); el?.scrollIntoView({ behavior: 'smooth' }); }}
-                            className="bg-white text-gray-900 font-bold px-9 py-4 rounded-full hover:bg-primary hover:text-white transition-all duration-300 shadow-2xl"
+                            className="w-full sm:w-auto bg-white text-gray-900 font-bold px-9 py-4 rounded-full hover:bg-primary hover:text-white transition-all duration-300 shadow-2xl"
                         >
                             Browse Properties
                         </button>
                         <button
                             onClick={() => navigate('/calculator')}
-                            className="flex items-center gap-2 bg-white/10 backdrop-blur-md border border-white/30 text-white font-bold px-9 py-4 rounded-full hover:bg-white/20 transition-all duration-300"
+                            className="w-full sm:w-auto flex items-center justify-center gap-2 bg-white/10 backdrop-blur-md border border-white/30 text-white font-bold px-9 py-4 rounded-full hover:bg-white/20 transition-all duration-300"
                         >
                             <Calculator className="w-5 h-5" />
                             Mortgage Calculator
@@ -579,7 +579,7 @@ const ThemeClassic = () => {
                             initial={{ opacity: 0, x: -30 }}
                             animate={{ opacity: 1, x: 0 }}
                             transition={{ duration: 0.6 }}
-                            className="inline-flex items-center gap-2 bg-white/10 backdrop-blur-md border border-white/20 text-white px-5 py-2.5 rounded-full text-xs font-bold uppercase tracking-widest mb-8"
+                            className="inline-flex items-center gap-2 bg-white/10 backdrop-blur-md border border-white/20 text-white px-4 sm:px-5 py-2.5 rounded-full text-xs font-bold uppercase tracking-widest mb-6 sm:mb-8"
                         >
                             <span className="w-2 h-2 bg-primary rounded-full animate-pulse" />
                             Trusted Real Estate Partner
@@ -589,7 +589,7 @@ const ThemeClassic = () => {
                             initial={{ opacity: 0, y: 40 }}
                             animate={{ opacity: 1, y: 0 }}
                             transition={{ duration: 0.8, delay: 0.1 }}
-                            className="text-5xl sm:text-6xl md:text-7xl font-display font-black text-white leading-[1.05] mb-6 tracking-tight"
+                            className="text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-display font-black text-white leading-[1.05] mb-5 sm:mb-6 tracking-tight"
                         >
                             Explore Your<br />
                             <span className="text-transparent bg-clip-text bg-gradient-to-r from-primary via-rose-300 to-orange-300">

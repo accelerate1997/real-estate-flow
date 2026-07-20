@@ -309,56 +309,58 @@ const BulkMarketing = () => {
     };
 
     return (
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-155 p-6">
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-155 p-4 sm:p-6 overflow-hidden">
             {!creatingCampaign && !viewingCampaignDetails && !creatingTemplate && (
                 <>
                     {/* Header & Tabs */}
-                    <div className="flex flex-col md:flex-row justify-between md:items-center gap-4 mb-6 border-b border-gray-200 pb-4">
-                        <div>
-                            <h3 className="font-bold text-gray-900 text-lg">Bulk Outreach & Templates</h3>
-                            <p className="text-xs text-gray-500 mt-0.5">Send bulk campaigns and manage official Meta templates.</p>
-                        </div>
-                        <div className="flex items-center gap-2">
-                            <div className="bg-gray-100 p-0.5 rounded-lg flex items-center shrink-0">
-                                <button
-                                    onClick={() => setSubTab('campaigns')}
-                                    className={`px-3.5 py-1.5 rounded-md text-xs font-bold transition-all ${subTab === 'campaigns' ? 'bg-white text-gray-950 shadow-sm' : 'text-gray-500 hover:text-gray-800'}`}
-                                >
-                                    Campaigns
-                                </button>
-                                <button
-                                    onClick={() => setSubTab('templates')}
-                                    className={`px-3.5 py-1.5 rounded-md text-xs font-bold transition-all ${subTab === 'templates' ? 'bg-white text-gray-950 shadow-sm' : 'text-gray-500 hover:text-gray-800'}`}
-                                >
-                                    WABA Templates
-                                </button>
+                    <div className="flex flex-col gap-4 mb-6 border-b border-gray-200 pb-4">
+                        <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-3">
+                            <div>
+                                <h3 className="font-bold text-gray-900 text-lg">Bulk Outreach & Templates</h3>
+                                <p className="text-xs text-gray-500 mt-0.5">Send bulk campaigns and manage official Meta templates.</p>
                             </div>
-                            
-                            {subTab === 'campaigns' ? (
-                                <button
-                                    onClick={() => {
-                                        const initCamp = {
-                                            name: '',
-                                            templateName: '',
-                                            templateLanguage: 'en_US',
-                                            variables: ['name'],
-                                            filters: { location: '', bhk: '', maxBudget: '' }
-                                        };
-                                        setCreatingCampaign(initCamp);
-                                        fetchTargetLeadCount(initCamp.filters);
-                                    }}
-                                    className="btn-dash-primary flex items-center gap-2 text-xs py-1.5 px-3"
-                                >
-                                    <Plus className="w-4 h-4" /> New Campaign
-                                </button>
-                            ) : (
-                                <button
-                                    onClick={() => setCreatingTemplate(true)}
-                                    className="btn-dash-primary flex items-center gap-2 text-xs py-1.5 px-3"
-                                >
-                                    <Plus className="w-4 h-4" /> Submit Template
-                                </button>
-                            )}
+                            <div className="flex items-center gap-2 flex-wrap">
+                                <div className="bg-gray-100 p-0.5 rounded-lg flex items-center shrink-0">
+                                    <button
+                                        onClick={() => setSubTab('campaigns')}
+                                        className={`px-3.5 py-1.5 rounded-md text-xs font-bold transition-all ${subTab === 'campaigns' ? 'bg-white text-gray-950 shadow-sm' : 'text-gray-500 hover:text-gray-800'}`}
+                                    >
+                                        Campaigns
+                                    </button>
+                                    <button
+                                        onClick={() => setSubTab('templates')}
+                                        className={`px-3.5 py-1.5 rounded-md text-xs font-bold transition-all ${subTab === 'templates' ? 'bg-white text-gray-950 shadow-sm' : 'text-gray-500 hover:text-gray-800'}`}
+                                    >
+                                        WABA Templates
+                                    </button>
+                                </div>
+                                
+                                {subTab === 'campaigns' ? (
+                                    <button
+                                        onClick={() => {
+                                            const initCamp = {
+                                                name: '',
+                                                templateName: '',
+                                                templateLanguage: 'en_US',
+                                                variables: ['name'],
+                                                filters: { location: '', bhk: '', maxBudget: '' }
+                                            };
+                                            setCreatingCampaign(initCamp);
+                                            fetchTargetLeadCount(initCamp.filters);
+                                        }}
+                                        className="btn-dash-primary flex items-center gap-2 text-xs py-1.5 px-3"
+                                    >
+                                        <Plus className="w-4 h-4" /> New Campaign
+                                    </button>
+                                ) : (
+                                    <button
+                                        onClick={() => setCreatingTemplate(true)}
+                                        className="btn-dash-primary flex items-center gap-2 text-xs py-1.5 px-3"
+                                    >
+                                        <Plus className="w-4 h-4" /> Submit Template
+                                    </button>
+                                )}
+                            </div>
                         </div>
                     </div>
 
