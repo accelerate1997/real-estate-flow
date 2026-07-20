@@ -14,8 +14,11 @@ console.log(`🔌 [Database] Connecting to PostgreSQL at ${connectionString.spli
 
 const pool = new Pool({
     connectionString,
-    // Add SSL support for production databases like Neon/AWS RDS
-    ssl: connectionString.includes('sslmode=') || connectionString.includes('render.com') || connectionString.includes('neon.tech')
+    // Add SSL support for production databases like Neon/AWS RDS, or when NODE_ENV is set to production
+    ssl: connectionString.includes('sslmode=') || 
+         connectionString.includes('render.com') || 
+         connectionString.includes('neon.tech') || 
+         process.env.NODE_ENV === 'production'
         ? { rejectUnauthorized: false }
         : false
 });

@@ -6,6 +6,9 @@ const fs = require('fs');
 const multer = require('multer');
 const bcrypt = require('bcryptjs');
 const admin = require('./firebase_admin');
+const crypto = require('crypto');
+const helmet = require('helmet');
+const rateLimit = require('express-rate-limit');
 
 const db = require('./database');
 const { pool, initDB, autoMigrateIfEmpty } = require('./database/db');
@@ -69,11 +72,67 @@ dbEvents.on('lead_created', async (lead) => {
 });
 
 const app = express();
+
+// Secure HTTP response headers
+app.use(helmet());
+
 app.use(cors());
 
-// Configure JSON and urlencoded parsing
-app.use(express.json());
+// Configure JSON and urlencoded parsing (with raw body support for signature checks)
+app.use(express.json({
+    verify: (req, res, buf) => {
+        req.rawBody = buf;
+    }
+}));
 app.use(express.urlencoded({ extended: true }));
+
+// Setup rate limiting for API endpoints (max 300 requests per 15 minutes per IP)
+const apiLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000,
+    max: 300,
+    message: { error: 'Too many requests from this IP, please try again after 15 minutes.' },
+    standardHeaders: true,
+    legacyHeaders: false,
+});
+
+// Apply rate limiting to all /api/ routes
+app.use('/api/', apiLimiter);
+
+// Webhook Signature verification middleware for Meta
+function verifyMetaSignature(req, res, next) {
+    const signature = req.headers['x-hub-signature-256'];
+    const appSecret = process.env.WHATSAPP_APP_SECRET;
+
+    if (!appSecret) {
+        if (process.env.NODE_ENV === 'production') {
+            console.warn("[SECURITY WARNING] WHATSAPP_APP_SECRET environment variable is missing. Meta Webhook signature verification is bypassed.");
+        }
+        return next();
+    }
+
+    if (!signature) {
+        console.error("[SECURITY] Rejected Meta Webhook: Missing x-hub-signature-256 header.");
+        return res.status(401).send('Signature missing');
+    }
+
+    const parts = signature.split('=');
+    const signatureHash = parts[1];
+    if (!signatureHash) {
+        return res.status(401).send('Invalid signature format');
+    }
+
+    const expectedHash = crypto
+        .createHmac('sha256', appSecret)
+        .update(req.rawBody || Buffer.from(''))
+        .digest('hex');
+
+    if (signatureHash !== expectedHash) {
+        console.error("[SECURITY] Rejected Meta Webhook: Signature verification failed (hash mismatch)!");
+        return res.status(401).send('Signature mismatch');
+    }
+
+    next();
+}
 
 
 
@@ -937,7 +996,7 @@ function isDuplicate(id) {
     return false;
 }
 
-app.post('/webhook', async (req, res) => {
+app.post('/webhook', verifyMetaSignature, async (req, res) => {
     try {
         const body = req.body;
         console.log("🔥 INCOMING META WEBHOOK:", JSON.stringify(body, null, 2));
@@ -1997,7 +2056,7 @@ app.get('/api/integrations/webhook/meta', (req, res) => {
 });
 
 // Meta Webhook Lead Ingestion (POST)
-app.post('/api/integrations/webhook/meta', async (req, res) => {
+app.post('/api/integrations/webhook/meta', verifyMetaSignature, async (req, res) => {
     try {
         const payload = req.body;
         console.log('📡 [Meta Webhook] Inbound Leadgen webhook received:', JSON.stringify(payload));
