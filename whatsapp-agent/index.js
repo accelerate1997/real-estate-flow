@@ -903,7 +903,7 @@ app.post('/api/chats/send-message', async (req, res) => {
         }
 
         // 2. Look up lead ID to reference in logs
-        const leadRes = await pool.query('SELECT id FROM leads WHERE REPLACE(phone, \' \', \'\') LIKE $1 AND agency_id = $2 LIMIT 1', [`%${cleanPhone}%`, agencyId]);
+        const leadRes = await pool.query('SELECT id FROM leads WHERE REPLACE(phone, \' \', \'\') LIKE $1 AND "agencyId" = $2 LIMIT 1', [`%${cleanPhone}%`, agencyId]);
         const leadId = leadRes.rows.length > 0 ? leadRes.rows[0].id : null;
 
         // 3. Log the message in the PostgreSQL chat_logs table
