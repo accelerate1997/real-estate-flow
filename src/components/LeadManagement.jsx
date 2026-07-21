@@ -43,6 +43,10 @@ const LeadManagement = () => {
     const [newLead, setNewLead] = useState({ name: '', phone: '', email: '', requirement: '', date: '', status: 'New Lead' });
     const [searchTerm, setSearchTerm] = useState('');
 
+    const [properties, setProperties] = useState([]);
+    const [selectedPropertyIds, setSelectedPropertyIds] = useState([]);
+    const [propertySearch, setPropertySearch] = useState('');
+
     const currentUser = pb.authStore.model;
     const isOwner = currentUser?.role !== 'agent';
     const targetAgencyId = isOwner ? currentUser?.id : currentUser?.agencyId;
@@ -50,10 +54,23 @@ const LeadManagement = () => {
     useEffect(() => {
         if (targetAgencyId) {
             fetchLeads();
+            fetchProperties();
         } else {
             setIsLoading(false);
         }
     }, [targetAgencyId]);
+
+    const fetchProperties = async () => {
+        try {
+            const records = await pb.collection('properties').getFullList({
+                filter: pb.filter('agencyId = {:agencyId}', { agencyId: targetAgencyId }),
+                sort: '-created',
+            });
+            setProperties(records);
+        } catch (error) {
+            console.error('Error fetching properties:', error);
+        }
+    };
 
     const fetchLeads = async () => {
         setIsLoading(true);
@@ -84,9 +101,25 @@ const LeadManagement = () => {
         e.preventDefault();
         try {
             const createdRecord = await pb.collection('leads').create({ ...newLead, agencyId: targetAgencyId });
+            
+            // Link selected properties in matches table
+            if (selectedPropertyIds.length > 0) {
+                const linkPromises = selectedPropertyIds.map(propId => 
+                    pb.collection('matches').create({
+                        lead_id: createdRecord.id,
+                        property_id: propId,
+                        agency_id: targetAgencyId,
+                        status: 'Pending Review'
+                    })
+                );
+                await Promise.all(linkPromises);
+            }
+
             setLeads([createdRecord, ...leads]);
             setIsAddModalOpen(false);
             setNewLead({ name: '', phone: '', email: '', requirement: '', date: '', status: 'New Lead' });
+            setSelectedPropertyIds([]);
+            setPropertySearch('');
         } catch (error) {
             console.error('Error creating lead:', error);
             alert('Failed to create lead.');
@@ -402,6 +435,68 @@ const LeadManagement = () => {
                                         placeholder="Looking for 3BHK sea view..."
                                     />
                                 </div>
+
+                                <div>
+                                    <label className="dash-label flex justify-between items-center">
+                                        <span>Link Properties (Manual)</span>
+                                        <span className="text-[10px] font-bold text-primary bg-primary/5 px-2 py-0.5 rounded-full border border-primary/10">
+                                            {selectedPropertyIds.length} Selected
+                                        </span>
+                                    </label>
+                                    <div className="border border-gray-200 rounded-xl p-3 bg-gray-50/50 space-y-2">
+                                        <div className="relative mb-2">
+                                            <Search className="w-3.5 h-3.5 text-gray-400 absolute left-3 top-2.5" />
+                                            <input
+                                                type="text"
+                                                placeholder="Search properties to link..."
+                                                className="w-full text-xs pl-8 pr-3 py-1.5 bg-white border border-gray-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary"
+                                                value={propertySearch}
+                                                onChange={e => setPropertySearch(e.target.value)}
+                                            />
+                                        </div>
+                                        <div className="max-h-[140px] overflow-y-auto space-y-2 pr-1 scrollbar-none">
+                                            {properties
+                                                .filter(p => 
+                                                    p.title.toLowerCase().includes(propertySearch.toLowerCase()) || 
+                                                    (p.location && p.location.toLowerCase().includes(propertySearch.toLowerCase()))
+                                                )
+                                                .map(p => {
+                                                    const isSelected = selectedPropertyIds.includes(p.id);
+                                                    return (
+                                                        <label key={p.id} className="flex items-start gap-2.5 p-2 bg-white rounded-lg border border-gray-150 shadow-sm cursor-pointer hover:bg-gray-50 transition-colors">
+                                                            <input
+                                                                type="checkbox"
+                                                                checked={isSelected}
+                                                                onChange={e => {
+                                                                    if (e.target.checked) {
+                                                                        setSelectedPropertyIds([...selectedPropertyIds, p.id]);
+                                                                    } else {
+                                                                        setSelectedPropertyIds(selectedPropertyIds.filter(id => id !== p.id));
+                                                                    }
+                                                                }}
+                                                                className="mt-0.5 rounded text-primary focus:ring-primary border-gray-300 w-3.5 h-3.5"
+                                                            />
+                                                            <div className="min-w-0 flex-1">
+                                                                <p className="text-xs font-bold text-gray-800 truncate">{p.title}</p>
+                                                                <p className="text-[10px] text-gray-500 truncate">{p.location || 'No Location'}</p>
+                                                            </div>
+                                                            <span className="text-[10px] font-mono text-gray-400 self-center shrink-0">
+                                                                {p.price ? (
+                                                                    parseFloat(p.price) >= 10000000 
+                                                                        ? `₹${(parseFloat(p.price) / 10000000).toFixed(1)} Cr` 
+                                                                        : `₹${(parseFloat(p.price) / 100000).toFixed(1)} L`
+                                                                ) : 'Request'}
+                                                            </span>
+                                                        </label>
+                                                    );
+                                                })
+                                            }
+                                            {properties.length === 0 && (
+                                                <p className="text-xs text-gray-400 text-center py-2">No properties available.</p>
+                                            )}
+                                        </div>
+                                    </div>
+                                </div>
                                 <div>
                                     <label className="dash-label">Next Follow-up Date</label>
                                     <input
@@ -418,7 +513,11 @@ const LeadManagement = () => {
                         <div className="px-6 py-4 border-t border-gray-100 bg-gray-50 flex justify-end gap-3">
                             <button
                                 type="button"
-                                onClick={() => setIsAddModalOpen(false)}
+                                onClick={() => {
+                                    setIsAddModalOpen(false);
+                                    setSelectedPropertyIds([]);
+                                    setPropertySearch('');
+                                }}
                                 className="px-5 py-2.5 text-gray-600 font-semibold hover:bg-gray-200 rounded-xl transition-colors text-sm"
                             >
                                 Cancel

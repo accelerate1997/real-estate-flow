@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { X, MessageCircle, Clock, CheckCircle2, Bot, User, Loader2, Target, Calendar, Edit2, Save } from 'lucide-react';
+import { X, MessageCircle, Clock, CheckCircle2, Bot, User, Loader2, Target, Calendar, Edit2, Save, Search } from 'lucide-react';
+import { pb } from '../services/pocketbase';
 
 const LeadDetailsModal = ({ isOpen, onClose, lead, onUpdate }) => {
     const [chats, setChats] = useState([]);
@@ -22,6 +23,13 @@ const LeadDetailsModal = ({ isOpen, onClose, lead, onUpdate }) => {
     const [isSavingEdit, setIsSavingEdit] = useState(false);
     const [editForm, setEditForm] = useState({ name: '', phone: '', requirement: '', date: '', status: '' });
 
+    const [linkedMatches, setLinkedMatches] = useState([]);
+    const [allProperties, setAllProperties] = useState([]);
+    const [isLoadingProperties, setIsLoadingProperties] = useState(false);
+    const [propertySearch, setPropertySearch] = useState('');
+    const [selectedPropertyIds, setSelectedPropertyIds] = useState([]);
+    const [originalPropertyIds, setOriginalPropertyIds] = useState([]);
+
     const formatDateForInput = (dateStr) => {
         if (!dateStr) return '';
         try {
@@ -36,13 +44,48 @@ const LeadDetailsModal = ({ isOpen, onClose, lead, onUpdate }) => {
         }
     };
 
+    const fetchLinkedProperties = async (leadId) => {
+        try {
+            const records = await pb.collection('matches').getFullList({
+                filter: pb.filter('lead_id = {:leadId}', { leadId }),
+                expand: 'property_id'
+            });
+            setLinkedMatches(records);
+            const ids = records.map(r => r.property_id);
+            setSelectedPropertyIds(ids);
+            setOriginalPropertyIds(ids);
+        } catch (error) {
+            console.error("Failed to fetch linked properties:", error);
+        }
+    };
+
+    const fetchAllProperties = async () => {
+        setIsLoadingProperties(true);
+        try {
+            const agencyId = lead?.agencyId || pb.authStore.model?.id;
+            if (!agencyId) return;
+            const records = await pb.collection('properties').getFullList({
+                filter: pb.filter('agencyId = {:agencyId}', { agencyId }),
+                sort: '-created'
+            });
+            setAllProperties(records);
+        } catch (error) {
+            console.error("Failed to fetch all properties:", error);
+        } finally {
+            setIsLoadingProperties(false);
+        }
+    };
+
     useEffect(() => {
         if (isOpen && lead) {
             setLeadOptIn(lead.marketing_opt_in !== false);
             setIsWhitelisted(lead.whitelisted === true);
             setLeadStatus(lead.status);
             setIsEditing(false);
+            setPropertySearch('');
             fetchConsentLogs(lead.id);
+            fetchLinkedProperties(lead.id);
+            fetchAllProperties();
             
             if (lead.interestedPropertyId) {
                 fetchInterestedProperty(lead.interestedPropertyId);
@@ -184,6 +227,31 @@ const LeadDetailsModal = ({ isOpen, onClose, lead, onUpdate }) => {
                 lead.date = editForm.date ? new Date(editForm.date).toISOString() : null;
                 lead.status = editForm.status;
 
+                // Sync linked properties
+                const toAdd = selectedPropertyIds.filter(id => !originalPropertyIds.includes(id));
+                const toDelete = originalPropertyIds.filter(id => !selectedPropertyIds.includes(id));
+                const agencyId = lead.agencyId || pb.authStore.model?.id;
+
+                const addPromises = toAdd.map(propId => 
+                    pb.collection('matches').create({
+                        lead_id: lead.id,
+                        property_id: propId,
+                        agency_id: agencyId,
+                        status: 'Pending Review'
+                    })
+                );
+
+                const deletePromises = toDelete.map(propId => {
+                    const matchToDelete = linkedMatches.find(m => m.property_id === propId);
+                    if (matchToDelete) {
+                        return pb.collection('matches').delete(matchToDelete.id);
+                    }
+                    return Promise.resolve();
+                });
+
+                await Promise.all([...addPromises, ...deletePromises]);
+                await fetchLinkedProperties(lead.id);
+
                 if (onUpdate) {
                     onUpdate(updatedLead);
                 }
@@ -308,6 +376,75 @@ const LeadDetailsModal = ({ isOpen, onClose, lead, onUpdate }) => {
                                     </select>
                                 </div>
 
+                                <div>
+                                    <label className="dash-label flex justify-between items-center">
+                                        <span>Link Properties (Manual)</span>
+                                        <span className="text-[10px] font-bold text-primary bg-primary/5 px-2 py-0.5 rounded-full border border-primary/10">
+                                            {selectedPropertyIds.length} Linked
+                                        </span>
+                                    </label>
+                                    <div className="border border-gray-200 rounded-xl p-3 bg-gray-50/50 space-y-2">
+                                        <div className="relative mb-2">
+                                            <Search className="w-3.5 h-3.5 text-gray-400 absolute left-3 top-2.5" />
+                                            <input
+                                                type="text"
+                                                placeholder="Search properties to link..."
+                                                className="w-full text-xs pl-8 pr-3 py-1.5 bg-white border border-gray-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary"
+                                                value={propertySearch}
+                                                onChange={e => setPropertySearch(e.target.value)}
+                                            />
+                                        </div>
+                                        {isLoadingProperties ? (
+                                            <div className="flex items-center justify-center py-4 gap-2 text-xs text-gray-400">
+                                                <Loader2 className="w-3.5 h-3.5 animate-spin text-primary" />
+                                                <span>Loading properties...</span>
+                                            </div>
+                                        ) : (
+                                            <div className="max-h-[140px] overflow-y-auto space-y-2 pr-1 scrollbar-none">
+                                                {allProperties
+                                                    .filter(p => 
+                                                        p.title.toLowerCase().includes(propertySearch.toLowerCase()) || 
+                                                        (p.location && p.location.toLowerCase().includes(propertySearch.toLowerCase()))
+                                                    )
+                                                    .map(p => {
+                                                        const isLinked = selectedPropertyIds.includes(p.id);
+                                                        return (
+                                                            <label key={p.id} className="flex items-start gap-2.5 p-2 bg-white rounded-lg border border-gray-150 shadow-sm cursor-pointer hover:bg-gray-50 transition-colors">
+                                                                <input
+                                                                    type="checkbox"
+                                                                    checked={isLinked}
+                                                                    onChange={e => {
+                                                                        if (e.target.checked) {
+                                                                            setSelectedPropertyIds([...selectedPropertyIds, p.id]);
+                                                                        } else {
+                                                                            setSelectedPropertyIds(selectedPropertyIds.filter(id => id !== p.id));
+                                                                        }
+                                                                    }}
+                                                                    className="mt-0.5 rounded text-primary focus:ring-primary border-gray-300 w-3.5 h-3.5"
+                                                                />
+                                                                <div className="min-w-0 flex-1">
+                                                                    <p className="text-xs font-bold text-gray-800 truncate">{p.title}</p>
+                                                                    <p className="text-[10px] text-gray-500 truncate">{p.location || 'No Location'}</p>
+                                                                </div>
+                                                                <span className="text-[10px] font-mono text-gray-400 self-center shrink-0">
+                                                                    {p.price ? (
+                                                                        parseFloat(p.price) >= 10000000 
+                                                                            ? `₹${(parseFloat(p.price) / 10000000).toFixed(1)} Cr` 
+                                                                            : `₹${(parseFloat(p.price) / 100000).toFixed(1)} L`
+                                                                    ) : 'Request'}
+                                                                </span>
+                                                            </label>
+                                                        );
+                                                    })
+                                                }
+                                                {allProperties.length === 0 && (
+                                                    <p className="text-xs text-gray-400 text-center py-2">No properties available.</p>
+                                                )}
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+
                                 <div className="flex gap-3 pt-4 border-t border-gray-100">
                                     <button
                                         type="button"
@@ -402,57 +539,58 @@ const LeadDetailsModal = ({ isOpen, onClose, lead, onUpdate }) => {
                                     </div>
                                 </div>
 
-                                {lead.interestedPropertyId && (
-                                    <div>
-                                        <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Interested Property</h3>
-                                        {isLoadingProperty ? (
-                                            <div className="bg-white p-4 rounded-xl border border-gray-100 shadow-sm flex items-center gap-2 justify-center py-6 text-gray-400">
-                                                <Loader2 className="w-4 h-4 animate-spin text-primary" />
-                                                <span className="text-xs font-medium">Loading property details...</span>
-                                            </div>
-                                        ) : interestedProperty ? (
-                                            <div className="bg-white p-4 rounded-xl border border-gray-100 shadow-sm flex items-center gap-3">
-                                                {interestedProperty.images && JSON.parse(interestedProperty.images).length > 0 ? (
-                                                    <img 
-                                                        src={`/api/files/properties/${interestedProperty.id}/${JSON.parse(interestedProperty.images)[0]}`} 
-                                                        alt={interestedProperty.title}
-                                                        className="w-12 h-12 rounded-lg object-cover bg-gray-50 border border-gray-100"
-                                                        onError={(e) => {
-                                                            e.target.src = 'https://images.unsplash.com/photo-1564013799919-ab600027ffc6?auto=format&fit=crop&w=400&q=80';
-                                                        }}
-                                                    />
-                                                ) : (
-                                                    <div className="w-12 h-12 rounded-lg bg-primary/10 flex items-center justify-center text-primary font-bold text-xs">
-                                                        🏡
+                                <div>
+                                    <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Linked Properties ({linkedMatches.length})</h3>
+                                    <div className="space-y-3">
+                                        {linkedMatches.map(match => {
+                                            const property = match.expand?.property_id;
+                                            if (!property) return null;
+
+                                            return (
+                                                <div key={match.id} className="bg-white p-3.5 rounded-xl border border-gray-100 shadow-sm flex items-center gap-3 relative group">
+                                                    {property.images && property.images.length > 0 ? (
+                                                        <img 
+                                                            src={`/api/files/properties/${property.id}/${property.images[0]}`} 
+                                                            alt={property.title}
+                                                            className="w-12 h-12 rounded-lg object-cover bg-gray-50 border border-gray-100"
+                                                            onError={(e) => {
+                                                                e.target.src = 'https://images.unsplash.com/photo-1564013799919-ab600027ffc6?auto=format&fit=crop&w=400&q=80';
+                                                            }}
+                                                        />
+                                                    ) : (
+                                                        <div className="w-12 h-12 rounded-lg bg-primary/10 flex items-center justify-center text-primary font-bold text-xs">
+                                                            🏡
+                                                        </div>
+                                                    )}
+                                                    <div className="min-w-0 flex-1">
+                                                        <p className="text-sm font-bold text-gray-900 truncate">{property.title}</p>
+                                                        <p className="text-xs text-gray-500 truncate">{property.location}</p>
+                                                        <p className="text-xs text-primary font-bold mt-0.5">
+                                                            {property.price ? (
+                                                                parseFloat(property.price) >= 10000000 
+                                                                    ? `₹${(parseFloat(property.price) / 10000000).toFixed(2)} Cr` 
+                                                                    : `₹${(parseFloat(property.price) / 100000).toFixed(2)} Lakh`
+                                                            ) : 'Price on request'}
+                                                        </p>
                                                     </div>
-                                                )}
-                                                <div className="min-w-0 flex-1">
-                                                    <p className="text-sm font-bold text-gray-900 truncate">{interestedProperty.title}</p>
-                                                    <p className="text-xs text-gray-500 truncate">{interestedProperty.location}</p>
-                                                    <p className="text-xs text-primary font-bold mt-0.5">
-                                                        {interestedProperty.price ? (
-                                                            parseFloat(interestedProperty.price) >= 10000000 
-                                                                ? `₹${(parseFloat(interestedProperty.price) / 10000000).toFixed(2)} Cr` 
-                                                                : `₹${(parseFloat(interestedProperty.price) / 100000).toFixed(2)} Lakh`
-                                                        ) : 'Price on request'}
-                                                    </p>
+                                                    <a 
+                                                        href={`/properties/${property.id}`}
+                                                        target="_blank"
+                                                        rel="noopener noreferrer"
+                                                        className="text-[10px] font-bold bg-primary/5 text-primary border border-primary/10 hover:bg-primary/10 px-2.5 py-1.5 rounded-lg transition-all"
+                                                    >
+                                                        View Page
+                                                    </a>
                                                 </div>
-                                                <a 
-                                                    href={`/properties/${interestedProperty.id}`}
-                                                    target="_blank"
-                                                    rel="noopener noreferrer"
-                                                    className="text-[10px] font-bold bg-primary/5 text-primary border border-primary/10 hover:bg-primary/10 px-2.5 py-1.5 rounded-lg transition-all"
-                                                >
-                                                    View Page
-                                                </a>
-                                            </div>
-                                        ) : (
+                                            );
+                                        })}
+                                        {linkedMatches.length === 0 && (
                                             <div className="bg-white p-4 rounded-xl border border-gray-100 shadow-sm text-xs text-gray-400">
-                                                Property details unavailable (ID: {lead.interestedPropertyId})
+                                                No properties linked manually.
                                             </div>
                                         )}
                                     </div>
-                                )}
+                                </div>
 
                                 {lead.date && (
                                     <div>
