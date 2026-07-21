@@ -310,13 +310,19 @@ const LeadManagement = () => {
                                         </div>
 
                                         {/* Date Display */}
-                                        <div className="flex items-center gap-1 text-gray-400">
-                                            <Clock className={`w-3 h-3 ${isPastOrToday(lead.date) ? 'text-primary' : 'text-gray-400'}`} />
-                                            <span className={`text-[9px] font-bold ${isPastOrToday(lead.date) ? 'text-primary' : 'text-gray-500'}`}>
-                                                {lead.date
-                                                    ? new Date(lead.date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })
-                                                    : 'No Date'}
-                                            </span>
+                                        <div className="flex flex-col items-end text-[9px] text-gray-400 gap-0.5 mt-auto">
+                                            {(lead.created || lead.created_at) && (
+                                                <span className="text-[9px] font-bold text-gray-400 flex items-center gap-0.5">
+                                                    <Calendar className="w-2.5 h-2.5 text-gray-300" />
+                                                    Added: {new Date(lead.created || lead.created_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}
+                                                </span>
+                                            )}
+                                            {lead.date && (
+                                                <span className={`font-bold flex items-center gap-0.5 ${isPastOrToday(lead.date) ? 'text-primary' : 'text-gray-500'}`}>
+                                                    <Clock className="w-2.5 h-2.5" />
+                                                    Follow-up: {new Date(lead.date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}
+                                                </span>
+                                            )}
                                         </div>
                                     </div>
                                 </div>

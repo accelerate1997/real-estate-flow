@@ -501,9 +501,17 @@ const LeadDetailsModal = ({ isOpen, onClose, lead, onUpdate }) => {
                                         </span>
                                     </div>
                                 </div>
-                                <div className="flex items-center gap-2 text-gray-500 text-sm mb-4">
-                                    <MessageCircle className="w-4 h-4" />
-                                    {lead.phone}
+                                <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 text-gray-500 text-sm mb-4">
+                                    <div className="flex items-center gap-1.5">
+                                        <MessageCircle className="w-4 h-4 text-gray-400" />
+                                        <span>{lead.phone}</span>
+                                    </div>
+                                    {(lead.created || lead.created_at) && (
+                                        <div className="flex items-center gap-1.5">
+                                            <Calendar className="w-4 h-4 text-gray-400" />
+                                            <span>Created: {new Date(lead.created || lead.created_at).toLocaleString('en-IN', { dateStyle: 'short', timeStyle: 'short' })}</span>
+                                        </div>
+                                    )}
                                 </div>
 
                                 <div className="flex flex-wrap gap-2">
@@ -809,9 +817,16 @@ const LeadDetailsModal = ({ isOpen, onClose, lead, onUpdate }) => {
                                                 {displayContent}
                                             </p>
 
-                                            <div className="flex justify-end items-center gap-1 mt-1 opacity-60">
-                                                <span className="text-[10px]">AI Logger</span>
-                                                <CheckCircle2 className="w-3 h-3 text-blue-500" />
+                                            <div className="flex justify-between items-center mt-1.5 opacity-60 text-[9px] text-gray-500">
+                                                <span>
+                                                    {msg.created_at 
+                                                        ? new Date(msg.created_at).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }) 
+                                                        : ''}
+                                                </span>
+                                                <div className="flex items-center gap-1">
+                                                    <span>{isBot ? 'AI Agent' : 'Customer'}</span>
+                                                    <CheckCircle2 className="w-3 h-3 text-blue-500" />
+                                                </div>
                                             </div>
                                         </div>
                                     </div>

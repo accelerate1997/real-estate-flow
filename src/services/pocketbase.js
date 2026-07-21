@@ -88,7 +88,28 @@ class Collection {
             return true;
         }
 
-        return res.json();
+        const data = await res.json();
+        
+        // Recursively map created_at/updated_at to created/updated
+        const mapTimestamps = (obj) => {
+            if (!obj || typeof obj !== 'object') return obj;
+            if (Array.isArray(obj)) return obj.map(mapTimestamps);
+            const mapped = {};
+            for (const [key, val] of Object.entries(obj)) {
+                if (key === 'created_at') {
+                    mapped.created = val;
+                    mapped.created_at = val;
+                } else if (key === 'updated_at') {
+                    mapped.updated = val;
+                    mapped.updated_at = val;
+                } else {
+                    mapped[key] = mapTimestamps(val);
+                }
+            }
+            return mapped;
+        };
+
+        return mapTimestamps(data);
     }
 
     async getFullList(options = {}) {

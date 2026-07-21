@@ -743,7 +743,8 @@ module.exports = {
             const res = await pool.query(query, [`%${cleanPhone}%`]);
             return res.rows.map(r => ({
                 role: r.role,
-                content: r.content
+                content: r.content,
+                created_at: r.created_at
             }));
         } catch (err) {
             console.error('[DB Error] Failed to fetch chat logs:', err.message);
