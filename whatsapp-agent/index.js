@@ -6,7 +6,6 @@ const fs = require('fs');
 const multer = require('multer');
 const bcrypt = require('bcryptjs');
 const admin = require('./firebase_admin');
-const PocketBase = require('pocketbase/cjs');
 const crypto = require('crypto');
 const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
@@ -2368,44 +2367,6 @@ async function startServer() {
     try {
         await initDB();
         await autoMigrateIfEmpty();
-
-        // Sync leads collection schema in PocketBase dynamically
-        try {
-            const pbUrl = process.env.POCKETBASE_URL || 'http://127.0.0.1:8090';
-            const pbEmail = process.env.POCKETBASE_ADMIN_EMAIL;
-            const pbPassword = process.env.POCKETBASE_ADMIN_PASSWORD;
-
-            if (pbEmail && pbPassword) {
-                const pbAdmin = new PocketBase(pbUrl);
-                await pbAdmin.admins.authWithPassword(pbEmail, pbPassword);
-                
-                // Get collection schema
-                const collection = await pbAdmin.collections.getOne('leads');
-                const fields = collection.schema || collection.fields || [];
-                const hasWhitelisted = fields.some(f => f.name === 'whitelisted');
-
-                if (!hasWhitelisted) {
-                    console.log('🔄 [PocketBase] Adding "whitelisted" field to leads collection...');
-                    const newField = {
-                        name: 'whitelisted',
-                        type: 'bool',
-                        required: false
-                    };
-                    if (collection.schema) {
-                        collection.schema.push(newField);
-                    } else if (collection.fields) {
-                        collection.fields.push(newField);
-                    }
-                    await pbAdmin.collections.update('leads', collection);
-                    console.log('✅ [PocketBase] Added "whitelisted" field successfully!');
-                }
-            } else {
-                console.log('ℹ️ [PocketBase] Admin credentials missing. Skipping schema sync.');
-            }
-        } catch (pbErr) {
-            console.error('⚠️ [PocketBase] Schema sync failed:', pbErr.message);
-        }
-
         app.listen(PORT, () => {
             console.log(`🚀 Unified API & Agent Server running on port ${PORT}`);
         });
