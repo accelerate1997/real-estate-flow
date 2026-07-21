@@ -149,7 +149,7 @@ const LeadManagement = () => {
             const colLeads = searchedLeads.filter(l => l.status === colName);
 
             return (
-                <div key={colName} className="kanban-col h-[calc(100vh-230px)] lg:h-[calc(100vh-200px)] snap-align-start shrink-0 w-[85vw] sm:w-[380px]">
+                <div key={colName} className="kanban-col h-[calc(100vh-230px)] lg:h-[calc(100vh-200px)] snap-align-start shrink-0 w-[85vw] sm:w-[300px]">
                     {/* Column Header */}
                     <div className="kanban-col-header">
                         <div className="flex items-center gap-2">
@@ -182,22 +182,22 @@ const LeadManagement = () => {
                                 <div
                                     key={lead.id}
                                     onClick={() => handleLeadClick(lead)}
-                                    className={`kanban-card ${colAccent[colName] || ''} hover:-translate-y-0.5 hover:shadow-md transition-all duration-300 relative group overflow-hidden bg-white p-4 rounded-xl border border-gray-100/80 flex flex-col gap-3.5 shrink-0`}
+                                    className={`kanban-card ${colAccent[colName] || ''} hover:-translate-y-0.5 hover:shadow-md transition-all duration-300 relative group overflow-hidden bg-white p-3.5 rounded-xl border border-gray-100/80 flex flex-col gap-2.5 shrink-0`}
                                 >
                                     {/* Header: Avatar, Name, Badges */}
-                                    <div className="flex justify-between items-start gap-2.5">
-                                        <div className="flex items-center gap-3 min-w-0">
+                                    <div className="flex justify-between items-start gap-2">
+                                        <div className="flex items-center gap-2.5 min-w-0">
                                             {/* Initials Avatar */}
-                                            <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0 text-xs font-bold text-primary border border-primary/20">
-                                                {initials === '?' ? <User className="w-3.5 h-3.5" /> : initials}
+                                            <div className="w-7 h-7 rounded-full bg-primary/10 flex items-center justify-center shrink-0 text-xs font-bold text-primary border border-primary/20">
+                                                {initials === '?' ? <User className="w-3" /> : initials}
                                             </div>
                                             {/* Name & Phone */}
                                             <div className="min-w-0">
-                                                <h4 className="font-bold text-gray-900 text-sm tracking-tight truncate group-hover:text-primary transition-colors">
+                                                <h4 className="font-bold text-gray-900 text-xs tracking-tight truncate group-hover:text-primary transition-colors">
                                                     {lead.name || 'WhatsApp Contact'}
                                                 </h4>
                                                 {lead.phone && (
-                                                    <span className="text-[10px] text-gray-400 font-mono block mt-0.5">
+                                                    <span className="text-[9px] text-gray-400 font-mono block mt-0.5">
                                                         +{lead.phone}
                                                     </span>
                                                 )}
@@ -207,12 +207,12 @@ const LeadManagement = () => {
                                         {/* Badges */}
                                         <div className="flex flex-col items-end gap-1 shrink-0">
                                             {lead.whitelisted && (
-                                                <span className="text-[8px] font-bold bg-amber-50 text-amber-600 border border-amber-200/50 px-2 py-0.5 rounded-full flex items-center gap-0.5 shadow-sm uppercase tracking-wide">
+                                                <span className="text-[7px] font-bold bg-amber-50 text-amber-600 border border-amber-200/50 px-1.5 py-0.5 rounded-full flex items-center gap-0.5 shadow-sm uppercase tracking-wide">
                                                     ★ VIP
                                                 </span>
                                             )}
                                             {isIntervention && (
-                                                <span className="text-[8px] font-bold bg-red-50 text-red-600 border border-red-200/50 px-2 py-0.5 rounded-full animate-pulse uppercase tracking-wide">
+                                                <span className="text-[7px] font-bold bg-red-50 text-red-600 border border-red-200/50 px-1.5 py-0.5 rounded-full animate-pulse uppercase tracking-wide">
                                                     Needs Agent
                                                 </span>
                                             )}
@@ -220,21 +220,21 @@ const LeadManagement = () => {
                                     </div>
 
                                     {/* Requirement snippet */}
-                                    <div className="bg-gray-50 border border-gray-100/80 rounded-xl p-2.5">
-                                        <span className="text-[9px] text-gray-400 font-bold uppercase tracking-wider block mb-0.5">Requirement</span>
+                                    <div className="bg-gray-50 border border-gray-100/80 rounded-xl p-2">
+                                        <span className="text-[8px] text-gray-400 font-bold uppercase tracking-wider block mb-0.5">Requirement</span>
                                         <p className="text-xs text-gray-600 line-clamp-2 leading-relaxed font-medium">
                                             {lead.requirement || 'No detailed requirements recorded.'}
                                         </p>
                                     </div>
 
                                     {/* Status Dropdown */}
-                                    <div className="flex flex-col gap-1">
-                                        <span className="text-[9px] text-gray-400 font-bold uppercase tracking-wider">Status</span>
+                                    <div className="flex flex-col gap-0.5">
+                                        <span className="text-[8px] text-gray-400 font-bold uppercase tracking-wider">Status</span>
                                         <select
                                             value={lead.status}
                                             onClick={(e) => e.stopPropagation()}
                                             onChange={(e) => handleStatusChange(lead.id, e.target.value)}
-                                            className="w-full text-xs font-semibold py-1.5 px-2 bg-white border border-gray-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary cursor-pointer text-gray-700 hover:border-gray-300 transition-colors"
+                                            className="w-full text-xs font-semibold py-1 px-1.5 bg-white border border-gray-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary cursor-pointer text-gray-700 hover:border-gray-300 transition-colors"
                                         >
                                             {Object.keys(initialColumns).map(col => (
                                                 <option key={col} value={col}>
@@ -245,41 +245,41 @@ const LeadManagement = () => {
                                     </div>
 
                                     {/* Footer: Actions & Date */}
-                                    <div className="flex items-center justify-between pt-2.5 border-t border-gray-100 mt-auto">
+                                    <div className="flex items-center justify-between pt-2 border-t border-gray-100 mt-auto">
                                         {/* Action Buttons */}
-                                        <div className="flex items-center gap-1.5">
+                                        <div className="flex items-center gap-1">
                                             <button
                                                 onClick={(e) => handleDeleteLead(e, lead.id)}
-                                                className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors border border-gray-150 shadow-sm"
+                                                className="p-1 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors border border-gray-150 shadow-sm"
                                                 title="Delete Lead"
                                             >
-                                                <Trash2 className="w-3.5 h-3.5" />
+                                                <Trash2 className="w-3 h-3" />
                                             </button>
                                             <button
                                                 onClick={(e) => {
                                                     e.stopPropagation();
                                                     handleLeadClick(lead);
                                                 }}
-                                                className="p-1.5 text-gray-400 hover:text-primary hover:bg-primary/5 rounded-lg transition-colors border border-gray-150 shadow-sm"
+                                                className="p-1 text-gray-400 hover:text-primary hover:bg-primary/5 rounded-lg transition-colors border border-gray-150 shadow-sm"
                                                 title="Edit / View Details"
                                             >
-                                                <Edit2 className="w-3.5 h-3.5" />
+                                                <Edit2 className="w-3 h-3" />
                                             </button>
                                             {lead.phone && (
                                                 <button
                                                     onClick={(e) => handleWhatsApp(e, lead.phone)}
-                                                    className="p-1.5 text-gray-400 hover:text-green-600 hover:bg-green-50 rounded-lg transition-colors border border-gray-150 shadow-sm"
+                                                    className="p-1 text-gray-400 hover:text-green-600 hover:bg-green-50 rounded-lg transition-colors border border-gray-150 shadow-sm"
                                                     title="WhatsApp Lead"
                                                 >
-                                                    <MessageCircle className="w-3.5 h-3.5" />
+                                                    <MessageCircle className="w-3 h-3" />
                                                 </button>
                                             )}
                                         </div>
 
                                         {/* Date Display */}
-                                        <div className="flex items-center gap-1.5 text-gray-400">
-                                            <Clock className={`w-3.5 h-3.5 ${isPastOrToday(lead.date) ? 'text-primary' : 'text-gray-400'}`} />
-                                            <span className={`text-[10px] font-bold ${isPastOrToday(lead.date) ? 'text-primary' : 'text-gray-500'}`}>
+                                        <div className="flex items-center gap-1 text-gray-400">
+                                            <Clock className={`w-3 h-3 ${isPastOrToday(lead.date) ? 'text-primary' : 'text-gray-400'}`} />
+                                            <span className={`text-[9px] font-bold ${isPastOrToday(lead.date) ? 'text-primary' : 'text-gray-500'}`}>
                                                 {lead.date
                                                     ? new Date(lead.date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })
                                                     : 'No Date'}
