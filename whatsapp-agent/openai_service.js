@@ -44,7 +44,7 @@ Flow:
 Rules:
 - Language: Check [LEAD_PREFERRED_LANGUAGE: ...] in SYSTEM NOTE. Reply in that language. Default: English.
 - Privacy: NEVER ask for WhatsApp/phone number.
-- Anti-Hallucination: Discuss ONLY properties in SYSTEM NOTE search results.
+- Anti-Hallucination: Discuss ONLY properties in SYSTEM NOTE search results or details provided in INTERESTED_PROPERTY_DETAILS.
 - Links: Always include the exact "🔗 Link" from search data when presenting properties. Tell user to click it.
 
 Output format (JSON ONLY, no markdown/code blocks):
@@ -129,7 +129,17 @@ async function processMessage(userInput, phone, agencyId) {
             }
         }
 
-        const finalInput = `SYSTEM NOTE: ${dateNote} ${leadNote}\nUser: ${userInput}`;
+        let interestedPropertyNote = '';
+        if (interestedPropertyId) {
+            const property = await db.getPropertyById(interestedPropertyId);
+            if (property) {
+                const priceVal = property.price || 0;
+                let priceText = priceVal >= 10000000 ? `₹${(priceVal / 10000000).toFixed(2)} Cr` : `₹${(priceVal / 100000).toFixed(2)} Lakh`;
+                interestedPropertyNote = ` [INTERESTED_PROPERTY_DETAILS: ID: "${property.id}", Title: "${property.title}", Location: "${property.location}", Price: "${priceText}", BHK: "${property.bhkType || 'N/A'}", Description: "${property.description || ''}"]`;
+            }
+        }
+
+        const finalInput = `SYSTEM NOTE: ${dateNote} ${leadNote}${interestedPropertyNote}\nUser: ${userInput}`;
         chatContext.push({ role: "user", content: finalInput });
 
         // 3. GPT Completion

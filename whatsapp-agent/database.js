@@ -965,6 +965,19 @@ module.exports = {
     },
 
     /**
+     * Fetches a property's details by its ID.
+     */
+    async getPropertyById(id) {
+        try {
+            const res = await pool.query('SELECT * FROM properties WHERE id = $1 LIMIT 1', [id]);
+            return res.rows.length > 0 ? res.rows[0] : null;
+        } catch (e) {
+            console.error('[DB Error] Failed to get property by id:', e.message);
+            return null;
+        }
+    },
+
+    /**
      * Links a property to a lead as their interested property.
      */
     async updateLeadInterestedProperty(phone, propertyId) {
