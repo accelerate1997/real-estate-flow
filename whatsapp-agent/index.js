@@ -342,8 +342,13 @@ async function expandRecords(collectionName, records) {
 
         if (collectionName === 'properties') {
             if (r.createdBy) {
-                const userRes = await pool.query('SELECT id, email, name, role FROM users WHERE id = $1', [r.createdBy]);
+                const userRes = await pool.query('SELECT id, email, name, role, phone FROM users WHERE id = $1', [r.createdBy]);
                 if (userRes.rows.length > 0) copy.expand.createdBy = userRes.rows[0];
+            }
+            const aId = r.agencyId || r["agencyId"];
+            if (aId) {
+                const agencyRes = await pool.query('SELECT id, email, name, role, phone, "agencyName", metadata FROM users WHERE id = $1', [aId]);
+                if (agencyRes.rows.length > 0) copy.expand.agencyId = agencyRes.rows[0];
             }
         } else if (collectionName === 'matches') {
             if (r.lead_id) {
