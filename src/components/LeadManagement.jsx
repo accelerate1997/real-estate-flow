@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, MessageCircle, Calendar, Search, Clock, Mail, UploadCloud, Loader2, Trash2, X, User, Target } from 'lucide-react';
+import { Plus, MessageCircle, Calendar, Search, Clock, Mail, UploadCloud, Loader2, Trash2, X, User, Target, Edit2 } from 'lucide-react';
 import { pb } from '../services/pocketbase';
 import BulkLeadUploadWizard from './BulkLeadUploadWizard';
 import LeadDetailsModal from './LeadDetailsModal';
@@ -220,22 +220,63 @@ const LeadManagement = () => {
                                     </div>
 
                                     {/* Requirement snippet */}
-                                    <div className="space-y-2">
-                                        <p className="text-xs text-gray-500 line-clamp-2 leading-relaxed font-medium">
+                                    <div className="bg-gray-50 border border-gray-100/80 rounded-xl p-2.5">
+                                        <span className="text-[9px] text-gray-400 font-bold uppercase tracking-wider block mb-0.5">Requirement</span>
+                                        <p className="text-xs text-gray-600 line-clamp-2 leading-relaxed font-medium">
                                             {lead.requirement || 'No detailed requirements recorded.'}
                                         </p>
-
-                                        {/* Interested Property Tag */}
-                                        {lead.interestedPropertyId && (
-                                            <div className="inline-flex items-center gap-1.5 bg-violet-50 text-violet-700 border border-violet-100/50 px-2 py-0.5 rounded-lg text-[9px] font-bold max-w-full">
-                                                <span className="shrink-0 text-xs">🏡</span>
-                                                <span className="truncate">Prop: {lead.interestedPropertyId}</span>
-                                            </div>
-                                        )}
                                     </div>
 
-                                    {/* Footer: Date & Primary Actions */}
+                                    {/* Status Dropdown */}
+                                    <div className="flex flex-col gap-1">
+                                        <span className="text-[9px] text-gray-400 font-bold uppercase tracking-wider">Status</span>
+                                        <select
+                                            value={lead.status}
+                                            onClick={(e) => e.stopPropagation()}
+                                            onChange={(e) => handleStatusChange(lead.id, e.target.value)}
+                                            className="w-full text-xs font-semibold py-1.5 px-2 bg-white border border-gray-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary cursor-pointer text-gray-700 hover:border-gray-300 transition-colors"
+                                        >
+                                            {Object.keys(initialColumns).map(col => (
+                                                <option key={col} value={col}>
+                                                    {col}
+                                                </option>
+                                            ))}
+                                        </select>
+                                    </div>
+
+                                    {/* Footer: Actions & Date */}
                                     <div className="flex items-center justify-between pt-2.5 border-t border-gray-100 mt-auto">
+                                        {/* Action Buttons */}
+                                        <div className="flex items-center gap-1.5">
+                                            <button
+                                                onClick={(e) => handleDeleteLead(e, lead.id)}
+                                                className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors border border-gray-150 shadow-sm"
+                                                title="Delete Lead"
+                                            >
+                                                <Trash2 className="w-3.5 h-3.5" />
+                                            </button>
+                                            <button
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    handleLeadClick(lead);
+                                                }}
+                                                className="p-1.5 text-gray-400 hover:text-primary hover:bg-primary/5 rounded-lg transition-colors border border-gray-150 shadow-sm"
+                                                title="Edit / View Details"
+                                            >
+                                                <Edit2 className="w-3.5 h-3.5" />
+                                            </button>
+                                            {lead.phone && (
+                                                <button
+                                                    onClick={(e) => handleWhatsApp(e, lead.phone)}
+                                                    className="p-1.5 text-gray-400 hover:text-green-600 hover:bg-green-50 rounded-lg transition-colors border border-gray-150 shadow-sm"
+                                                    title="WhatsApp Lead"
+                                                >
+                                                    <MessageCircle className="w-3.5 h-3.5" />
+                                                </button>
+                                            )}
+                                        </div>
+
+                                        {/* Date Display */}
                                         <div className="flex items-center gap-1.5 text-gray-400">
                                             <Clock className={`w-3.5 h-3.5 ${isPastOrToday(lead.date) ? 'text-primary' : 'text-gray-400'}`} />
                                             <span className={`text-[10px] font-bold ${isPastOrToday(lead.date) ? 'text-primary' : 'text-gray-500'}`}>
@@ -243,18 +284,6 @@ const LeadManagement = () => {
                                                     ? new Date(lead.date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })
                                                     : 'No Date'}
                                             </span>
-                                        </div>
-
-                                        <div className="flex items-center gap-1.5 opacity-80 group-hover:opacity-100 transition-opacity">
-                                            {lead.phone && (
-                                                <button
-                                                    onClick={(e) => handleWhatsApp(e, lead.phone)}
-                                                    className="p-1.5 bg-green-50 hover:bg-green-500 text-green-600 hover:text-white rounded-lg transition-all border border-green-200/30 shadow-sm"
-                                                    title="WhatsApp Lead"
-                                                >
-                                                    <MessageCircle className="w-3.5 h-3.5" />
-                                                </button>
-                                            )}
                                         </div>
                                     </div>
                                 </div>
