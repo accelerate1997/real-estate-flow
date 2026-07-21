@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { X, MessageCircle, Clock, CheckCircle2, Bot, User, Loader2, Target, Calendar, Edit2, Save, Search } from 'lucide-react';
+import { X, MessageCircle, Clock, CheckCircle2, Bot, User, Loader2, Target, Calendar, Edit2, Save, Search, Send } from 'lucide-react';
 import { pb } from '../services/pocketbase';
 
 const LeadDetailsModal = ({ isOpen, onClose, lead, onUpdate }) => {
@@ -22,6 +22,8 @@ const LeadDetailsModal = ({ isOpen, onClose, lead, onUpdate }) => {
     const [isEditing, setIsEditing] = useState(false);
     const [isSavingEdit, setIsSavingEdit] = useState(false);
     const [editForm, setEditForm] = useState({ name: '', phone: '', requirement: '', date: '', status: '' });
+    const [typedMessage, setTypedMessage] = useState('');
+    const [isSendingChat, setIsSendingChat] = useState(false);
 
     const [linkedMatches, setLinkedMatches] = useState([]);
     const [allProperties, setAllProperties] = useState([]);
@@ -282,6 +284,51 @@ const LeadDetailsModal = ({ isOpen, onClose, lead, onUpdate }) => {
             console.error("Failed to fetch AI chat logs", error);
         } finally {
             setIsLoadingChats(false);
+        }
+    };
+
+    const handleSendChat = async () => {
+        if (!typedMessage.trim() || !lead || !lead.phone) return;
+        setIsSendingChat(true);
+        try {
+            const agencyId = lead.agencyId || pb.authStore.model?.id;
+            const response = await fetch('/api/chats/send-message', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    phone: lead.phone,
+                    message: typedMessage,
+                    agencyId
+                })
+            });
+
+            if (response.ok) {
+                const data = await response.json();
+                if (data.success) {
+                    const newMsg = {
+                        role: 'assistant',
+                        content: typedMessage,
+                        created_at: new Date().toISOString()
+                    };
+                    setChats(prev => [...prev, newMsg]);
+                    setTypedMessage('');
+                    setTimeout(() => {
+                        if (chatContainerRef.current) {
+                            chatContainerRef.current.scrollTop = chatContainerRef.current.scrollHeight;
+                        }
+                    }, 100);
+                } else {
+                    alert(data.error || "Failed to send message.");
+                }
+            } else {
+                const errText = await response.text();
+                alert(errText || "Error sending message.");
+            }
+        } catch (err) {
+            console.error("Direct send chat error:", err);
+            alert("An error occurred while sending the message.");
+        } finally {
+            setIsSendingChat(false);
         }
     };
 
@@ -833,6 +880,59 @@ const LeadDetailsModal = ({ isOpen, onClose, lead, onUpdate }) => {
                                 );
                             })
                         )}
+                    </div>
+
+                    {/* Smart AI Banner & Chat Input Box */}
+                    {leadStatus !== 'Needs Human Intervention' && (
+                        <div className="bg-amber-50 border-t border-amber-200 px-4 py-2 flex items-center justify-between text-xs text-amber-800 font-medium z-10">
+                            <span className="flex items-center gap-1.5">
+                                ⚠️ AI Agent is active. Customer replies will trigger AI responses.
+                            </span>
+                            <button
+                                onClick={async () => {
+                                    try {
+                                        const updated = await pb.collection('leads').update(lead.id, {
+                                            status: 'Needs Human Intervention'
+                                        });
+                                        setLeadStatus('Needs Human Intervention');
+                                        if (onUpdate) onUpdate(updated);
+                                    } catch (e) {
+                                        console.error("Failed to update status:", e);
+                                    }
+                                }}
+                                className="bg-amber-100 hover:bg-amber-200 border border-amber-300 text-amber-900 px-2 py-0.5 rounded-lg font-bold transition-all text-[10px]"
+                            >
+                                Disable AI (Needs Intervention)
+                            </button>
+                        </div>
+                    )}
+
+                    <div className="bg-[#f0f2f5] p-3 border-t border-gray-200 flex items-center gap-2 z-10">
+                        <textarea
+                            rows="1"
+                            value={typedMessage}
+                            onChange={(e) => setTypedMessage(e.target.value)}
+                            onKeyDown={(e) => {
+                                if (e.key === 'Enter' && !e.shiftKey) {
+                                    e.preventDefault();
+                                    handleSendChat();
+                                }
+                            }}
+                            placeholder="Type a message to chat directly..."
+                            className="flex-1 resize-none rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary max-h-[100px] min-h-[38px] leading-relaxed font-messaging text-gray-800"
+                        />
+                        <button
+                            onClick={handleSendChat}
+                            disabled={isSendingChat || !typedMessage.trim()}
+                            className="bg-primary hover:bg-primary/95 disabled:bg-gray-300 disabled:cursor-not-allowed text-white p-2.5 rounded-full shadow transition-all shrink-0"
+                            title="Send Message via WhatsApp"
+                        >
+                            {isSendingChat ? (
+                                <Loader2 className="w-4 h-4 animate-spin" />
+                            ) : (
+                                <Send className="w-4 h-4" />
+                            )}
+                        </button>
                     </div>
                 </div>
 

@@ -883,6 +883,44 @@ app.get('/api/chats/:phone', async (req, res) => {
     }
 });
 
+// API Endpoint for Agents to send free-form WhatsApp messages directly
+app.post('/api/chats/send-message', async (req, res) => {
+    try {
+        const { phone, message, agencyId } = req.body;
+        if (!phone || !message || !agencyId) {
+            return res.status(400).json({ error: "phone, message, and agencyId are required" });
+        }
+
+        const cleanPhone = phone.replace(/[^\d]/g, '');
+        const instanceName = `Agency_${agencyId}`;
+
+        console.log(`✉️ [Human Agent Chat] Sending WhatsApp message to ${cleanPhone} for agency ${agencyId}: "${message}"`);
+        
+        // 1. Send the message via official Meta API
+        const success = await sendMessage(cleanPhone, message, instanceName);
+        if (!success) {
+            return res.status(500).json({ success: false, error: "Failed to send WhatsApp message via Meta API" });
+        }
+
+        // 2. Look up lead ID to reference in logs
+        const leadRes = await pool.query('SELECT id FROM leads WHERE REPLACE(phone, \' \', \'\') LIKE $1 AND agency_id = $2 LIMIT 1', [`%${cleanPhone}%`, agencyId]);
+        const leadId = leadRes.rows.length > 0 ? leadRes.rows[0].id : null;
+
+        // 3. Log the message in the PostgreSQL chat_logs table
+        const newLogId = generateId();
+        await pool.query(
+            `INSERT INTO chat_logs (id, phone, role, content, agency_id, lead_id, created_at, updated_at)
+             VALUES ($1, $2, $3, $4, $5, $6, NOW(), NOW())`,
+            [newLogId, cleanPhone, 'assistant', message, agencyId, leadId]
+        );
+
+        res.json({ success: true });
+    } catch (err) {
+        console.error("❌ Send agent message error:", err);
+        res.status(500).json({ error: err.message });
+    }
+});
+
 // API Endpoint for Voice Agent to log transcripts
 const { logMessage } = require('./openai_service');
 app.post('/api/chats/log', (req, res) => {
@@ -1332,6 +1370,13 @@ app.post('/webhook', verifyMetaSignature, async (req, res) => {
                     }
                     return res.sendStatus(200);
                 }
+            }
+
+            // Check if lead status is 'Needs Human Intervention' and bypass AI replies
+            const needsIntervention = await db.isLeadNeedsIntervention(fromPhone);
+            if (needsIntervention) {
+                console.log(`ℹ️ Lead ${fromPhone} status is "Needs Human Intervention". Skipping automatic AI response.`);
+                return res.sendStatus(200);
             }
 
             res.sendStatus(200);
