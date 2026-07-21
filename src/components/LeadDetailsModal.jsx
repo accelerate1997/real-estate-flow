@@ -15,12 +15,21 @@ const LeadDetailsModal = ({ isOpen, onClose, lead }) => {
     const [leadStatus, setLeadStatus] = useState(lead ? lead.status : 'New Lead');
     const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
 
+    const [interestedProperty, setInterestedProperty] = useState(null);
+    const [isLoadingProperty, setIsLoadingProperty] = useState(false);
+
     useEffect(() => {
         if (isOpen && lead) {
             setLeadOptIn(lead.marketing_opt_in !== false);
             setIsWhitelisted(lead.whitelisted === true);
             setLeadStatus(lead.status);
             fetchConsentLogs(lead.id);
+            
+            if (lead.interestedPropertyId) {
+                fetchInterestedProperty(lead.interestedPropertyId);
+            } else {
+                setInterestedProperty(null);
+            }
         }
     }, [isOpen, lead]);
 
@@ -29,6 +38,21 @@ const LeadDetailsModal = ({ isOpen, onClose, lead }) => {
             fetchChats(lead.phone);
         }
     }, [isOpen, lead]);
+
+    const fetchInterestedProperty = async (propId) => {
+        setIsLoadingProperty(true);
+        try {
+            const response = await fetch(`/api/collections/properties/${propId}`);
+            if (response.ok) {
+                const data = await response.json();
+                setInterestedProperty(data);
+            }
+        } catch (error) {
+            console.error("Failed to fetch interested property:", error);
+        } finally {
+            setIsLoadingProperty(false);
+        }
+    };
 
     const toggleWhitelist = async () => {
         setIsUpdatingWhitelist(true);
@@ -188,6 +212,58 @@ const LeadDetailsModal = ({ isOpen, onClose, lead }) => {
                                 {lead.requirement || "No detailed requirements recorded yet."}
                             </div>
                         </div>
+
+                        {lead.interestedPropertyId && (
+                            <div>
+                                <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Interested Property</h3>
+                                {isLoadingProperty ? (
+                                    <div className="bg-white p-4 rounded-xl border border-gray-100 shadow-sm flex items-center gap-2 justify-center py-6 text-gray-400">
+                                        <Loader2 className="w-4 h-4 animate-spin text-primary" />
+                                        <span className="text-xs font-medium">Loading property details...</span>
+                                    </div>
+                                ) : interestedProperty ? (
+                                    <div className="bg-white p-4 rounded-xl border border-gray-100 shadow-sm flex items-center gap-3">
+                                        {interestedProperty.images && JSON.parse(interestedProperty.images).length > 0 ? (
+                                            <img 
+                                                src={`/api/files/properties/${interestedProperty.id}/${JSON.parse(interestedProperty.images)[0]}`} 
+                                                alt={interestedProperty.title}
+                                                className="w-12 h-12 rounded-lg object-cover bg-gray-50 border border-gray-100"
+                                                onError={(e) => {
+                                                    e.target.src = 'https://images.unsplash.com/photo-1564013799919-ab600027ffc6?auto=format&fit=crop&w=400&q=80';
+                                                }}
+                                            />
+                                        ) : (
+                                            <div className="w-12 h-12 rounded-lg bg-primary/10 flex items-center justify-center text-primary font-bold text-xs">
+                                                🏡
+                                            </div>
+                                        )}
+                                        <div className="min-w-0 flex-1">
+                                            <p className="text-sm font-bold text-gray-900 truncate">{interestedProperty.title}</p>
+                                            <p className="text-xs text-gray-500 truncate">{interestedProperty.location}</p>
+                                            <p className="text-xs text-primary font-bold mt-0.5">
+                                                {interestedProperty.price ? (
+                                                    parseFloat(interestedProperty.price) >= 10000000 
+                                                        ? `₹${(parseFloat(interestedProperty.price) / 10000000).toFixed(2)} Cr` 
+                                                        : `₹${(parseFloat(interestedProperty.price) / 100000).toFixed(2)} Lakh`
+                                                ) : 'Price on request'}
+                                            </p>
+                                        </div>
+                                        <a 
+                                            href={`/properties/${interestedProperty.id}`}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="text-[10px] font-bold bg-primary/5 text-primary border border-primary/10 hover:bg-primary/10 px-2.5 py-1.5 rounded-lg transition-all"
+                                        >
+                                            View Page
+                                        </a>
+                                    </div>
+                                ) : (
+                                    <div className="bg-white p-4 rounded-xl border border-gray-100 shadow-sm text-xs text-gray-400">
+                                        Property details unavailable (ID: {lead.interestedPropertyId})
+                                    </div>
+                                )}
+                            </div>
+                        )}
 
                         {lead.date && (
                             <div>

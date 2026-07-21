@@ -171,7 +171,10 @@ module.exports = {
                 let finalName = existingLead.name;
                 if (name) {
                     finalName = name;
-                }                // Update existing lead
+                }
+                const interestedPropertyId = params.interestedPropertyId || null;
+
+                // Update existing lead
                 const updateQuery = `
                     UPDATE leads 
                     SET name = COALESCE($1, name), 
@@ -183,8 +186,9 @@ module.exports = {
                         verified = COALESCE($7, verified),
                         "preferredLanguage" = COALESCE($8, "preferredLanguage"),
                         marketing_opt_in = COALESCE($9, marketing_opt_in),
+                        "interestedPropertyId" = COALESCE($10, "interestedPropertyId"),
                         updated_at = NOW()
-                    WHERE id = $10
+                    WHERE id = $11
                     RETURNING *
                 `;
                 const updateRes = await pool.query(updateQuery, [
@@ -193,6 +197,7 @@ module.exports = {
                     params.verified !== undefined ? params.verified : null,
                     params.preferredLanguage || null,
                     params.marketing_opt_in !== undefined ? params.marketing_opt_in : null,
+                    interestedPropertyId,
                     leadId
                 ]);
                 console.log(`[DB] Updated Lead ${leadId}`);
@@ -223,16 +228,17 @@ module.exports = {
                 // Insert new lead
                 const newId = generateId();
                 const optIn = params.marketing_opt_in !== undefined ? params.marketing_opt_in : true;
+                const interestedPropertyId = params.interestedPropertyId || null;
                 const insertQuery = `
-                    INSERT INTO leads (id, "agencyId", name, phone, requirement, target_bhk, target_location, max_budget, status, date, verified, "preferredLanguage", marketing_opt_in, created_at, updated_at)
-                    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, NOW(), NOW())
+                    INSERT INTO leads (id, "agencyId", name, phone, requirement, target_bhk, target_location, max_budget, status, date, verified, "preferredLanguage", marketing_opt_in, "interestedPropertyId", created_at, updated_at)
+                    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, NOW(), NOW())
                     RETURNING *
                 `;
                 const insertRes = await pool.query(insertQuery, [
                     newId, agencyId, name || 'WhatsApp Contact', cleanPhone, requirementText,
                     targetBhk, targetLocation, maxBudget, 'New Lead', followUpDate,
                     params.verified === true, params.preferredLanguage || 'English',
-                    optIn
+                    optIn, interestedPropertyId
                 ]);
                 const newLead = insertRes.rows[0];
                 console.log(`[DB] Created new Lead: ${newLead.id}`);
@@ -901,6 +907,32 @@ module.exports = {
             console.log(`[DB] Escalated lead ${cleanPhone} to Needs Human Intervention (limit hit).`);
         } catch (err) {
             console.error('[DB Error] Failed to escalate lead:', err.message);
+        }
+    },
+
+    /**
+     * Checks if a property with the specified ID exists in the database.
+     */
+    async verifyPropertyExists(id) {
+        try {
+            const res = await pool.query('SELECT 1 FROM properties WHERE id = $1 LIMIT 1', [id]);
+            return res.rows.length > 0;
+        } catch (e) {
+            return false;
+        }
+    },
+
+    /**
+     * Links a property to a lead as their interested property.
+     */
+    async updateLeadInterestedProperty(phone, propertyId) {
+        try {
+            const cleanPhone = phone.replace(/[^\d]/g, '');
+            const query = `UPDATE leads SET "interestedPropertyId" = $1 WHERE REPLACE(phone, ' ', '') LIKE $2`;
+            await pool.query(query, [propertyId, `%${cleanPhone}%`]);
+            console.log(`[DB] Linked interested property ${propertyId} to phone ${cleanPhone}`);
+        } catch (err) {
+            console.error('[DB Error] Failed to link property to lead:', err.message);
         }
     }
 };

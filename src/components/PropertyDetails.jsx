@@ -123,7 +123,8 @@ const PropertyDetails = () => {
                     email: leadEmail,
                     requirement: `Interested in property: "${property?.title}" (ID: ${property?.id})`,
                     preferredLanguage,
-                    marketing_opt_in: consentChecked
+                    marketing_opt_in: consentChecked,
+                    interestedPropertyId: property?.id
                 })
             });
             const data = await res.json();

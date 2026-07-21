@@ -108,9 +108,25 @@ async function processMessage(userInput, phone, agencyId) {
         const lead = await db.getLeadByPhone(cleanPhone);
         let leadNote = "[LEAD_EXISTS: false]";
         let leadIdFound = null;
+        let interestedPropertyId = null;
+
+        // Scan for property Reference ID in the user's message (e.g. Ref: abc123xyz789def)
+        const refMatch = userInput.match(/Ref:\s*([a-z0-9]{15})/i);
+        if (refMatch) {
+            const potentialId = refMatch[1];
+            const propExists = await db.verifyPropertyExists(potentialId);
+            if (propExists) {
+                console.log(`🎯 [Property Interest] Detected interest in property ID: ${potentialId} from message.`);
+                interestedPropertyId = potentialId;
+            }
+        }
+
         if (lead) {
             leadNote = `[LEAD_EXISTS: true] [LEAD_NAME: ${lead.name || 'Unknown'}] [LEAD_REQS: ${lead.requirement || 'None'}] [LEAD_PREFERRED_LANGUAGE: ${lead.preferredLanguage || 'English'}]`;
             leadIdFound = lead.id;
+            if (lead.interestedPropertyId && !interestedPropertyId) {
+                interestedPropertyId = lead.interestedPropertyId;
+            }
         }
 
         const finalInput = `SYSTEM NOTE: ${dateNote} ${leadNote}\nUser: ${userInput}`;
@@ -130,6 +146,9 @@ async function processMessage(userInput, phone, agencyId) {
         const params = parsed.parameters || {};
 
         // 4. Capture DATA (Upsert Lead)
+        if (interestedPropertyId) {
+            params.interestedPropertyId = interestedPropertyId;
+        }
         const updatedLead = await db.upsertLead(cleanPhone, agencyId, { ...params, isChatUpdate: true });
         leadIdFound = updatedLead ? updatedLead.id : leadIdFound;
 
