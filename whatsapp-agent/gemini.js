@@ -106,10 +106,11 @@ async function processMessage(userInput, phone, agencyId) {
 
             // Always attempt to save/update the Lead when the AI learns new information
             const hasLeadData = params.name || params.bhk || params.location || params.budget_in_rupees || params.purpose;
+            let currentLead = null;
             if (hasLeadData && agencyId) {
                 // Use the phone number the user typed if the environment didn't provide one
                 const leadPhone = phone.match(/^\d+$/) ? phone : (params.extracted_phone || phone);
-                await db.upsertLead(leadPhone, agencyId, { ...params, isChatUpdate: true });
+                currentLead = await db.upsertLead(leadPhone, agencyId, { ...params, isChatUpdate: true });
             }
 
             if (intent === 'SEARCH_PROPERTIES') {
@@ -133,10 +134,10 @@ async function processMessage(userInput, phone, agencyId) {
                 }
 
                 // Format properties into a readable string
-                // In a real scenario, you'd construct a URL to your actual frontend property detail page based on the ID.
                 const baseUrl = process.env.VITE_APP_URL || 'http://localhost:5173';
+                const leadId = currentLead ? currentLead.id : '';
                 const propertyList = properties.map(p =>
-                    `🏡 *${p.title}*\n📍 ${p.location} | ${p.bhk || 'N/A'}\n💰 ₹${(p.price / 10000000).toFixed(2)} Cr\n🔗 Link: ${baseUrl}/properties/${p.id}`
+                    `🏡 *${p.title}*\n📍 ${p.location} | ${p.bhk || 'N/A'}\n💰 ₹${(p.price / 10000000).toFixed(2)} Cr\n🔗 Link: ${baseUrl}/api/track-click?leadId=${leadId}&propertyId=${p.id}`
                 ).join('\n\n');
 
                 const successResult = await chat.sendMessage(`SYSTEM NOTE: The database found these properties:\n${propertyList}\n\nPresent these to the user perfectly formatted and ask when you can follow up regarding their decision.`);

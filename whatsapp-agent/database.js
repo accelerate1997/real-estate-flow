@@ -202,6 +202,27 @@ module.exports = {
                 ]);
                 console.log(`[DB] Updated Lead ${leadId}`);
                 const updatedLead = updateRes.rows[0];
+
+                // Auto-link the interested property as a manual inquiry match
+                if (interestedPropertyId) {
+                    try {
+                        const existRes = await pool.query(
+                            'SELECT * FROM matches WHERE lead_id = $1 AND property_id = $2 LIMIT 1',
+                            [updatedLead.id, interestedPropertyId]
+                        );
+                        if (existRes.rows.length === 0) {
+                            const newMatchId = generateId();
+                            await pool.query(
+                                `INSERT INTO matches (id, lead_id, property_id, agency_id, status, created_at, updated_at)
+                                 VALUES ($1, $2, $3, $4, $5, NOW(), NOW())`,
+                                [newMatchId, updatedLead.id, interestedPropertyId, agencyId, 'Inquired']
+                            );
+                            console.log(`[DB] Auto-linked property ${interestedPropertyId} to updated Lead ${updatedLead.id} as Inquired`);
+                        }
+                    } catch (matchErr) {
+                        console.error('Failed to link property on upsert update:', matchErr.message);
+                    }
+                }
                 
                 // Log consent update if consent status changed
                 if (params.marketing_opt_in !== undefined && existingLead.marketing_opt_in !== params.marketing_opt_in) {
@@ -242,6 +263,27 @@ module.exports = {
                 ]);
                 const newLead = insertRes.rows[0];
                 console.log(`[DB] Created new Lead: ${newLead.id}`);
+
+                // Auto-link the interested property as a manual inquiry match
+                if (interestedPropertyId) {
+                    try {
+                        const existRes = await pool.query(
+                            'SELECT * FROM matches WHERE lead_id = $1 AND property_id = $2 LIMIT 1',
+                            [newLead.id, interestedPropertyId]
+                        );
+                        if (existRes.rows.length === 0) {
+                            const newMatchId = generateId();
+                            await pool.query(
+                                `INSERT INTO matches (id, lead_id, property_id, agency_id, status, created_at, updated_at)
+                                 VALUES ($1, $2, $3, $4, $5, NOW(), NOW())`,
+                                [newMatchId, newLead.id, interestedPropertyId, agencyId, 'Inquired']
+                            );
+                            console.log(`[DB] Auto-linked property ${interestedPropertyId} to new Lead ${newLead.id} as Inquired`);
+                        }
+                    } catch (matchErr) {
+                        console.error('Failed to link property on upsert insert:', matchErr.message);
+                    }
+                }
 
                 // Log consent for new lead
                 const consentId = generateId();

@@ -181,7 +181,8 @@ async function processMessage(userInput, phone, agencyId) {
                     const priceVal = p.price || 0;
                     let priceText = priceVal >= 10000000 ? `₹${(priceVal / 10000000).toFixed(2)} Cr` : `₹${(priceVal / 100000).toFixed(2)} Lakh`;
                     const baseUrl = process.env.BASE_URL || 'https://realestateflow.elevetoai.com';
-                    return `🏡 *${p.title}*\n📍 ${p.location}\n💰 ${priceText}\n🔗 Link: ${baseUrl}/properties/${p.id}`;
+                    const leadId = leadIdFound || '';
+                    return `🏡 *${p.title}*\n📍 ${p.location}\n💰 ${priceText}\n🔗 Link: ${baseUrl}/api/track-click?leadId=${leadId}&propertyId=${p.id}`;
                 }).join('\n\n');
 
                 const successMsg = `SYSTEM NOTE: Found properties:\n${propertyList}\n\nPresent them and ask about a site visit.`;

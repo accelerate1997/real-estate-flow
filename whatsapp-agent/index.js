@@ -997,10 +997,80 @@ app.post('/api/leads/verify-otp', async (req, res) => {
 
         const newLead = await db.upsertLead(cleanPhone, agencyId, leadParams);
 
+        // Auto-link the interested property as a manual inquiry match
+        if (interestedPropertyId) {
+            try {
+                // Check if match already exists
+                const existRes = await pool.query(
+                    'SELECT * FROM matches WHERE lead_id = $1 AND property_id = $2 LIMIT 1',
+                    [newLead.id, interestedPropertyId]
+                );
+                if (existRes.rows.length === 0) {
+                    const newMatchId = generateId();
+                    await pool.query(
+                        `INSERT INTO matches (id, lead_id, property_id, agency_id, status, created_at, updated_at)
+                         VALUES ($1, $2, $3, $4, $5, NOW(), NOW())`,
+                        [newMatchId, newLead.id, interestedPropertyId, agencyId, 'Inquired']
+                    );
+                    console.log(`[DB] Created manual website enquiry match: Lead ${newLead.id} <-> Property ${interestedPropertyId}`);
+                }
+            } catch (matchErr) {
+                console.error('❌ Failed to link inquiry property on OTP verify:', matchErr.message);
+            }
+        }
+
         res.json({ success: true, message: 'OTP verified successfully!', lead: newLead });
     } catch (err) {
         console.error('❌ Error verifying OTP:', err.message);
         res.status(500).json({ success: false, message: err.message });
+    }
+// Click Tracking Redirect Endpoint
+app.get('/api/track-click', async (req, res) => {
+    try {
+        const { leadId, propertyId } = req.query;
+        if (!propertyId) {
+            return res.status(400).send('Property ID is required');
+        }
+
+        if (leadId && leadId.trim() !== '' && leadId !== 'undefined' && leadId !== 'null') {
+            try {
+                // Check if match already exists
+                const existRes = await pool.query(
+                    'SELECT * FROM matches WHERE lead_id = $1 AND property_id = $2 LIMIT 1',
+                    [leadId, propertyId]
+                );
+
+                if (existRes.rows.length > 0) {
+                    // Update existing match status to 'Clicked'
+                    await pool.query(
+                        'UPDATE matches SET status = $1, updated_at = NOW() WHERE id = $2',
+                        ['Clicked', existRes.rows[0].id]
+                    );
+                    console.log(`[Tracking] Updated match status to Clicked: Lead ${leadId} <-> Property ${propertyId}`);
+                } else {
+                    // Fetch lead to get agencyId
+                    const leadRes = await pool.query('SELECT "agencyId" FROM leads WHERE id = $1', [leadId]);
+                    const agencyId = leadRes.rows.length > 0 ? leadRes.rows[0].agencyId : null;
+                    
+                    // Create a new match record
+                    const newMatchId = generateId();
+                    await pool.query(
+                        `INSERT INTO matches (id, lead_id, property_id, agency_id, status, created_at, updated_at)
+                         VALUES ($1, $2, $3, $4, $5, NOW(), NOW())`,
+                        [newMatchId, leadId, propertyId, agencyId, 'Clicked']
+                    );
+                    console.log(`[Tracking] Created new match with status Clicked: Lead ${leadId} <-> Property ${propertyId}`);
+                }
+            } catch (dbErr) {
+                console.error('❌ Tracking Database Error:', dbErr.message);
+            }
+        }
+
+        // Redirect to the property details page on the frontend
+        res.redirect(`/properties/${propertyId}`);
+    } catch (err) {
+        console.error('❌ Tracking Click Endpoint Error:', err.message);
+        res.status(500).send('Internal Server Error');
     }
 });
 
