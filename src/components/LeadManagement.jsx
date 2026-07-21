@@ -168,113 +168,98 @@ const LeadManagement = () => {
                                 <p className="text-xs text-gray-400 font-medium">No leads here</p>
                             </div>
                         )}
-                        {colLeads.map(lead => (
-                            <div
-                                key={lead.id}
-                                onClick={() => handleLeadClick(lead)}
-                                className={`kanban-card ${colAccent[colName] || ''}`}
-                            >
-                                {/* Name + Status selector */}
-                                <div className="flex justify-between items-start gap-2">
-                                    <div className="flex items-center gap-2">
-                                        <div className="w-7 h-7 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
-                                            <User className="w-3.5 h-3.5 text-primary" />
+                        {colLeads.map(lead => {
+                            const initials = (lead.name || '')
+                                .split(' ')
+                                .map(n => n[0])
+                                .join('')
+                                .slice(0, 2)
+                                .toUpperCase() || '?';
+                                
+                            const isIntervention = lead.status === 'Needs Human Intervention';
+
+                            return (
+                                <div
+                                    key={lead.id}
+                                    onClick={() => handleLeadClick(lead)}
+                                    className={`kanban-card ${colAccent[colName] || ''} hover:-translate-y-0.5 hover:shadow-md transition-all duration-300 relative group overflow-hidden bg-white p-4 rounded-xl border border-gray-100/80 flex flex-col gap-3.5`}
+                                >
+                                    {/* Header: Avatar, Name, Badges */}
+                                    <div className="flex justify-between items-start gap-2.5">
+                                        <div className="flex items-center gap-3 min-w-0">
+                                            {/* Initials Avatar */}
+                                            <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0 text-xs font-bold text-primary border border-primary/20">
+                                                {initials === '?' ? <User className="w-3.5 h-3.5" /> : initials}
+                                            </div>
+                                            {/* Name & Phone */}
+                                            <div className="min-w-0">
+                                                <h4 className="font-bold text-gray-900 text-sm tracking-tight truncate group-hover:text-primary transition-colors">
+                                                    {lead.name || 'WhatsApp Contact'}
+                                                </h4>
+                                                {lead.phone && (
+                                                    <span className="text-[10px] text-gray-400 font-mono block mt-0.5">
+                                                        +{lead.phone}
+                                                    </span>
+                                                )}
+                                            </div>
                                         </div>
-                                        <span className="font-bold text-gray-900 text-sm">{lead.name || 'WhatsApp Contact'}</span>
+
+                                        {/* Badges */}
+                                        <div className="flex flex-col items-end gap-1 shrink-0">
+                                            {lead.whitelisted && (
+                                                <span className="text-[8px] font-bold bg-amber-50 text-amber-600 border border-amber-200/50 px-2 py-0.5 rounded-full flex items-center gap-0.5 shadow-sm uppercase tracking-wide">
+                                                    ★ VIP
+                                                </span>
+                                            )}
+                                            {isIntervention && (
+                                                <span className="text-[8px] font-bold bg-red-50 text-red-600 border border-red-200/50 px-2 py-0.5 rounded-full animate-pulse uppercase tracking-wide">
+                                                    Needs Agent
+                                                </span>
+                                            )}
+                                        </div>
                                     </div>
-                                    <select
-                                        value={lead.status}
-                                        onClick={(e) => e.stopPropagation()}
-                                        onChange={(e) => {
-                                            e.stopPropagation();
-                                            handleStatusChange(lead.id, e.target.value);
-                                        }}
-                                        className="text-[10px] font-bold bg-gray-50 text-gray-600 border border-gray-200 rounded-lg px-1.5 py-1 outline-none hover:bg-gray-100 cursor-pointer shrink-0"
-                                    >
-                                        {Object.keys(initialColumns).map(opt => (
-                                            <option key={opt} value={opt}>{opt}</option>
-                                        ))}
-                                    </select>
-                                </div>
 
-                                {/* Requirement */}
-                                <p className="text-xs text-gray-500 line-clamp-2 leading-relaxed pl-9">
-                                    {lead.requirement || 'No requirement specified.'}
-                                </p>
+                                    {/* Requirement snippet */}
+                                    <div className="space-y-2">
+                                        <p className="text-xs text-gray-500 line-clamp-2 leading-relaxed font-medium">
+                                            {lead.requirement || 'No detailed requirements recorded.'}
+                                        </p>
 
-                                {/* Footer */}
-                                <div className="flex items-center justify-between mt-auto pt-2 border-t border-gray-50">
-                                    <div className="flex items-center gap-2">
-                                        <div className="flex items-center gap-1">
-                                            <Clock className={`w-3 h-3 ${isPastOrToday(lead.date) ? 'text-primary' : 'text-gray-400'}`} />
+                                        {/* Interested Property Tag */}
+                                        {lead.interestedPropertyId && (
+                                            <div className="inline-flex items-center gap-1.5 bg-violet-50 text-violet-700 border border-violet-100/50 px-2 py-0.5 rounded-lg text-[9px] font-bold max-w-full">
+                                                <span className="shrink-0 text-xs">🏡</span>
+                                                <span className="truncate">Prop: {lead.interestedPropertyId}</span>
+                                            </div>
+                                        )}
+                                    </div>
+
+                                    {/* Footer: Date & Primary Actions */}
+                                    <div className="flex items-center justify-between pt-2.5 border-t border-gray-100 mt-auto">
+                                        <div className="flex items-center gap-1.5 text-gray-400">
+                                            <Clock className={`w-3.5 h-3.5 ${isPastOrToday(lead.date) ? 'text-primary' : 'text-gray-400'}`} />
                                             <span className={`text-[10px] font-bold ${isPastOrToday(lead.date) ? 'text-primary' : 'text-gray-500'}`}>
                                                 {lead.date
                                                     ? new Date(lead.date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })
                                                     : 'No Date'}
                                             </span>
                                         </div>
-                                        {lead.marketing_opt_in === false ? (
-                                            <span className="text-[9px] bg-red-50 text-red-600 px-1.5 py-0.5 rounded font-bold border border-red-100/50 uppercase tracking-wide" title="Opted out of marketing updates">
-                                                Opt-Out
-                                            </span>
-                                        ) : (
-                                            <span className="text-[9px] bg-green-50 text-green-600 px-1.5 py-0.5 rounded font-bold border border-green-100/50 uppercase tracking-wide" title="Opted in to receive updates">
-                                                Opt-In
-                                            </span>
-                                        )}
-                                    </div>
-                                    <div className="flex gap-1.5">
-                                        {lead.email && (
-                                            <a
-                                                href={`mailto:${lead.email}`}
-                                                onClick={(e) => e.stopPropagation()}
-                                                className="p-1.5 bg-gray-50 hover:bg-blue-50 text-gray-400 hover:text-blue-600 rounded-lg transition-colors"
-                                                title="Email Lead"
-                                            >
-                                                <Mail className="w-3.5 h-3.5" />
-                                            </a>
-                                        )}
-                                        {lead.phone && (
-                                            <button
-                                                onClick={(e) => handleWhatsApp(e, lead.phone)}
-                                                className="p-1.5 bg-green-50 hover:bg-green-100 text-green-600 rounded-lg transition-colors"
-                                                title="WhatsApp Lead"
-                                            >
-                                                <MessageCircle className="w-3.5 h-3.5" />
-                                            </button>
-                                        )}
-                                        <button
-                                            onClick={async (e) => {
-                                                e.stopPropagation();
-                                                try {
-                                                    const res = await fetch(`/api/leads/match`, {
-                                                        method: 'POST',
-                                                        headers: { 'Content-Type': 'application/json' },
-                                                        body: JSON.stringify({ leadId: lead.id })
-                                                    });
-                                                    const data = await res.json();
-                                                    alert(`Matching engine successfully executed! Found ${data.matchesFound || 0} match(es). Check the "Smart Matches" tab.`);
-                                                } catch (err) {
-                                                    console.error(err);
-                                                    alert("Failed to run matching engine.");
-                                                }
-                                            }}
-                                            className="p-1.5 bg-amber-50 hover:bg-amber-100 text-amber-600 rounded-lg transition-colors"
-                                            title="Find matches for this lead"
-                                        >
-                                            <Target className="w-3.5 h-3.5" />
-                                        </button>
-                                        <button
-                                            onClick={(e) => handleDeleteLead(e, lead.id)}
-                                            className="p-1.5 bg-red-50 hover:bg-red-100 text-red-500 rounded-lg transition-colors"
-                                            title="Delete Lead"
-                                        >
-                                            <Trash2 className="w-3.5 h-3.5" />
-                                        </button>
+
+                                        <div className="flex items-center gap-1.5 opacity-80 group-hover:opacity-100 transition-opacity">
+                                            {lead.phone && (
+                                                <button
+                                                    onClick={(e) => handleWhatsApp(e, lead.phone)}
+                                                    className="p-1.5 bg-green-50 hover:bg-green-500 text-green-600 hover:text-white rounded-lg transition-all border border-green-200/30 shadow-sm"
+                                                    title="WhatsApp Lead"
+                                                >
+                                                    <MessageCircle className="w-3.5 h-3.5" />
+                                                </button>
+                                            )}
+                                        </div>
                                     </div>
                                 </div>
-                            </div>
-                        ))}
+                            );
+                        })}
                     </div>
                 </div>
             );
