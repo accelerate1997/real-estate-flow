@@ -3,7 +3,7 @@ const http = require('http');
 const options = {
     hostname: '31.97.231.139',
     port: 8000,
-    path: '/api/v1/deployments/rog04s4c0c4c4w88skkwo88w',
+    path: '/api/v1/deployments/gko0ck4ks008wc4o04s000og',
     method: 'GET',
     headers: {
         'Authorization': 'Bearer TSYU03K2BFZPC7TOuJYwQrrZvHfp2s9ugEqYrrUo887bca87'
@@ -16,15 +16,17 @@ const req = http.request(options, (res) => {
         data += chunk;
     });
     res.on('end', () => {
-        console.log(`Status: ${res.statusCode}`);
         try {
             const result = JSON.parse(data);
+            console.log("=== FULL DEPLOYMENT RESULT ===");
             console.log("Status:", result.status);
-            console.log("Logs excerpt:");
+            console.log("Keys:", Object.keys(result));
             if (result.logs) {
-                console.log(result.logs.substring(result.logs.length - 1000));
+                console.log("Logs length:", result.logs.length);
+                // Print the last 1500 characters of logs
+                console.log(result.logs.substring(Math.max(0, result.logs.length - 1500)));
             } else {
-                console.log(JSON.stringify(result, null, 2));
+                console.log("No logs field found.");
             }
         } catch(e) {
             console.log(data);

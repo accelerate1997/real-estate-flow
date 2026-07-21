@@ -176,11 +176,11 @@ const LeadManagement = () => {
                             >
                                 {/* Name + Status selector */}
                                 <div className="flex justify-between items-start gap-2">
-                                    <div className="flex items-center gap-2 min-w-0 flex-1">
+                                    <div className="flex items-center gap-2">
                                         <div className="w-7 h-7 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
                                             <User className="w-3.5 h-3.5 text-primary" />
                                         </div>
-                                        <span className="font-bold text-gray-900 text-sm truncate block">{lead.name || 'WhatsApp Contact'}</span>
+                                        <span className="font-bold text-gray-900 text-sm">{lead.name || 'WhatsApp Contact'}</span>
                                     </div>
                                     <select
                                         value={lead.status}
