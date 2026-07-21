@@ -1024,6 +1024,8 @@ app.post('/api/leads/verify-otp', async (req, res) => {
         console.error('❌ Error verifying OTP:', err.message);
         res.status(500).json({ success: false, message: err.message });
     }
+});
+
 // Click Tracking Redirect Endpoint
 app.get('/api/track-click', async (req, res) => {
     try {
