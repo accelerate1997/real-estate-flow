@@ -182,7 +182,7 @@ const LeadManagement = () => {
                                 <div
                                     key={lead.id}
                                     onClick={() => handleLeadClick(lead)}
-                                    className={`kanban-card ${colAccent[colName] || ''} hover:-translate-y-0.5 hover:shadow-md transition-all duration-300 relative group overflow-hidden bg-white p-4 rounded-xl border border-gray-100/80 flex flex-col gap-3.5`}
+                                    className={`kanban-card ${colAccent[colName] || ''} hover:-translate-y-0.5 hover:shadow-md transition-all duration-300 relative group overflow-hidden bg-white p-4 rounded-xl border border-gray-100/80 flex flex-col gap-3.5 shrink-0`}
                                 >
                                     {/* Header: Avatar, Name, Badges */}
                                     <div className="flex justify-between items-start gap-2.5">
