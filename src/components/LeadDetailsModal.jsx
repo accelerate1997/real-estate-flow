@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { X, MessageCircle, Clock, CheckCircle2, Bot, User, Loader2, Target, Calendar } from 'lucide-react';
+import { X, MessageCircle, Clock, CheckCircle2, Bot, User, Loader2, Target, Calendar, Edit2, Save } from 'lucide-react';
 
-const LeadDetailsModal = ({ isOpen, onClose, lead }) => {
+const LeadDetailsModal = ({ isOpen, onClose, lead, onUpdate }) => {
     const [chats, setChats] = useState([]);
     const [isLoadingChats, setIsLoadingChats] = useState(false);
     const chatContainerRef = useRef(null);
@@ -18,11 +18,30 @@ const LeadDetailsModal = ({ isOpen, onClose, lead }) => {
     const [interestedProperty, setInterestedProperty] = useState(null);
     const [isLoadingProperty, setIsLoadingProperty] = useState(false);
 
+    const [isEditing, setIsEditing] = useState(false);
+    const [isSavingEdit, setIsSavingEdit] = useState(false);
+    const [editForm, setEditForm] = useState({ name: '', phone: '', requirement: '', date: '', status: '' });
+
+    const formatDateForInput = (dateStr) => {
+        if (!dateStr) return '';
+        try {
+            const d = new Date(dateStr);
+            if (isNaN(d.getTime())) return '';
+            const year = d.getFullYear();
+            const month = String(d.getMonth() + 1).padStart(2, '0');
+            const day = String(d.getDate()).padStart(2, '0');
+            return `${year}-${month}-${day}`;
+        } catch (e) {
+            return '';
+        }
+    };
+
     useEffect(() => {
         if (isOpen && lead) {
             setLeadOptIn(lead.marketing_opt_in !== false);
             setIsWhitelisted(lead.whitelisted === true);
             setLeadStatus(lead.status);
+            setIsEditing(false);
             fetchConsentLogs(lead.id);
             
             if (lead.interestedPropertyId) {
@@ -66,6 +85,7 @@ const LeadDetailsModal = ({ isOpen, onClose, lead }) => {
             if (response.ok) {
                 setIsWhitelisted(newWhitelist);
                 lead.whitelisted = newWhitelist; // update local object reference
+                if (onUpdate) onUpdate({ ...lead, whitelisted: newWhitelist });
             }
         } catch (error) {
             console.error("Failed to update whitelist status:", error);
@@ -87,6 +107,7 @@ const LeadDetailsModal = ({ isOpen, onClose, lead }) => {
             if (response.ok) {
                 setLeadStatus(newStatus);
                 lead.status = newStatus; // update local object reference
+                if (onUpdate) onUpdate({ ...lead, status: newStatus });
             }
         } catch (error) {
             console.error("Failed to update permanent block status:", error);
@@ -127,11 +148,55 @@ const LeadDetailsModal = ({ isOpen, onClose, lead }) => {
                 setLeadOptIn(newOptIn);
                 await fetchConsentLogs(lead.id);
                 lead.marketing_opt_in = newOptIn; // update local object reference
+                if (onUpdate) onUpdate({ ...lead, marketing_opt_in: newOptIn });
             }
         } catch (error) {
             console.error("Failed to update consent:", error);
         } finally {
             setIsUpdatingConsent(false);
+        }
+    };
+
+    const handleSaveEdit = async (e) => {
+        e.preventDefault();
+        setIsSavingEdit(true);
+        try {
+            const response = await fetch(`/api/collections/leads/${lead.id}`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    name: editForm.name,
+                    phone: editForm.phone,
+                    requirement: editForm.requirement,
+                    date: editForm.date ? new Date(editForm.date).toISOString() : null,
+                    status: editForm.status
+                })
+            });
+
+            if (response.ok) {
+                const updatedLead = await response.json();
+                setLeadStatus(editForm.status);
+                
+                // Update local object reference
+                lead.name = editForm.name;
+                lead.phone = editForm.phone;
+                lead.requirement = editForm.requirement;
+                lead.date = editForm.date ? new Date(editForm.date).toISOString() : null;
+                lead.status = editForm.status;
+
+                if (onUpdate) {
+                    onUpdate(updatedLead);
+                }
+                setIsEditing(false);
+            } else {
+                const errData = await response.json();
+                alert(`Failed to save: ${errData.message || 'Unknown error'}`);
+            }
+        } catch (error) {
+            console.error("Failed to update lead details:", error);
+            alert("An error occurred while saving lead details.");
+        } finally {
+            setIsSavingEdit(false);
         }
     };
 
@@ -168,253 +233,379 @@ const LeadDetailsModal = ({ isOpen, onClose, lead }) => {
 
                 {/* LEFT SIDE: Lead Data */}
                 <div className="w-full md:w-1/3 bg-gray-50 flex flex-col border-r border-gray-100 overflow-y-auto max-h-[40vh] md:max-h-none shrink-0">
-                    <div className="p-6 bg-white border-b border-gray-100">
-                        <div className="flex justify-between items-start mb-2">
-                            <h2 className="text-xl font-bold text-gray-900">{lead.name}</h2>
-                            <span className="bg-blue-50 text-blue-700 text-xs font-bold px-2.5 py-1 rounded-full border border-blue-100">
-                                {lead.status}
-                            </span>
-                        </div>
-                        <div className="flex items-center gap-2 text-gray-500 text-sm mb-4">
-                            <MessageCircle className="w-4 h-4" />
-                            {lead.phone}
-                        </div>
-
-                        <div className="flex flex-wrap gap-2">
-                            <button
-                                onClick={() => window.open(`https://wa.me/${lead.phone.replace(/\D/g, '')}`, '_blank')}
-                                className="flex-1 min-w-[120px] bg-green-50 hover:bg-green-100 text-green-700 font-semibold py-2 px-4 rounded-xl transition-colors flex justify-center items-center gap-2 text-sm"
-                            >
-                                <MessageCircle className="w-4 h-4" />
-                                WhatsApp
-                            </button>
-                            <button
-                                onClick={() => alert("Searching for property matches for this lead...")}
-                                className="flex-1 min-w-[120px] bg-blue-50 hover:bg-blue-100 text-blue-700 font-semibold py-2 px-4 rounded-xl transition-colors flex justify-center items-center gap-2 text-sm"
-                            >
-                                <Target className="w-4 h-4" />
-                                Find Match
-                            </button>
-                            <button
-                                onClick={() => alert("Opening site visit scheduler...")}
-                                className="flex-1 min-w-[120px] bg-red-50 hover:bg-red-100 text-primary font-semibold py-2 px-4 rounded-xl transition-colors flex justify-center items-center gap-2 text-sm"
-                            >
-                                <Calendar className="w-4 h-4" />
-                                Schedule Visit
-                            </button>
-                        </div>
-                    </div>
-
-                    <div className="p-6 space-y-6">
-                        <div>
-                            <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Requirement Overview</h3>
-                            <div className="bg-white p-4 rounded-xl border border-gray-100 shadow-sm text-sm text-gray-700 leading-relaxed whitespace-pre-wrap">
-                                {lead.requirement || "No detailed requirements recorded yet."}
-                            </div>
-                        </div>
-
-                        {lead.interestedPropertyId && (
-                            <div>
-                                <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Interested Property</h3>
-                                {isLoadingProperty ? (
-                                    <div className="bg-white p-4 rounded-xl border border-gray-100 shadow-sm flex items-center gap-2 justify-center py-6 text-gray-400">
-                                        <Loader2 className="w-4 h-4 animate-spin text-primary" />
-                                        <span className="text-xs font-medium">Loading property details...</span>
-                                    </div>
-                                ) : interestedProperty ? (
-                                    <div className="bg-white p-4 rounded-xl border border-gray-100 shadow-sm flex items-center gap-3">
-                                        {interestedProperty.images && JSON.parse(interestedProperty.images).length > 0 ? (
-                                            <img 
-                                                src={`/api/files/properties/${interestedProperty.id}/${JSON.parse(interestedProperty.images)[0]}`} 
-                                                alt={interestedProperty.title}
-                                                className="w-12 h-12 rounded-lg object-cover bg-gray-50 border border-gray-100"
-                                                onError={(e) => {
-                                                    e.target.src = 'https://images.unsplash.com/photo-1564013799919-ab600027ffc6?auto=format&fit=crop&w=400&q=80';
-                                                }}
-                                            />
-                                        ) : (
-                                            <div className="w-12 h-12 rounded-lg bg-primary/10 flex items-center justify-center text-primary font-bold text-xs">
-                                                🏡
-                                            </div>
-                                        )}
-                                        <div className="min-w-0 flex-1">
-                                            <p className="text-sm font-bold text-gray-900 truncate">{interestedProperty.title}</p>
-                                            <p className="text-xs text-gray-500 truncate">{interestedProperty.location}</p>
-                                            <p className="text-xs text-primary font-bold mt-0.5">
-                                                {interestedProperty.price ? (
-                                                    parseFloat(interestedProperty.price) >= 10000000 
-                                                        ? `₹${(parseFloat(interestedProperty.price) / 10000000).toFixed(2)} Cr` 
-                                                        : `₹${(parseFloat(interestedProperty.price) / 100000).toFixed(2)} Lakh`
-                                                ) : 'Price on request'}
-                                            </p>
-                                        </div>
-                                        <a 
-                                            href={`/properties/${interestedProperty.id}`}
-                                            target="_blank"
-                                            rel="noopener noreferrer"
-                                            className="text-[10px] font-bold bg-primary/5 text-primary border border-primary/10 hover:bg-primary/10 px-2.5 py-1.5 rounded-lg transition-all"
-                                        >
-                                            View Page
-                                        </a>
-                                    </div>
-                                ) : (
-                                    <div className="bg-white p-4 rounded-xl border border-gray-100 shadow-sm text-xs text-gray-400">
-                                        Property details unavailable (ID: {lead.interestedPropertyId})
-                                    </div>
-                                )}
-                            </div>
-                        )}
-
-                        {lead.date && (
-                            <div>
-                                <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Next Action</h3>
-                                <div className="bg-white p-4 rounded-xl border border-gray-100 shadow-sm flex items-center gap-3">
-                                    <div className="bg-orange-50 p-2 rounded-lg">
-                                        <Clock className="w-5 h-5 text-orange-500" />
-                                    </div>
-                                    <div>
-                                        <p className="text-sm font-semibold text-gray-800">Follow-up Scheduled</p>
-                                        <p className="text-xs text-gray-500">{new Date(lead.date).toLocaleDateString(undefined, { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</p>
-                                    </div>
+                    {isEditing ? (
+                        <div className="flex flex-col h-full bg-white">
+                            {/* Edit Mode Header */}
+                            <div className="px-6 py-5 bg-white border-b border-gray-100 flex justify-between items-center">
+                                <div>
+                                    <h2 className="text-base font-bold text-gray-900">Edit Details</h2>
+                                    <p className="text-xs text-gray-400">Update lead info</p>
                                 </div>
+                                <button
+                                    onClick={() => setIsEditing(false)}
+                                    className="w-8 h-8 flex items-center justify-center rounded-lg bg-gray-100 hover:bg-gray-200 text-gray-500 transition-colors"
+                                >
+                                    <X className="w-4 h-4" />
+                                </button>
                             </div>
-                        )}
 
-                        <div>
-                            <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Lead Source</h3>
-                            <div className="bg-white p-4 rounded-xl border border-gray-100 shadow-sm flex items-center gap-3">
-                                <div className="bg-blue-50 p-2 rounded-lg">
-                                    <Bot className="w-5 h-5 text-blue-500" />
+                            {/* Edit Mode Body */}
+                            <form onSubmit={handleSaveEdit} className="p-6 space-y-4 overflow-y-auto flex-1">
+                                <div>
+                                    <label className="dash-label">Lead Name <span className="text-primary">*</span></label>
+                                    <input
+                                        type="text"
+                                        required
+                                        value={editForm.name}
+                                        onChange={e => setEditForm({ ...editForm, name: e.target.value })}
+                                        className="dash-input"
+                                        placeholder="e.g. John Doe"
+                                    />
                                 </div>
                                 <div>
-                                    <p className="text-sm font-semibold text-gray-800">AI WhatsApp Agent</p>
-                                    <p className="text-xs text-gray-500">Processed seamlessly via ChatGPT</p>
+                                    <label className="dash-label">WhatsApp Phone <span className="text-primary">*</span></label>
+                                    <input
+                                        type="tel"
+                                        required
+                                        value={editForm.phone}
+                                        onChange={e => setEditForm({ ...editForm, phone: e.target.value })}
+                                        className="dash-input"
+                                        placeholder="+91..."
+                                    />
                                 </div>
-                            </div>
+                                <div>
+                                    <label className="dash-label">Requirement Overview</label>
+                                    <textarea
+                                        value={editForm.requirement}
+                                        onChange={e => setEditForm({ ...editForm, requirement: e.target.value })}
+                                        rows="4"
+                                        className="dash-input resize-none"
+                                        placeholder="Requirement details..."
+                                    />
+                                </div>
+                                <div>
+                                    <label className="dash-label">Next Follow-up Date</label>
+                                    <input
+                                        type="date"
+                                        value={editForm.date}
+                                        onChange={e => setEditForm({ ...editForm, date: e.target.value })}
+                                        className="dash-input"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="dash-label">Pipeline Status</label>
+                                    <select
+                                        value={editForm.status}
+                                        onChange={e => setEditForm({ ...editForm, status: e.target.value })}
+                                        className="dash-input"
+                                    >
+                                        <option value="New Lead">New Lead</option>
+                                        <option value="Contacted">Contacted</option>
+                                        <option value="Needs Human Intervention">Needs Human Intervention</option>
+                                        <option value="Site Visit">Site Visit</option>
+                                        <option value="Closed">Closed</option>
+                                        <option value="Blocked">Blocked</option>
+                                    </select>
+                                </div>
+
+                                <div className="flex gap-3 pt-4 border-t border-gray-100">
+                                    <button
+                                        type="button"
+                                        onClick={() => setIsEditing(false)}
+                                        className="flex-1 px-4 py-2.5 text-gray-600 font-semibold hover:bg-gray-100 rounded-xl transition-colors border border-gray-200 text-sm"
+                                    >
+                                        Cancel
+                                    </button>
+                                    <button
+                                        type="submit"
+                                        disabled={isSavingEdit}
+                                        className="flex-1 btn-dash-primary flex justify-center items-center gap-2 animate-in"
+                                    >
+                                        {isSavingEdit ? (
+                                            <>
+                                                <Loader2 className="w-4 h-4 animate-spin" />
+                                                Saving...
+                                            </>
+                                        ) : (
+                                            <>
+                                                <Save className="w-4 h-4" />
+                                                Save
+                                            </>
+                                        )}
+                                    </button>
+                                </div>
+                            </form>
                         </div>
-
-                        {/* DPDP Consent Status & Logs */}
-                        <div className="bg-white p-4 rounded-xl border border-gray-100 shadow-sm space-y-3">
-                            <div className="flex justify-between items-center pb-2 border-b border-gray-105">
-                                <h4 className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">WhatsApp Consent</h4>
-                                {leadOptIn ? (
-                                    <span className="text-[9px] bg-green-50 text-green-700 border border-green-100 font-extrabold px-2 py-0.5 rounded-full">
-                                        Opted-In
-                                    </span>
-                                ) : (
-                                    <span className="text-[9px] bg-red-50 text-red-700 border border-red-100 font-extrabold px-2 py-0.5 rounded-full">
-                                        Opted-Out
-                                    </span>
-                                )}
-                            </div>
-
-                            <div className="flex justify-between items-center gap-2">
-                                <p className="text-[11px] text-gray-500 leading-normal">
-                                    {leadOptIn ? "Lead agrees to receive property alerts on WhatsApp." : "Lead has unsubscribed. Campaigns are blocked."}
-                                </p>
-                                <button
-                                    onClick={toggleConsent}
-                                    disabled={isUpdatingConsent}
-                                    className={`px-3 py-1.5 rounded-lg text-[10px] font-bold border transition-all ${
-                                        leadOptIn 
-                                        ? 'bg-red-50 border-red-200 text-red-700 hover:bg-red-100' 
-                                        : 'bg-green-50 border-green-200 text-green-700 hover:bg-green-100'
-                                    }`}
-                                >
-                                    {isUpdatingConsent ? 'Updating...' : (leadOptIn ? 'Unsubscribe' : 'Subscribe')}
-                                </button>
-                            </div>
-
-                            {/* Consent Audit Logs */}
-                            {consentLogs.length > 0 && (
-                                <div className="pt-2 border-t border-gray-100">
-                                    <h5 className="text-[9px] font-bold text-gray-400 uppercase tracking-wider mb-2">Consent Audit History</h5>
-                                    <div className="max-h-[120px] overflow-y-auto space-y-2 pr-1">
-                                        {consentLogs.map(log => (
-                                            <div key={log.id} className="text-[10px] bg-gray-50 border border-gray-100 rounded-lg p-2 flex flex-col gap-0.5">
-                                                <div className="flex justify-between items-center">
-                                                    <span className={`font-bold uppercase tracking-wider text-[8px] px-1 rounded-sm ${log.consent_status === 'active' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
-                                                        {log.consent_status === 'active' ? 'Granted' : 'Withdrawn'}
-                                                    </span>
-                                                    <span className="text-[8px] text-gray-400 font-mono">
-                                                        {new Date(log.created_at || log.updated_at).toLocaleString('en-IN', { dateStyle: 'short', timeStyle: 'short' })}
-                                                    </span>
-                                                </div>
-                                                <p className="text-gray-600 font-medium leading-normal">{log.consent_clause}</p>
-                                                <span className="text-[8px] text-gray-400 font-semibold italic">Source: {log.source}</span>
-                                            </div>
-                                        ))}
+                    ) : (
+                        <>
+                            <div className="p-6 bg-white border-b border-gray-100">
+                                <div className="flex justify-between items-start mb-2">
+                                    <h2 className="text-xl font-bold text-gray-900 truncate max-w-[150px] sm:max-w-none">{lead.name}</h2>
+                                    <div className="flex items-center gap-2">
+                                        <button
+                                            onClick={() => {
+                                                setEditForm({
+                                                    name: lead.name || '',
+                                                    phone: lead.phone || '',
+                                                    requirement: lead.requirement || '',
+                                                    date: formatDateForInput(lead.date),
+                                                    status: lead.status || 'New Lead'
+                                                });
+                                                setIsEditing(true);
+                                            }}
+                                            className="px-2.5 py-1 text-gray-500 hover:text-primary hover:bg-primary/5 rounded-lg border border-gray-200 shadow-sm flex items-center gap-1.5 text-xs font-bold transition-all"
+                                            title="Edit Lead Details"
+                                        >
+                                            <Edit2 className="w-3.5 h-3.5" />
+                                            <span>Edit</span>
+                                        </button>
+                                        <span className="bg-blue-50 text-blue-700 text-xs font-bold px-2.5 py-1 rounded-full border border-blue-100">
+                                            {lead.status}
+                                        </span>
                                     </div>
                                 </div>
-                            )}
-                        </div>
+                                <div className="flex items-center gap-2 text-gray-500 text-sm mb-4">
+                                    <MessageCircle className="w-4 h-4" />
+                                    {lead.phone}
+                                </div>
 
-                        {/* AI Billing & Security Settings */}
-                        <div className="bg-white p-4 rounded-xl border border-gray-100 shadow-sm space-y-3">
-                            <div className="flex justify-between items-center pb-2 border-b border-gray-100">
-                                <h4 className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">AI Billing & Security</h4>
-                                <div className="flex gap-1.5">
-                                    {isWhitelisted && (
-                                        <span className="text-[9px] bg-blue-50 text-blue-700 border border-blue-100 font-extrabold px-2 py-0.5 rounded-full">
-                                            VIP Whitelist
-                                        </span>
-                                    )}
-                                    {leadStatus === 'Blocked' && (
-                                        <span className="text-[9px] bg-red-50 text-red-700 border border-red-100 font-extrabold px-2 py-0.5 rounded-full">
-                                            Blocked Competitor
-                                        </span>
-                                    )}
-                                    {leadStatus === 'Needs Human Intervention' && (
-                                        <span className="text-[9px] bg-amber-50 text-amber-700 border border-amber-100 font-extrabold px-2 py-0.5 rounded-full">
-                                            Needs Handover
-                                        </span>
-                                    )}
+                                <div className="flex flex-wrap gap-2">
+                                    <button
+                                        onClick={() => window.open(`https://wa.me/${lead.phone.replace(/\D/g, '')}`, '_blank')}
+                                        className="flex-1 min-w-[120px] bg-green-50 hover:bg-green-100 text-green-700 font-semibold py-2 px-4 rounded-xl transition-colors flex justify-center items-center gap-2 text-sm"
+                                    >
+                                        <MessageCircle className="w-4 h-4" />
+                                        WhatsApp
+                                    </button>
+                                    <button
+                                        onClick={() => alert("Searching for property matches for this lead...")}
+                                        className="flex-1 min-w-[120px] bg-blue-50 hover:bg-blue-100 text-blue-700 font-semibold py-2 px-4 rounded-xl transition-colors flex justify-center items-center gap-2 text-sm"
+                                    >
+                                        <Target className="w-4 h-4" />
+                                        Find Match
+                                    </button>
+                                    <button
+                                        onClick={() => alert("Opening site visit scheduler...")}
+                                        className="flex-1 min-w-[120px] bg-red-50 hover:bg-red-100 text-primary font-semibold py-2 px-4 rounded-xl transition-colors flex justify-center items-center gap-2 text-sm"
+                                    >
+                                        <Calendar className="w-4 h-4" />
+                                        Schedule Visit
+                                    </button>
                                 </div>
                             </div>
 
-                            {/* Whitelist Toggle */}
-                            <div className="flex justify-between items-center gap-2">
-                                <div className="space-y-0.5 pr-2">
-                                    <p className="text-xs font-bold text-gray-800">Whitelist VIP Client</p>
-                                    <p className="text-[10px] text-gray-500 leading-normal">
-                                        Allows unlimited WhatsApp messages bypassing the 50 messages limit.
-                                    </p>
+                            <div className="p-6 space-y-6">
+                                <div>
+                                    <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Requirement Overview</h3>
+                                    <div className="bg-white p-4 rounded-xl border border-gray-100 shadow-sm text-sm text-gray-700 leading-relaxed whitespace-pre-wrap">
+                                        {lead.requirement || "No detailed requirements recorded yet."}
+                                    </div>
                                 </div>
-                                <button
-                                    onClick={toggleWhitelist}
-                                    disabled={isUpdatingWhitelist}
-                                    className={`px-3 py-1.5 rounded-lg text-[10px] font-bold border transition-all shrink-0 ${
-                                        isWhitelisted 
-                                        ? 'bg-blue-50 border-blue-200 text-blue-700 hover:bg-blue-100' 
-                                        : 'bg-gray-50 border-gray-200 text-gray-700 hover:bg-gray-100'
-                                    }`}
-                                >
-                                    {isUpdatingWhitelist ? 'Updating...' : (isWhitelisted ? 'Remove' : 'Whitelist')}
-                                </button>
-                            </div>
 
-                            {/* Permanent Ban Toggle */}
-                            <div className="flex justify-between items-center gap-2 pt-2 border-t border-gray-50">
-                                <div className="space-y-0.5 pr-2">
-                                    <p className="text-xs font-bold text-gray-800">Permanent Ban / Block</p>
-                                    <p className="text-[10px] text-gray-500 leading-normal">
-                                        Completely ignore incoming messages from this phone number to save API costs.
-                                    </p>
+                                {lead.interestedPropertyId && (
+                                    <div>
+                                        <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Interested Property</h3>
+                                        {isLoadingProperty ? (
+                                            <div className="bg-white p-4 rounded-xl border border-gray-100 shadow-sm flex items-center gap-2 justify-center py-6 text-gray-400">
+                                                <Loader2 className="w-4 h-4 animate-spin text-primary" />
+                                                <span className="text-xs font-medium">Loading property details...</span>
+                                            </div>
+                                        ) : interestedProperty ? (
+                                            <div className="bg-white p-4 rounded-xl border border-gray-100 shadow-sm flex items-center gap-3">
+                                                {interestedProperty.images && JSON.parse(interestedProperty.images).length > 0 ? (
+                                                    <img 
+                                                        src={`/api/files/properties/${interestedProperty.id}/${JSON.parse(interestedProperty.images)[0]}`} 
+                                                        alt={interestedProperty.title}
+                                                        className="w-12 h-12 rounded-lg object-cover bg-gray-50 border border-gray-100"
+                                                        onError={(e) => {
+                                                            e.target.src = 'https://images.unsplash.com/photo-1564013799919-ab600027ffc6?auto=format&fit=crop&w=400&q=80';
+                                                        }}
+                                                    />
+                                                ) : (
+                                                    <div className="w-12 h-12 rounded-lg bg-primary/10 flex items-center justify-center text-primary font-bold text-xs">
+                                                        🏡
+                                                    </div>
+                                                )}
+                                                <div className="min-w-0 flex-1">
+                                                    <p className="text-sm font-bold text-gray-900 truncate">{interestedProperty.title}</p>
+                                                    <p className="text-xs text-gray-500 truncate">{interestedProperty.location}</p>
+                                                    <p className="text-xs text-primary font-bold mt-0.5">
+                                                        {interestedProperty.price ? (
+                                                            parseFloat(interestedProperty.price) >= 10000000 
+                                                                ? `₹${(parseFloat(interestedProperty.price) / 10000000).toFixed(2)} Cr` 
+                                                                : `₹${(parseFloat(interestedProperty.price) / 100000).toFixed(2)} Lakh`
+                                                        ) : 'Price on request'}
+                                                    </p>
+                                                </div>
+                                                <a 
+                                                    href={`/properties/${interestedProperty.id}`}
+                                                    target="_blank"
+                                                    rel="noopener noreferrer"
+                                                    className="text-[10px] font-bold bg-primary/5 text-primary border border-primary/10 hover:bg-primary/10 px-2.5 py-1.5 rounded-lg transition-all"
+                                                >
+                                                    View Page
+                                                </a>
+                                            </div>
+                                        ) : (
+                                            <div className="bg-white p-4 rounded-xl border border-gray-100 shadow-sm text-xs text-gray-400">
+                                                Property details unavailable (ID: {lead.interestedPropertyId})
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
+
+                                {lead.date && (
+                                    <div>
+                                        <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Next Action</h3>
+                                        <div className="bg-white p-4 rounded-xl border border-gray-100 shadow-sm flex items-center gap-3">
+                                            <div className="bg-orange-50 p-2 rounded-lg">
+                                                <Clock className="w-5 h-5 text-orange-500" />
+                                            </div>
+                                            <div>
+                                                <p className="text-sm font-semibold text-gray-800">Follow-up Scheduled</p>
+                                                <p className="text-xs text-gray-500">{new Date(lead.date).toLocaleDateString(undefined, { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
+
+                                <div>
+                                    <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Lead Source</h3>
+                                    <div className="bg-white p-4 rounded-xl border border-gray-100 shadow-sm flex items-center gap-3">
+                                        <div className="bg-blue-50 p-2 rounded-lg">
+                                            <Bot className="w-5 h-5 text-blue-500" />
+                                        </div>
+                                        <div>
+                                            <p className="text-sm font-semibold text-gray-800">AI WhatsApp Agent</p>
+                                            <p className="text-xs text-gray-500">Processed seamlessly via ChatGPT</p>
+                                        </div>
+                                    </div>
                                 </div>
-                                <button
-                                    onClick={togglePermanentBlock}
-                                    disabled={isUpdatingStatus}
-                                    className={`px-3 py-1.5 rounded-lg text-[10px] font-bold border transition-all shrink-0 ${
-                                        leadStatus === 'Blocked'
-                                        ? 'bg-green-50 border-green-200 text-green-700 hover:bg-green-100' 
-                                        : 'bg-red-50 border-red-200 text-red-700 hover:bg-red-100'
-                                    }`}
-                                >
-                                    {isUpdatingStatus ? 'Updating...' : (leadStatus === 'Blocked' ? 'Unblock' : 'Block Permanent')}
-                                </button>
+
+                                {/* DPDP Consent Status & Logs */}
+                                <div className="bg-white p-4 rounded-xl border border-gray-100 shadow-sm space-y-3">
+                                    <div className="flex justify-between items-center pb-2 border-b border-gray-105">
+                                        <h4 className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">WhatsApp Consent</h4>
+                                        {leadOptIn ? (
+                                            <span className="text-[9px] bg-green-50 text-green-700 border border-green-100 font-extrabold px-2 py-0.5 rounded-full">
+                                                Opted-In
+                                            </span>
+                                        ) : (
+                                            <span className="text-[9px] bg-red-50 text-red-700 border border-red-100 font-extrabold px-2 py-0.5 rounded-full">
+                                                Opted-Out
+                                            </span>
+                                        )}
+                                    </div>
+
+                                    <div className="flex justify-between items-center gap-2">
+                                        <p className="text-[11px] text-gray-500 leading-normal">
+                                            {leadOptIn ? "Lead agrees to receive property alerts on WhatsApp." : "Lead has unsubscribed. Campaigns are blocked."}
+                                        </p>
+                                        <button
+                                            onClick={toggleConsent}
+                                            disabled={isUpdatingConsent}
+                                            className={`px-3 py-1.5 rounded-lg text-[10px] font-bold border transition-all ${
+                                                leadOptIn 
+                                                ? 'bg-red-50 border-red-200 text-red-700 hover:bg-red-100' 
+                                                : 'bg-green-50 border-green-200 text-green-700 hover:bg-green-100'
+                                            }`}
+                                        >
+                                            {isUpdatingConsent ? 'Updating...' : (leadOptIn ? 'Unsubscribe' : 'Subscribe')}
+                                        </button>
+                                    </div>
+
+                                    {/* Consent Audit Logs */}
+                                    {consentLogs.length > 0 && (
+                                        <div className="pt-2 border-t border-gray-100">
+                                            <h5 className="text-[9px] font-bold text-gray-400 uppercase tracking-wider mb-2">Consent Audit History</h5>
+                                            <div className="max-h-[120px] overflow-y-auto space-y-2 pr-1">
+                                                {consentLogs.map(log => (
+                                                    <div key={log.id} className="text-[10px] bg-gray-50 border border-gray-100 rounded-lg p-2 flex flex-col gap-0.5">
+                                                        <div className="flex justify-between items-center">
+                                                            <span className={`font-bold uppercase tracking-wider text-[8px] px-1 rounded-sm ${log.consent_status === 'active' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
+                                                                {log.consent_status === 'active' ? 'Granted' : 'Withdrawn'}
+                                                            </span>
+                                                            <span className="text-[8px] text-gray-400 font-mono">
+                                                                {new Date(log.created_at || log.updated_at).toLocaleString('en-IN', { dateStyle: 'short', timeStyle: 'short' })}
+                                                            </span>
+                                                        </div>
+                                                        <p className="text-gray-600 font-medium leading-normal">{log.consent_clause}</p>
+                                                        <span className="text-[8px] text-gray-400 font-semibold italic">Source: {log.source}</span>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+
+                                {/* AI Billing & Security Settings */}
+                                <div className="bg-white p-4 rounded-xl border border-gray-100 shadow-sm space-y-3">
+                                    <div className="flex justify-between items-center pb-2 border-b border-gray-100">
+                                        <h4 className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">AI Billing & Security</h4>
+                                        <div className="flex gap-1.5">
+                                            {isWhitelisted && (
+                                                <span className="text-[9px] bg-blue-50 text-blue-700 border border-blue-100 font-extrabold px-2 py-0.5 rounded-full">
+                                                    VIP Whitelist
+                                                </span>
+                                            )}
+                                            {leadStatus === 'Blocked' && (
+                                                <span className="text-[9px] bg-red-50 text-red-700 border border-red-100 font-extrabold px-2 py-0.5 rounded-full">
+                                                    Blocked Competitor
+                                                </span>
+                                            )}
+                                            {leadStatus === 'Needs Human Intervention' && (
+                                                <span className="text-[9px] bg-amber-50 text-amber-700 border border-amber-100 font-extrabold px-2 py-0.5 rounded-full">
+                                                    Needs Handover
+                                                </span>
+                                            )}
+                                        </div>
+                                    </div>
+
+                                    {/* Whitelist Toggle */}
+                                    <div className="flex justify-between items-center gap-2">
+                                        <div className="space-y-0.5 pr-2">
+                                            <p className="text-xs font-bold text-gray-800">Whitelist VIP Client</p>
+                                            <p className="text-[10px] text-gray-500 leading-normal">
+                                                Allows unlimited WhatsApp messages bypassing the 50 messages limit.
+                                            </p>
+                                        </div>
+                                        <button
+                                            onClick={toggleWhitelist}
+                                            disabled={isUpdatingWhitelist}
+                                            className={`px-3 py-1.5 rounded-lg text-[10px] font-bold border transition-all shrink-0 ${
+                                                isWhitelisted 
+                                                ? 'bg-blue-50 border-blue-200 text-blue-700 hover:bg-blue-100' 
+                                                : 'bg-gray-50 border-gray-200 text-gray-700 hover:bg-gray-100'
+                                            }`}
+                                        >
+                                            {isUpdatingWhitelist ? 'Updating...' : (isWhitelisted ? 'Remove' : 'Whitelist')}
+                                        </button>
+                                    </div>
+
+                                    {/* Permanent Ban Toggle */}
+                                    <div className="flex justify-between items-center gap-2 pt-2 border-t border-gray-50">
+                                        <div className="space-y-0.5 pr-2">
+                                            <p className="text-xs font-bold text-gray-800">Permanent Ban / Block</p>
+                                            <p className="text-[10px] text-gray-500 leading-normal">
+                                                Completely ignore incoming messages from this phone number to save API costs.
+                                            </p>
+                                        </div>
+                                        <button
+                                            onClick={togglePermanentBlock}
+                                            disabled={isUpdatingStatus}
+                                            className={`px-3 py-1.5 rounded-lg text-[10px] font-bold border transition-all shrink-0 ${
+                                                leadStatus === 'Blocked'
+                                                ? 'bg-green-50 border-green-200 text-green-700 hover:bg-green-100' 
+                                                : 'bg-red-50 border-red-200 text-red-700 hover:bg-red-100'
+                                            }`}
+                                        >
+                                            {isUpdatingStatus ? 'Updating...' : (leadStatus === 'Blocked' ? 'Unblock' : 'Block Permanent')}
+                                        </button>
+                                    </div>
+                                </div>
                             </div>
-                        </div>
-                    </div>
+                        </>
+                    )}
                 </div>
 
                 {/* RIGHT SIDE: AI Chat Log */}

@@ -454,6 +454,10 @@ const LeadManagement = () => {
                 isOpen={isDetailsModalOpen}
                 onClose={() => setIsDetailsModalOpen(false)}
                 lead={selectedLead}
+                onUpdate={(updatedLead) => {
+                    setLeads(prevLeads => prevLeads.map(l => l.id === updatedLead.id ? updatedLead : l));
+                    setSelectedLead(updatedLead);
+                }}
             />
         </div>
     );
