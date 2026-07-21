@@ -86,6 +86,29 @@ app.use(express.json({
 }));
 app.use(express.urlencoded({ extended: true }));
 
+// High-performance recursive input sanitizer to protect against Stored XSS attacks
+function sanitizePayload(val) {
+    if (typeof val === 'string') {
+        return val.replace(/<[^>]*>/g, ''); // Strip HTML tags
+    }
+    if (typeof val === 'object' && val !== null) {
+        for (const key in val) {
+            if (Object.prototype.hasOwnProperty.call(val, key)) {
+                val[key] = sanitizePayload(val[key]);
+            }
+        }
+    }
+    return val;
+}
+
+// Global sanitization middleware for all POST/PUT/PATCH request payloads
+app.use((req, res, next) => {
+    if (req.body) {
+        req.body = sanitizePayload(req.body);
+    }
+    next();
+});
+
 // Auth Middleware to decode Firebase ID Token (moved early to allow rate limiter bypassing)
 app.use(async (req, res, next) => {
     const authHeader = req.headers.authorization;
@@ -2297,6 +2320,16 @@ app.get('/api/visits/:agencyId', async (req, res) => {
     } catch(err) { res.status(500).json({ error: "Failed to fetch visits" }); }
 });
 
+
+// Global production-grade error handling middleware (prevents leaking internal stack traces / SQL queries)
+app.use((err, req, res, next) => {
+    console.error("[SERVER EXCEPTION]:", err);
+    res.status(500).json({
+        error: process.env.NODE_ENV === 'production'
+            ? 'An unexpected error occurred on the server.'
+            : err.message
+    });
+});
 
 // Start Server
 const PORT = process.env.PORT || 3000;
