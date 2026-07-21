@@ -149,7 +149,7 @@ const LeadManagement = () => {
             const colLeads = searchedLeads.filter(l => l.status === colName);
 
             return (
-                <div key={colName} className="kanban-col h-[calc(100vh-230px)] lg:h-[calc(100vh-200px)] snap-align-start shrink-0 w-[85vw] sm:w-[320px]">
+                <div key={colName} className="kanban-col h-[calc(100vh-230px)] lg:h-[calc(100vh-200px)] snap-align-start shrink-0 w-[85vw] sm:w-[350px]">
                     {/* Column Header */}
                     <div className="kanban-col-header">
                         <div className="flex items-center gap-2">
