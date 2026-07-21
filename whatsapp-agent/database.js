@@ -852,5 +852,55 @@ module.exports = {
         } catch (err) {
             console.error('[DB Error] Failed to block lead:', err.message);
         }
+    },
+
+    /**
+     * Checks if a lead is whitelisted (VIP client)
+     */
+    async isLeadWhitelisted(phone) {
+        try {
+            const cleanPhone = phone.replace(/[^\d]/g, '');
+            const query = `SELECT whitelisted FROM leads WHERE REPLACE(phone, ' ', '') LIKE $1 LIMIT 1`;
+            const res = await pool.query(query, [`%${cleanPhone}%`]);
+            if (res.rows.length > 0) {
+                return res.rows[0].whitelisted === true;
+            }
+            return false;
+        } catch (err) {
+            console.error('[DB Error] Failed to check if lead is whitelisted:', err.message);
+            return false;
+        }
+    },
+
+    /**
+     * Checks if a lead status is 'Needs Human Intervention'
+     */
+    async isLeadNeedsIntervention(phone) {
+        try {
+            const cleanPhone = phone.replace(/[^\d]/g, '');
+            const query = `SELECT status FROM leads WHERE REPLACE(phone, ' ', '') LIKE $1 LIMIT 1`;
+            const res = await pool.query(query, [`%${cleanPhone}%`]);
+            if (res.rows.length > 0) {
+                return res.rows[0].status === 'Needs Human Intervention';
+            }
+            return false;
+        } catch (err) {
+            console.error('[DB Error] Failed to check if lead needs intervention:', err.message);
+            return false;
+        }
+    },
+
+    /**
+     * Updates a lead's status to 'Needs Human Intervention' (handover)
+     */
+    async escalateLead(phone) {
+        try {
+            const cleanPhone = phone.replace(/[^\d]/g, '');
+            const query = `UPDATE leads SET status = 'Needs Human Intervention', updated_at = NOW() WHERE REPLACE(phone, ' ', '') LIKE $1`;
+            await pool.query(query, [`%${cleanPhone}%`]);
+            console.log(`[DB] Escalated lead ${cleanPhone} to Needs Human Intervention (limit hit).`);
+        } catch (err) {
+            console.error('[DB Error] Failed to escalate lead:', err.message);
+        }
     }
 };

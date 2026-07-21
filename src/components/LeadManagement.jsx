@@ -7,24 +7,30 @@ import LeadDetailsModal from './LeadDetailsModal';
 const initialColumns = {
     'New Lead': [],
     'Contacted': [],
+    'Needs Human Intervention': [],
     'Site Visit': [],
     'Closed': [],
+    'Blocked': [],
 };
 
 // Left-border accent per status
 const colAccent = {
     'New Lead':   'kanban-card-new',
     'Contacted':  'kanban-card-contacted',
+    'Needs Human Intervention': 'border-l-4 border-amber-500 bg-amber-50/10 hover:shadow-amber-100/30',
     'Site Visit': 'kanban-card-visit',
     'Closed':     'kanban-card-closed',
+    'Blocked':    'border-l-4 border-red-500 bg-red-50/10 hover:shadow-red-100/30',
 };
 
 // Header dot colour per column
 const colDotClass = {
     'New Lead':   'bg-primary',
     'Contacted':  'bg-blue-500',
-    'Site Visit': 'bg-amber-500',
+    'Needs Human Intervention': 'bg-amber-500',
+    'Site Visit': 'bg-orange-500',
     'Closed':     'bg-green-500',
+    'Blocked':    'bg-red-500',
 };
 
 const LeadManagement = () => {

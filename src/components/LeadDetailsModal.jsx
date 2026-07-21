@@ -10,9 +10,16 @@ const LeadDetailsModal = ({ isOpen, onClose, lead }) => {
     const [isUpdatingConsent, setIsUpdatingConsent] = useState(false);
     const [leadOptIn, setLeadOptIn] = useState(lead ? lead.marketing_opt_in !== false : true);
 
+    const [isWhitelisted, setIsWhitelisted] = useState(lead ? lead.whitelisted === true : false);
+    const [isUpdatingWhitelist, setIsUpdatingWhitelist] = useState(false);
+    const [leadStatus, setLeadStatus] = useState(lead ? lead.status : 'New Lead');
+    const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
+
     useEffect(() => {
         if (isOpen && lead) {
             setLeadOptIn(lead.marketing_opt_in !== false);
+            setIsWhitelisted(lead.whitelisted === true);
+            setLeadStatus(lead.status);
             fetchConsentLogs(lead.id);
         }
     }, [isOpen, lead]);
@@ -22,6 +29,47 @@ const LeadDetailsModal = ({ isOpen, onClose, lead }) => {
             fetchChats(lead.phone);
         }
     }, [isOpen, lead]);
+
+    const toggleWhitelist = async () => {
+        setIsUpdatingWhitelist(true);
+        try {
+            const newWhitelist = !isWhitelisted;
+            const response = await fetch(`/api/collections/leads/${lead.id}`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ whitelisted: newWhitelist })
+            });
+            if (response.ok) {
+                setIsWhitelisted(newWhitelist);
+                lead.whitelisted = newWhitelist; // update local object reference
+            }
+        } catch (error) {
+            console.error("Failed to update whitelist status:", error);
+        } finally {
+            setIsUpdatingWhitelist(false);
+        }
+    };
+
+    const togglePermanentBlock = async () => {
+        setIsUpdatingStatus(true);
+        try {
+            const isBlocked = leadStatus === 'Blocked';
+            const newStatus = isBlocked ? 'New Lead' : 'Blocked';
+            const response = await fetch(`/api/collections/leads/${lead.id}`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ status: newStatus })
+            });
+            if (response.ok) {
+                setLeadStatus(newStatus);
+                lead.status = newStatus; // update local object reference
+            }
+        } catch (error) {
+            console.error("Failed to update permanent block status:", error);
+        } finally {
+            setIsUpdatingStatus(false);
+        }
+    };
 
     // Auto-scroll to bottom of chat
     useEffect(() => {
@@ -223,6 +271,72 @@ const LeadDetailsModal = ({ isOpen, onClose, lead }) => {
                                     </div>
                                 </div>
                             )}
+                        </div>
+
+                        {/* AI Billing & Security Settings */}
+                        <div className="bg-white p-4 rounded-xl border border-gray-100 shadow-sm space-y-3">
+                            <div className="flex justify-between items-center pb-2 border-b border-gray-100">
+                                <h4 className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">AI Billing & Security</h4>
+                                <div className="flex gap-1.5">
+                                    {isWhitelisted && (
+                                        <span className="text-[9px] bg-blue-50 text-blue-700 border border-blue-100 font-extrabold px-2 py-0.5 rounded-full">
+                                            VIP Whitelist
+                                        </span>
+                                    )}
+                                    {leadStatus === 'Blocked' && (
+                                        <span className="text-[9px] bg-red-50 text-red-700 border border-red-100 font-extrabold px-2 py-0.5 rounded-full">
+                                            Blocked Competitor
+                                        </span>
+                                    )}
+                                    {leadStatus === 'Needs Human Intervention' && (
+                                        <span className="text-[9px] bg-amber-50 text-amber-700 border border-amber-100 font-extrabold px-2 py-0.5 rounded-full">
+                                            Needs Handover
+                                        </span>
+                                    )}
+                                </div>
+                            </div>
+
+                            {/* Whitelist Toggle */}
+                            <div className="flex justify-between items-center gap-2">
+                                <div className="space-y-0.5 pr-2">
+                                    <p className="text-xs font-bold text-gray-800">Whitelist VIP Client</p>
+                                    <p className="text-[10px] text-gray-500 leading-normal">
+                                        Allows unlimited WhatsApp messages bypassing the 50 messages limit.
+                                    </p>
+                                </div>
+                                <button
+                                    onClick={toggleWhitelist}
+                                    disabled={isUpdatingWhitelist}
+                                    className={`px-3 py-1.5 rounded-lg text-[10px] font-bold border transition-all shrink-0 ${
+                                        isWhitelisted 
+                                        ? 'bg-blue-50 border-blue-200 text-blue-700 hover:bg-blue-100' 
+                                        : 'bg-gray-50 border-gray-200 text-gray-700 hover:bg-gray-100'
+                                    }`}
+                                >
+                                    {isUpdatingWhitelist ? 'Updating...' : (isWhitelisted ? 'Remove' : 'Whitelist')}
+                                </button>
+                            </div>
+
+                            {/* Permanent Ban Toggle */}
+                            <div className="flex justify-between items-center gap-2 pt-2 border-t border-gray-50">
+                                <div className="space-y-0.5 pr-2">
+                                    <p className="text-xs font-bold text-gray-800">Permanent Ban / Block</p>
+                                    <p className="text-[10px] text-gray-500 leading-normal">
+                                        Completely ignore incoming messages from this phone number to save API costs.
+                                    </p>
+                                </div>
+                                <button
+                                    onClick={togglePermanentBlock}
+                                    disabled={isUpdatingStatus}
+                                    className={`px-3 py-1.5 rounded-lg text-[10px] font-bold border transition-all shrink-0 ${
+                                        leadStatus === 'Blocked'
+                                        ? 'bg-green-50 border-green-200 text-green-700 hover:bg-green-100' 
+                                        : 'bg-red-50 border-red-200 text-red-700 hover:bg-red-100'
+                                    }`}
+                                >
+                                    {isUpdatingStatus ? 'Updating...' : (leadStatus === 'Blocked' ? 'Unblock' : 'Block Permanent')}
+                                </button>
+                            </div>
                         </div>
                     </div>
                 </div>

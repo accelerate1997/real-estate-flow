@@ -6,6 +6,7 @@ const fs = require('fs');
 const multer = require('multer');
 const bcrypt = require('bcryptjs');
 const admin = require('./firebase_admin');
+const PocketBase = require('pocketbase/cjs');
 const crypto = require('crypto');
 const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
@@ -1225,26 +1226,34 @@ app.post('/webhook', verifyMetaSignature, async (req, res) => {
                 return res.sendStatus(200);
             }
 
-            // 1. Billing & Spammer Protection: Check if number is blocked
-            const isBlocked = await db.isLeadBlocked(fromPhone);
-            if (isBlocked) {
-                console.log(`🚫 [Billing Protection] Blocked user ${fromPhone} sent a message. Ignoring request to save API costs.`);
-                return res.sendStatus(200);
-            }
+            // 1. Spammer & Billing Protection: Check if number is whitelisted (VIP client)
+            const isWhitelisted = await db.isLeadWhitelisted(fromPhone);
+            if (!isWhitelisted) {
+                // 2. Check if lead is permanently blocked
+                const isBlocked = await db.isLeadBlocked(fromPhone);
+                if (isBlocked) {
+                    console.log(`🚫 [Billing Protection] Blocked user ${fromPhone} sent a message. Ignoring request to save API costs.`);
+                    return res.sendStatus(200);
+                }
 
-            // 2. Billing & Spammer Protection: Check daily message count limit (Max 50 messages per 24 hours)
-            const dailyCount = await db.getDailyUserMessageCount(fromPhone);
-            if (dailyCount >= 50) {
-                console.log(`⚠️ [Billing Protection] Spammer detected: User ${fromPhone} exceeded daily limit (${dailyCount}/50). Automatically blocking number.`);
-                
-                // Block the lead status in DB
-                await db.blockLead(fromPhone);
+                // 3. Check if lead status is 'Needs Human Intervention'
+                const needsIntervention = await db.isLeadNeedsIntervention(fromPhone);
 
-                // Notify spammer they are blocked/capped
-                const limitWarning = "You have reached the daily chat limit. Our agent will get in touch with you shortly. Thank you.";
-                await sendMessage(fromPhone, limitWarning, instanceName);
-                
-                return res.sendStatus(200);
+                // 4. Check daily message count limit (Max 50 messages per 24 hours)
+                const dailyCount = await db.getDailyUserMessageCount(fromPhone);
+                if (dailyCount >= 50) {
+                    console.log(`⚠️ [Billing Protection] Spammer or High Usage detected: User ${fromPhone} hit 24h limit (${dailyCount}/50).`);
+                    
+                    if (!needsIntervention) {
+                        // Mark status as 'Needs Human Intervention' in PostgreSQL and sync
+                        await db.escalateLead(fromPhone);
+
+                        // Notify user with polite handover message
+                        const handoverMsg = "Aapki requirement bohot specific hai! Main hamare Senior Property Expert ko aapka number forward kar raha hu, wo aapko 10 mins mein call/WhatsApp karenge.";
+                        await sendMessage(fromPhone, handoverMsg, instanceName);
+                    }
+                    return res.sendStatus(200);
+                }
             }
 
             res.sendStatus(200);
@@ -2359,6 +2368,44 @@ async function startServer() {
     try {
         await initDB();
         await autoMigrateIfEmpty();
+
+        // Sync leads collection schema in PocketBase dynamically
+        try {
+            const pbUrl = process.env.POCKETBASE_URL || 'http://127.0.0.1:8090';
+            const pbEmail = process.env.POCKETBASE_ADMIN_EMAIL;
+            const pbPassword = process.env.POCKETBASE_ADMIN_PASSWORD;
+
+            if (pbEmail && pbPassword) {
+                const pbAdmin = new PocketBase(pbUrl);
+                await pbAdmin.admins.authWithPassword(pbEmail, pbPassword);
+                
+                // Get collection schema
+                const collection = await pbAdmin.collections.getOne('leads');
+                const fields = collection.schema || collection.fields || [];
+                const hasWhitelisted = fields.some(f => f.name === 'whitelisted');
+
+                if (!hasWhitelisted) {
+                    console.log('🔄 [PocketBase] Adding "whitelisted" field to leads collection...');
+                    const newField = {
+                        name: 'whitelisted',
+                        type: 'bool',
+                        required: false
+                    };
+                    if (collection.schema) {
+                        collection.schema.push(newField);
+                    } else if (collection.fields) {
+                        collection.fields.push(newField);
+                    }
+                    await pbAdmin.collections.update('leads', collection);
+                    console.log('✅ [PocketBase] Added "whitelisted" field successfully!');
+                }
+            } else {
+                console.log('ℹ️ [PocketBase] Admin credentials missing. Skipping schema sync.');
+            }
+        } catch (pbErr) {
+            console.error('⚠️ [PocketBase] Schema sync failed:', pbErr.message);
+        }
+
         app.listen(PORT, () => {
             console.log(`🚀 Unified API & Agent Server running on port ${PORT}`);
         });
