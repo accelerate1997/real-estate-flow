@@ -802,5 +802,55 @@ module.exports = {
         } catch (err) {
             console.error('[DB Error] Failed to update follow-up progress:', err.message);
         }
+    },
+
+    /**
+     * Checks if a lead's status is set to 'Blocked'
+     */
+    async isLeadBlocked(phone) {
+        try {
+            const cleanPhone = phone.replace(/[^\d]/g, '');
+            const query = `SELECT status FROM leads WHERE REPLACE(phone, ' ', '') LIKE $1 LIMIT 1`;
+            const res = await pool.query(query, [`%${cleanPhone}%`]);
+            if (res.rows.length > 0) {
+                return res.rows[0].status === 'Blocked';
+            }
+            return false;
+        } catch (err) {
+            console.error('[DB Error] Failed to check if lead is blocked:', err.message);
+            return false;
+        }
+    },
+
+    /**
+     * Gets count of user messages sent in the last 24 hours
+     */
+    async getDailyUserMessageCount(phone) {
+        try {
+            const cleanPhone = phone.replace(/[^\d]/g, '');
+            const query = `
+                SELECT COUNT(*) FROM chat_logs 
+                WHERE REPLACE(phone, ' ', '') LIKE $1 AND role = 'user' AND created_at >= NOW() - INTERVAL '24 hours'
+            `;
+            const res = await pool.query(query, [`%${cleanPhone}%`]);
+            return parseInt(res.rows[0].count) || 0;
+        } catch (err) {
+            console.error('[DB Error] Failed to count daily messages:', err.message);
+            return 0;
+        }
+    },
+
+    /**
+     * Updates a lead's status to 'Blocked'
+     */
+    async blockLead(phone) {
+        try {
+            const cleanPhone = phone.replace(/[^\d]/g, '');
+            const query = `UPDATE leads SET status = 'Blocked', updated_at = NOW() WHERE REPLACE(phone, ' ', '') LIKE $1`;
+            await pool.query(query, [`%${cleanPhone}%`]);
+            console.log(`[DB] Automatically blocked lead ${cleanPhone} due to billing protection limits.`);
+        } catch (err) {
+            console.error('[DB Error] Failed to block lead:', err.message);
+        }
     }
 };

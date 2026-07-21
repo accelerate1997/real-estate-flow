@@ -1225,6 +1225,28 @@ app.post('/webhook', verifyMetaSignature, async (req, res) => {
                 return res.sendStatus(200);
             }
 
+            // 1. Billing & Spammer Protection: Check if number is blocked
+            const isBlocked = await db.isLeadBlocked(fromPhone);
+            if (isBlocked) {
+                console.log(`🚫 [Billing Protection] Blocked user ${fromPhone} sent a message. Ignoring request to save API costs.`);
+                return res.sendStatus(200);
+            }
+
+            // 2. Billing & Spammer Protection: Check daily message count limit (Max 50 messages per 24 hours)
+            const dailyCount = await db.getDailyUserMessageCount(fromPhone);
+            if (dailyCount >= 50) {
+                console.log(`⚠️ [Billing Protection] Spammer detected: User ${fromPhone} exceeded daily limit (${dailyCount}/50). Automatically blocking number.`);
+                
+                // Block the lead status in DB
+                await db.blockLead(fromPhone);
+
+                // Notify spammer they are blocked/capped
+                const limitWarning = "You have reached the daily chat limit. Our agent will get in touch with you shortly. Thank you.";
+                await sendMessage(fromPhone, limitWarning, instanceName);
+                
+                return res.sendStatus(200);
+            }
+
             res.sendStatus(200);
 
             const reply = await processMessage(text, fromPhone, agencyId);
