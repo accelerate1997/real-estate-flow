@@ -86,16 +86,79 @@ app.use(express.json({
 }));
 app.use(express.urlencoded({ extended: true }));
 
-// Setup rate limiting for API endpoints (max 300 requests per 15 minutes per IP)
-const apiLimiter = rateLimit({
+// Auth Middleware to decode Firebase ID Token (moved early to allow rate limiter bypassing)
+app.use(async (req, res, next) => {
+    const authHeader = req.headers.authorization;
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+        const token = authHeader.substring(7);
+        try {
+            // Verify ID Token with Firebase Admin SDK
+            const decodedToken = await admin.auth().verifyIdToken(token);
+            
+            // Query local user matching the Firebase uid (id column in pg users)
+            const userRes = await pool.query('SELECT * FROM users WHERE id = $1', [decodedToken.uid]);
+            if (userRes.rows.length > 0) {
+                const user = userRes.rows[0];
+                req.user = {
+                    id: user.id,
+                    email: user.email,
+                    name: user.name,
+                    role: user.role,
+                    agentEnabled: user.agentEnabled,
+                    isActive: user.isActive
+                };
+            } else {
+                // User authenticated in Firebase, but profile not created yet in PostgreSQL
+                req.user = {
+                    id: decodedToken.uid,
+                    email: decodedToken.email || '',
+                    name: decodedToken.name || '',
+                    role: 'agent',
+                    agentEnabled: true,
+                    isActive: true,
+                    isNewUser: true
+                };
+            }
+        } catch (e) {
+            console.error("Firebase Auth token verification failed:", e.message);
+        }
+    }
+    next();
+});
+
+// Setup strict rate limiting for unauthenticated/sensitive public endpoints (max 100 requests per 15 minutes per IP)
+const strictLimiter = rateLimit({
     windowMs: 15 * 60 * 1000,
-    max: 300,
+    max: 100,
     message: { error: 'Too many requests from this IP, please try again after 15 minutes.' },
     standardHeaders: true,
     legacyHeaders: false,
 });
 
-// Apply rate limiting to all /api/ routes
+// Apply strict rate limiting to auth register, login sync, and lead OTP endpoints
+app.use('/api/auth/register', strictLimiter);
+app.use('/api/auth/sync', strictLimiter);
+app.use('/api/leads/send-otp', strictLimiter);
+app.use('/api/leads/verify-otp', strictLimiter);
+
+// Setup standard rate limiting for general API endpoints (max 3000 requests per 15 minutes per IP)
+// Bypasses authenticated agents and Meta webhooks
+const apiLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000,
+    max: 3000,
+    message: { error: 'Too many requests from this IP, please try again after 15 minutes.' },
+    standardHeaders: true,
+    legacyHeaders: false,
+    skip: (req) => {
+        // 1. Bypass authenticated users
+        if (req.user) return true;
+        // 2. Bypass Meta webhooks (validated via HMAC-SHA256 signature checks)
+        if (req.path === '/integrations/webhook/meta' || req.originalUrl === '/api/integrations/webhook/meta') return true;
+        return false;
+    }
+});
+
+// Apply API rate limiting to all /api/ routes
 app.use('/api/', apiLimiter);
 
 // Webhook Signature verification middleware for Meta
@@ -307,46 +370,6 @@ async function expandRecords(collectionName, records) {
     }
     return newRecords;
 }
-
-// Auth Middleware to decode Firebase ID Token
-app.use(async (req, res, next) => {
-    const authHeader = req.headers.authorization;
-    if (authHeader && authHeader.startsWith('Bearer ')) {
-        const token = authHeader.substring(7);
-        try {
-            // Verify ID Token with Firebase Admin SDK
-            const decodedToken = await admin.auth().verifyIdToken(token);
-            
-            // Query local user matching the Firebase uid (id column in pg users)
-            const userRes = await pool.query('SELECT * FROM users WHERE id = $1', [decodedToken.uid]);
-            if (userRes.rows.length > 0) {
-                const user = userRes.rows[0];
-                req.user = {
-                    id: user.id,
-                    email: user.email,
-                    name: user.name,
-                    role: user.role,
-                    agentEnabled: user.agentEnabled,
-                    isActive: user.isActive
-                };
-            } else {
-                // User authenticated in Firebase, but profile not created yet in PostgreSQL
-                req.user = {
-                    id: decodedToken.uid,
-                    email: decodedToken.email || '',
-                    name: decodedToken.name || '',
-                    role: 'agent',
-                    agentEnabled: true,
-                    isActive: true,
-                    isNewUser: true
-                };
-            }
-        } catch (e) {
-            console.error("Firebase Auth token verification failed:", e.message);
-        }
-    }
-    next();
-});
 
 // DEBUG CACHE for Webhooks
 const recentWebhooks = [];
