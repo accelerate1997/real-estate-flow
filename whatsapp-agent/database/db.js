@@ -41,6 +41,7 @@ async function initDB() {
             ALTER TABLE users ADD COLUMN IF NOT EXISTS "primaryColor" VARCHAR(50) DEFAULT '#DC2626';
             ALTER TABLE users ADD COLUMN IF NOT EXISTS "secondaryColor" VARCHAR(50) DEFAULT '#1E293B';
             ALTER TABLE leads ADD COLUMN IF NOT EXISTS whitelisted BOOLEAN DEFAULT FALSE;
+            ALTER TABLE leads ADD COLUMN IF NOT EXISTS "interestedPropertyId" VARCHAR(50);
         `);
         console.log('✅ [Database] Schema migrations completed successfully!');
     } catch (err) {
