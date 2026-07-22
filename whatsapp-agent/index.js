@@ -1252,12 +1252,15 @@ app.post('/webhook', verifyMetaSignature, async (req, res) => {
             }
 
             if (!agency && cleanDisplayPhone) {
-                const resDb = await pool.query(
-                    'SELECT * FROM users WHERE REPLACE(phone, \' \', \'\') LIKE $1 LIMIT 1',
-                    [`%${cleanDisplayPhone}%`]
-                );
-                if (resDb.rows.length > 0) {
-                    agency = resDb.rows[0];
+                const last10Digits = cleanDisplayPhone.slice(-10);
+                if (last10Digits.length === 10) {
+                    const resDb = await pool.query(
+                        'SELECT * FROM users WHERE REPLACE(REPLACE(phone, \'+\', \'\'), \' \', \'\') LIKE $1 LIMIT 1',
+                        [`%${last10Digits}`]
+                    );
+                    if (resDb.rows.length > 0) {
+                        agency = resDb.rows[0];
+                    }
                 }
             }
 

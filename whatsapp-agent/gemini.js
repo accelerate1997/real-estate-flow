@@ -133,8 +133,16 @@ async function processMessage(userInput, phone, agencyId) {
                     return JSON.parse(failClean).human_response || "I couldn't find any properties matching that criteria.";
                 }
 
+                // Auto-link top property to lead record
+                const topPropertyId = properties[0].id;
+                if (topPropertyId && agencyId) {
+                    params.interestedPropertyId = topPropertyId;
+                    const leadPhone = phone.match(/^\d+$/) ? phone : (params.extracted_phone || phone);
+                    currentLead = await db.upsertLead(leadPhone, agencyId, { ...params, isChatUpdate: true });
+                }
+
                 // Format properties into a readable string
-                const baseUrl = process.env.VITE_APP_URL || 'http://localhost:5173';
+                const baseUrl = process.env.VITE_APP_URL || 'https://realestateflow.elevetoai.com';
                 const leadId = currentLead ? currentLead.id : '';
                 const propertyList = properties.map(p =>
                     `🏡 *${p.title}*\n📍 ${p.location} | ${p.bhk || 'N/A'}\n💰 ₹${(p.price / 10000000).toFixed(2)} Cr\n🔗 Link: ${baseUrl}/api/track-click?leadId=${leadId}&propertyId=${p.id}`
@@ -144,6 +152,30 @@ async function processMessage(userInput, phone, agencyId) {
 
                 const successClean = successResult.response.text().match(/\{[\s\S]*\}/)?.[0] || successResult.response.text();
                 return JSON.parse(successClean).human_response || "Here are some properties I found:\n" + propertyList;
+            } else if (intent === 'SCHEDULE_SITE_VISIT') {
+                const propertyId = params.visit_property_id || (currentLead ? currentLead.interestedPropertyId : null);
+                let visitDate = params.visit_date;
+
+                if (!visitDate || visitDate.includes('YYYY') || isNaN(new Date(visitDate).getTime())) {
+                    const tmr = new Date();
+                    tmr.setDate(tmr.getDate() + 1);
+                    visitDate = tmr.toISOString().split('T')[0];
+                }
+
+                if (propertyId && currentLead) {
+                    await db.scheduleVisit(
+                        currentLead.id,
+                        propertyId,
+                        visitDate,
+                        params.visit_time || '16:00',
+                        agencyId,
+                        `Scheduled via AI. User requested: ${visitDate} at ${params.visit_time || '16:00'}`
+                    );
+
+                    const confirmResult = await chat.sendMessage(`SYSTEM NOTE: Site visit recorded in database successfully. Confirm professionally.`);
+                    const confirmClean = confirmResult.response.text().match(/\{[\s\S]*\}/)?.[0] || confirmResult.response.text();
+                    return JSON.parse(confirmClean).human_response || "Your site visit has been scheduled.";
+                }
             }
 
             // Default fallback for GENERAL_CHAT

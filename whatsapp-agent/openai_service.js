@@ -188,6 +188,15 @@ async function processMessage(userInput, phone, agencyId) {
                 finalReplyText = retryData.human_response || "I couldn't find any properties matching those criteria at the moment.";
                 assistantContextText = retryText;
             } else {
+                // Auto-link first property to lead record
+                const topPropertyId = properties[0].id;
+                if (!interestedPropertyId && topPropertyId && agencyId) {
+                    interestedPropertyId = topPropertyId;
+                    params.interestedPropertyId = topPropertyId;
+                    const reUpdatedLead = await db.upsertLead(cleanPhone, agencyId, { ...params, isChatUpdate: true });
+                    if (reUpdatedLead) leadIdFound = reUpdatedLead.id;
+                }
+
                 const propertyList = properties.map(p => {
                     const priceVal = p.price || 0;
                     let priceText = priceVal >= 10000000 ? `₹${(priceVal / 10000000).toFixed(2)} Cr` : `₹${(priceVal / 100000).toFixed(2)} Lakh`;
@@ -210,20 +219,27 @@ async function processMessage(userInput, phone, agencyId) {
                 assistantContextText = finalResponseText;
             }
         } else if (intent === 'SCHEDULE_SITE_VISIT') {
-            const propertyId = params.visit_property_id;
-            const visitDate = params.visit_date;
+            const propertyId = params.visit_property_id || interestedPropertyId || (lead ? lead.interestedPropertyId : null);
+            let visitDate = params.visit_date;
             
-            if (propertyId && visitDate && !visitDate.includes('YYYY') && leadIdFound) {
+            // Auto-fallback date if placeholder or invalid
+            if (!visitDate || visitDate.includes('YYYY') || isNaN(new Date(visitDate).getTime())) {
+                const tmr = new Date();
+                tmr.setDate(tmr.getDate() + 1);
+                visitDate = tmr.toISOString().split('T')[0];
+            }
+            
+            if (propertyId && leadIdFound) {
                 await db.scheduleVisit(
                     leadIdFound,
                     propertyId,
                     visitDate,
-                    params.visit_time || '',
+                    params.visit_time || '16:00',
                     agencyId,
-                    `Scheduled via AI. User requested: ${visitDate} at ${params.visit_time}`
+                    `Scheduled via AI. User requested: ${visitDate} at ${params.visit_time || '16:00'}`
                 );
                 
-                const confirmationMsg = "SYSTEM NOTE: Site visit recorded. Confirm professionally.";
+                const confirmationMsg = "SYSTEM NOTE: Site visit recorded in database successfully. Confirm professionally to user.";
                 const tempContext = [...chatContext, { role: "assistant", content: responseText }];
                 const finalContext = [...tempContext, { role: "user", content: confirmationMsg }];
                 const confirmRes = await openai.chat.completions.create({
