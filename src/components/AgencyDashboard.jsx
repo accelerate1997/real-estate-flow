@@ -120,7 +120,7 @@ const CustomTooltip = ({ active, payload, label }) => {
 };
 
 // ─── Dashboard Overview ───────────────────────────────────────────────────────
-const DashboardOverview = ({ currentUser, isOwner }) => {
+const DashboardOverview = ({ currentUser, isOwner, setActiveTab }) => {
     const [stats, setStats] = useState([]);
     const [chartData, setChartData] = useState([]);
     const [isLoading, setIsLoading] = useState(true);
@@ -173,7 +173,7 @@ const DashboardOverview = ({ currentUser, isOwner }) => {
                 if (isOwner) {
                     try {
                         const agentRes = await fetch(
-                            `${baseUrl}/api/collections/users?filter=role="agent"&page=1&perPage=1`,
+                            `${baseUrl}/api/collections/users?filter=agencyId="${agencyId}" && role="agent"&page=1&perPage=1`,
                             { headers }
                         );
                         const agentData = agentRes.ok ? await agentRes.json() : { totalItems: 0 };
@@ -298,15 +298,15 @@ const DashboardOverview = ({ currentUser, isOwner }) => {
                             <defs>
                                 <linearGradient id="barGrad" x1="0" y1="0" x2="0" y2="1">
                                     <stop offset="0%" stopColor="#CC0000" stopOpacity={1} />
-                                    <stop offset="100%" stopColor="#990000" stopOpacity={0.7} />
+                                    <stop offset="100%" stopColor="#990000" stopOpacity={1} />
                                 </linearGradient>
                             </defs>
-                            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f3f4f6" />
+                            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#F3F4F6" />
                             <XAxis
                                 dataKey="name"
                                 axisLine={false}
                                 tickLine={false}
-                                tick={{ fontSize: 12, fill: '#9CA3AF', fontWeight: 500 }}
+                                tick={{ fontSize: 12, fill: '#9CA3AF' }}
                                 dy={10}
                             />
                             <YAxis
@@ -335,20 +335,20 @@ const DashboardOverview = ({ currentUser, isOwner }) => {
                         <p className="text-white/70 text-sm mt-0.5">Add properties or leads to get started</p>
                     </div>
                     <div className="flex gap-3 flex-wrap">
-                        <a
-                            href="#"
-                            onClick={e => { e.preventDefault(); }}
-                            className="inline-flex items-center gap-2 bg-white text-primary px-4 py-2 rounded-xl text-sm font-bold hover:bg-white/90 transition-all"
+                        <button
+                            type="button"
+                            onClick={() => { if (setActiveTab) setActiveTab('properties'); }}
+                            className="inline-flex items-center gap-2 bg-white text-primary px-4 py-2 rounded-xl text-sm font-bold hover:bg-white/90 transition-all cursor-pointer"
                         >
                             <Home className="w-4 h-4" /> Add Property
-                        </a>
-                        <a
-                            href="#"
-                            onClick={e => { e.preventDefault(); }}
-                            className="inline-flex items-center gap-2 bg-white/15 border border-white/20 text-white px-4 py-2 rounded-xl text-sm font-bold hover:bg-white/25 transition-all"
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => { if (setActiveTab) setActiveTab('leads'); }}
+                            className="inline-flex items-center gap-2 bg-white/15 border border-white/20 text-white px-4 py-2 rounded-xl text-sm font-bold hover:bg-white/25 transition-all cursor-pointer"
                         >
                             <Target className="w-4 h-4" /> Add Lead
-                        </a>
+                        </button>
                     </div>
                 </div>
             </motion.div>
@@ -362,7 +362,11 @@ const AgencyDashboard = () => {
     const [activeTab, setActiveTab] = useState('overview');
     const [sidebarOpen, setSidebarOpen] = useState(false);
 
+    const currentUser = pb.authStore.model;
+    const isOwner = currentUser?.role !== 'agent';
+
     const [userName, setUserName] = useState(() => {
+        if (currentUser?.name) return currentUser.name;
         const storedUser = localStorage.getItem('user');
         if (storedUser) {
             try {
@@ -376,11 +380,15 @@ const AgencyDashboard = () => {
     });
 
     useEffect(() => {
+        if (currentUser?.name && currentUser.name !== userName) {
+            setUserName(currentUser.name);
+            return;
+        }
         const storedUser = localStorage.getItem('user');
         if (storedUser) {
             try {
                 const parsedUser = JSON.parse(storedUser);
-                if (parsedUser.name !== userName) {
+                if (parsedUser.name && parsedUser.name !== userName) {
                     setUserName(parsedUser.name);
                 }
             } catch (e) {}
@@ -388,13 +396,11 @@ const AgencyDashboard = () => {
     }, []);
 
     const handleLogout = () => {
+        pb.authStore.clear();
         localStorage.removeItem('token');
         localStorage.removeItem('user');
         navigate('/login');
     };
-
-    const currentUser = pb.authStore.model;
-    const isOwner = currentUser?.role !== 'agent';
 
     const getPageTitle = () => {
         const titles = {
@@ -412,7 +418,7 @@ const AgencyDashboard = () => {
 
     const renderContent = () => {
         switch (activeTab) {
-            case 'overview': return <DashboardOverview currentUser={currentUser} isOwner={isOwner} />;
+            case 'overview': return <DashboardOverview currentUser={currentUser} isOwner={isOwner} setActiveTab={setActiveTab} />;
             case 'leads': return <LeadManagement />;
             case 'properties': return <PropertyManagement />;
             case 'matches': return <SmartMatches />;

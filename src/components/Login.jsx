@@ -45,10 +45,10 @@ const Login = () => {
             }
 
             if (authData?.token) {
-                // PocketBase automatically stores auth in localStorage (pb_auth)
-                // We'll also set standard ones if needed, or rely strictly on pb.authStore
-                // localStorage.setItem('token', authData.token);
-                // localStorage.setItem('user', JSON.stringify(authData.record));
+                localStorage.setItem('token', authData.token);
+                if (authData?.record) {
+                    localStorage.setItem('user', JSON.stringify(authData.record));
+                }
                 navigate('/agency-dashboard');
             }
         } catch (error) {
@@ -72,6 +72,10 @@ const Login = () => {
             }
 
             if (authData?.token) {
+                localStorage.setItem('token', authData.token);
+                if (authData?.record) {
+                    localStorage.setItem('user', JSON.stringify(authData.record));
+                }
                 navigate('/agency-dashboard');
             }
         } catch (error) {

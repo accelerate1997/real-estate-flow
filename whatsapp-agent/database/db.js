@@ -40,6 +40,8 @@ async function initDB() {
             ALTER TABLE users ADD COLUMN IF NOT EXISTS "templateId" VARCHAR(50) DEFAULT 'classic';
             ALTER TABLE users ADD COLUMN IF NOT EXISTS "primaryColor" VARCHAR(50) DEFAULT '#DC2626';
             ALTER TABLE users ADD COLUMN IF NOT EXISTS "secondaryColor" VARCHAR(50) DEFAULT '#1E293B';
+            ALTER TABLE users ALTER COLUMN password_hash DROP NOT NULL;
+            ALTER TABLE users ALTER COLUMN password_hash SET DEFAULT 'firebase_auth';
             ALTER TABLE leads ADD COLUMN IF NOT EXISTS whitelisted BOOLEAN DEFAULT FALSE;
             ALTER TABLE leads ADD COLUMN IF NOT EXISTS "interestedPropertyId" VARCHAR(50);
         `);

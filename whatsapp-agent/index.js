@@ -683,6 +683,10 @@ app.post('/api/collections/:collection', upload.fields([{ name: 'images' }, { na
             } else if (body.steps) {
                 body.steps = JSON.stringify(body.steps);
             }
+        } else if (collection === 'users') {
+            if (!body.password_hash) {
+                body.password_hash = 'firebase_auth';
+            }
         }
 
         const fields = [];
@@ -704,9 +708,12 @@ app.post('/api/collections/:collection', upload.fields([{ name: 'images' }, { na
                 fields.push(`"${matchedCol}"`);
                 placeholders.push(`$${pIdx++}`);
                 
-                // Parse numbers/booleans appropriately
+                // Parse numbers/booleans/objects appropriately for SQL/JSONB
                 if (val === 'true') val = true;
                 if (val === 'false') val = false;
+                if (typeof val === 'object' && val !== null) {
+                    val = JSON.stringify(val);
+                }
                 values.push(val);
             }
         }
@@ -811,11 +818,14 @@ app.patch('/api/collections/:collection/:id', upload.fields([{ name: 'images' },
                 if (val === 'true') val = true;
                 if (val === 'false') val = false;
                 
-                if (matchedCol === 'steps' || matchedCol === 'projectAmenities' || matchedCol === 'neighborhoodHighlights' || matchedCol === 'images' || matchedCol === 'videos') {
-                    if (typeof val !== 'string') {
-                        val = JSON.stringify(val);
-                    }
+                if (typeof val === 'object' && val !== null) {
+                    val = JSON.stringify(val);
                 }
+
+                if ((matchedCol === 'subdomain' || matchedCol === 'customDomain') && (val === '' || val === undefined)) {
+                    val = null;
+                }
+
                 values.push(val);
             }
         }
@@ -2475,6 +2485,235 @@ app.get('/api/visits/:agencyId', async (req, res) => {
         const visits = await db.getVisits(agencyId);
         res.json({ success: true, visits });
     } catch(err) { res.status(500).json({ error: "Failed to fetch visits" }); }
+});
+
+// ─── Click Tracking Endpoint ──────────────────────────────────────────
+app.get('/api/track-click', async (req, res) => {
+    try {
+        const { leadId, propertyId } = req.query;
+        if (leadId && propertyId) {
+            await pool.query(
+                `UPDATE leads SET requirement = COALESCE(requirement, '') || '\nClicked Property: ' || $1, updated_at = NOW() WHERE id = $2`,
+                [propertyId, leadId]
+            ).catch(e => console.error("Track click DB update error:", e.message));
+        }
+        const appUrl = process.env.VITE_APP_URL || 'http://localhost:5173';
+        if (propertyId) {
+            return res.redirect(`${appUrl}/property/${propertyId}`);
+        }
+        return res.redirect(appUrl);
+    } catch (err) {
+        console.error("Track click error:", err);
+        res.redirect('/');
+    }
+});
+
+// ─── WhatsApp Lead OTP Endpoints ─────────────────────────────────────
+app.post('/api/leads/send-otp', async (req, res) => {
+    try {
+        const { phone, agencyId } = req.body;
+        if (!phone) return res.status(400).json({ success: false, message: 'Phone number is required' });
+
+        const cleanPhone = phone.replace(/[^\d]/g, '');
+        const otp = Math.floor(100000 + Math.random() * 900000).toString();
+        const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
+
+        await pool.query(
+            `INSERT INTO otp_verifications (id, phone, otp, expires_at) VALUES ($1, $2, $3, $4)`,
+            [generateId(), cleanPhone, otp, expiresAt]
+        );
+
+        const instanceName = agencyId ? `Agency_${agencyId}` : 'Agency_default';
+        const msgText = `Your RR Estate verification code is: ${otp}. Valid for 10 minutes.`;
+        await sendMessage(cleanPhone, msgText, instanceName);
+
+        res.json({ success: true, message: 'Verification code sent to WhatsApp' });
+    } catch (err) {
+        console.error("Send OTP error:", err);
+        res.status(500).json({ success: false, message: 'Failed to send OTP' });
+    }
+});
+
+app.post('/api/leads/verify-otp', async (req, res) => {
+    try {
+        const { phone, otp, agencyId, name, email, requirement, preferredLanguage, marketing_opt_in, interestedPropertyId } = req.body;
+        if (!phone || !otp) return res.status(400).json({ success: false, message: 'Phone and OTP are required' });
+
+        const cleanPhone = phone.replace(/[^\d]/g, '');
+
+        const otpRes = await pool.query(
+            `SELECT * FROM otp_verifications WHERE phone = $1 AND otp = $2 AND expires_at > NOW() ORDER BY created_at DESC LIMIT 1`,
+            [cleanPhone, otp]
+        );
+
+        if (otpRes.rows.length === 0) {
+            return res.status(400).json({ success: false, message: 'Invalid or expired verification code' });
+        }
+
+        // Upsert lead
+        const lead = await db.upsertLead(cleanPhone, agencyId || 'default', {
+            name: name || 'Verified Lead',
+            email: email || '',
+            requirement: requirement || '',
+            preferredLanguage: preferredLanguage || 'English',
+            marketing_opt_in: marketing_opt_in ?? true,
+            interestedPropertyId
+        });
+
+        // Clear used OTP
+        await pool.query(`DELETE FROM otp_verifications WHERE phone = $1`, [cleanPhone]);
+
+        res.json({ success: true, lead });
+    } catch (err) {
+        console.error("Verify OTP error:", err);
+        res.status(500).json({ success: false, message: 'Failed to verify OTP' });
+    }
+});
+
+// ─── Property Match Engine & Alert Endpoints ─────────────────────────
+app.post('/api/properties/match', async (req, res) => {
+    try {
+        const { propertyId, leadId } = req.body;
+        if (propertyId) {
+            const matches = await db.matchProperty(propertyId);
+            return res.json({ success: true, matches });
+        } else if (leadId) {
+            const matches = await db.matchLead(leadId);
+            return res.json({ success: true, matches });
+        }
+        res.status(400).json({ success: false, message: 'propertyId or leadId required' });
+    } catch (err) {
+        console.error("Property match error:", err);
+        res.status(500).json({ success: false, error: err.message });
+    }
+});
+
+app.post('/api/properties/alert', async (req, res) => {
+    try {
+        const { matchId } = req.body;
+        if (!matchId) return res.status(400).json({ success: false, message: 'matchId is required' });
+
+        const matchData = await db.getMatchAlertData(matchId);
+        if (!matchData || !matchData.leadPhone) {
+            return res.status(404).json({ success: false, message: 'Match data not found' });
+        }
+
+        const instanceName = `Agency_${matchData.agencyId}`;
+        const priceVal = matchData.propertyPrice || 0;
+        const priceText = priceVal >= 10000000 ? `₹${(priceVal / 10000000).toFixed(2)} Cr` : `₹${(priceVal / 100000).toFixed(2)} Lakh`;
+        const alertMsg = `🏡 *New Property Match Alert!*\n\nHi ${matchData.leadName || 'there'}! We found a property matching your preferences:\n\n📍 *${matchData.propertyTitle}*\nLocation: ${matchData.propertyLocation}\nPrice: ${priceText}\n\nReply to this message if you'd like to schedule a site visit!`;
+
+        await sendMessage(matchData.leadPhone, alertMsg, instanceName);
+        await db.updateMatchStatus(matchId, 'Alert Sent');
+
+        res.json({ success: true, message: 'Match alert sent via WhatsApp' });
+    } catch (err) {
+        console.error("Property alert error:", err);
+        res.status(500).json({ success: false, error: err.message });
+    }
+});
+
+// ─── Bulk Marketing Campaigns & Templates Endpoints ──────────────────
+app.get('/api/campaigns', async (req, res) => {
+    try {
+        const { agencyId } = req.query;
+        const result = await pool.query('SELECT * FROM campaigns WHERE agency_id = $1 ORDER BY created_at DESC', [agencyId]);
+        res.json({ success: true, items: result.rows });
+    } catch (err) {
+        res.status(500).json({ success: false, error: err.message });
+    }
+});
+
+app.post('/api/campaigns/target-count', async (req, res) => {
+    try {
+        const { agencyId } = req.body;
+        const countRes = await pool.query('SELECT COUNT(*) FROM leads WHERE "agencyId" = $1', [agencyId]);
+        res.json({ success: true, totalRecipients: parseInt(countRes.rows[0].count) });
+    } catch (err) {
+        res.status(500).json({ success: false, error: err.message });
+    }
+});
+
+app.post('/api/campaigns', async (req, res) => {
+    try {
+        const { agencyId, name, templateName, templateLanguage, variables, filters } = req.body;
+        const id = generateId();
+        await pool.query(
+            `INSERT INTO campaigns (id, name, template_name, template_language, variables, filters, status, agency_id, created_at, updated_at)
+             VALUES ($1, $2, $3, $4, $5, $6, 'draft', $7, NOW(), NOW())`,
+            [id, name, templateName, templateLanguage || 'en_US', JSON.stringify(variables || []), JSON.stringify(filters || {}), agencyId]
+        );
+        const leadsRes = await pool.query('SELECT id, phone FROM leads WHERE "agencyId" = $1', [agencyId]);
+        for (const lead of leadsRes.rows) {
+            await pool.query(
+                `INSERT INTO campaign_logs (id, campaign_id, lead_id, phone, status, created_at, updated_at)
+                 VALUES ($1, $2, $3, $4, 'pending', NOW(), NOW())`,
+                [generateId(), id, lead.id, lead.phone]
+            );
+        }
+        res.json({ success: true, campaignId: id, totalRecipients: leadsRes.rows.length });
+    } catch (err) {
+        res.status(500).json({ success: false, error: err.message });
+    }
+});
+
+app.post('/api/campaigns/:id/send', async (req, res) => {
+    try {
+        const { id } = req.params;
+        await pool.query("UPDATE campaigns SET status = 'in_progress' WHERE id = $1", [id]);
+        
+        // Dispatch in background
+        setImmediate(async () => {
+            try {
+                const logsRes = await pool.query('SELECT cl.*, c.agency_id, c.template_name, c.template_language FROM campaign_logs cl JOIN campaigns c ON cl.campaign_id = c.id WHERE cl.campaign_id = $1 AND cl.status = \'pending\'', [id]);
+                for (const log of logsRes.rows) {
+                    const instanceName = `Agency_${log.agency_id}`;
+                    const msgId = await sendTemplateMessage(log.phone, log.template_name, log.template_language, [], instanceName);
+                    if (msgId) {
+                        await pool.query("UPDATE campaign_logs SET status = 'sent', meta_message_id = $1 WHERE id = $2", [msgId, log.id]);
+                    } else {
+                        await pool.query("UPDATE campaign_logs SET status = 'failed' WHERE id = $1", [log.id]);
+                    }
+                }
+                await pool.query("UPDATE campaigns SET status = 'completed' WHERE id = $1", [id]);
+            } catch (e) {
+                console.error("Campaign send error:", e.message);
+            }
+        });
+
+        res.json({ success: true, message: 'Campaign dispatch started' });
+    } catch (err) {
+        res.status(500).json({ success: false, error: err.message });
+    }
+});
+
+app.get('/api/campaigns/:id/recipients', async (req, res) => {
+    try {
+        const { id } = req.params;
+        const result = await pool.query('SELECT * FROM campaign_logs WHERE campaign_id = $1 ORDER BY created_at DESC', [id]);
+        res.json({ success: true, items: result.rows });
+    } catch (err) {
+        res.status(500).json({ success: false, error: err.message });
+    }
+});
+
+app.get('/api/whatsapp/templates', async (req, res) => {
+    res.json({ success: true, items: [] });
+});
+
+app.post('/api/whatsapp/templates', async (req, res) => {
+    res.json({ success: true, message: 'Template saved' });
+});
+
+app.post('/api/whatsapp/templates/polish-with-ai', async (req, res) => {
+    try {
+        const { prompt } = req.body;
+        const { polishTemplateWithAI } = require('./openai_service');
+        const polished = await polishTemplateWithAI(prompt);
+        res.json({ success: true, ...polished });
+    } catch (err) {
+        res.status(500).json({ success: false, error: err.message });
+    }
 });
 
 

@@ -63,10 +63,16 @@ const Register = () => {
 
             if (record) {
                 // Auto login after registration
-                await pb.collection('users').authWithPassword(
+                const authData = await pb.collection('users').authWithPassword(
                     formData.email,
                     formData.password
                 );
+                if (authData?.token) {
+                    localStorage.setItem('token', authData.token);
+                    if (authData?.record) {
+                        localStorage.setItem('user', JSON.stringify(authData.record));
+                    }
+                }
                 navigate('/agency-dashboard');
             }
         } catch (error) {
@@ -74,14 +80,16 @@ const Register = () => {
             const pbError = error?.response?.data;
             let errorMessage = 'Registration failed. Please check your network and try again.';
 
-            if (pbError && pbError.email) {
+            if (error?.code === 'auth/email-already-in-use' || error?.message?.includes('email-already-in-use')) {
+                errorMessage = 'This email address is already registered. Please Sign In to your existing account or use a different email.';
+            } else if (pbError && pbError.email) {
                 if (pbError.email.code === 'validation_not_unique') {
                     errorMessage = 'This email is already in use by another agency or agent.';
                 } else {
                     errorMessage = pbError.email.message;
                 }
             } else if (error?.message) {
-                errorMessage = error.message;
+                errorMessage = error.message.replace('Firebase: ', '');
             }
 
             setErrors({ email: errorMessage });
@@ -120,8 +128,27 @@ const Register = () => {
             const record = await pb.collection('users').create(datatoSend);
 
             if (record) {
-                // Auto login after registration using Google token sync
-                await pb.collection('users').authWithOAuth2('google');
+                // Single Firebase token sync (prevents 2nd popup)
+                const firebaseToken = await firebaseUser.getIdToken(true);
+                const pbUrl = pb.baseUrl || window.location.origin;
+                const syncRes = await fetch(`${pbUrl}/api/auth/sync`, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${firebaseToken}`,
+                        'Content-Type': 'application/json'
+                    }
+                });
+
+                if (syncRes.ok) {
+                    const syncData = await syncRes.json();
+                    if (syncData?.token) {
+                        pb.authStore.save(syncData.token, syncData.record);
+                        localStorage.setItem('token', syncData.token);
+                        if (syncData.record) {
+                            localStorage.setItem('user', JSON.stringify(syncData.record));
+                        }
+                    }
+                }
                 navigate('/agency-dashboard');
             }
         } catch (error) {

@@ -496,6 +496,19 @@ const fetchSequences = async () => {
                                         placeholder="e.g. rahul-properties"
                                     />
                                     <p className="text-xs text-gray-500 mt-1">Only lowercase letters, numbers, and dashes are allowed.</p>
+                                    {agencyData.subdomain && (
+                                        <div className="mt-2 text-xs font-semibold text-primary flex items-center gap-1">
+                                            <span>🔗 Live Test Link:</span>
+                                            <a
+                                                href={`${window.location.origin}/?subdomain=${agencyData.subdomain}`}
+                                                target="_blank"
+                                                rel="noreferrer"
+                                                className="underline hover:text-red-700 font-mono"
+                                            >
+                                                {window.location.origin}/?subdomain={agencyData.subdomain}
+                                            </a>
+                                        </div>
+                                    )}
                                 </div>
                                 <div>
                                     <label className="dash-label">Custom Domain (e.g. <code>properties.agentrahul.com</code>)</label>

@@ -259,7 +259,7 @@ async function processMessage(userInput, phone, agencyId) {
         await db.logChat(cleanPhone, "assistant", finalReplyText, agencyId, leadIdFound);
         
         // 7. Save Assistant Context in memory session
-        chatContext.push({ role: "assistant", content: assistantContextText });
+        chatContext.push({ role: "assistant", content: finalReplyText });
 
         // Limit the in-memory chat session to the last 10 messages + system prompt
         if (chatContext.length > 11) {

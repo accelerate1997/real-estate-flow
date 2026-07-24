@@ -39,17 +39,17 @@ const AgentInviteRegister = () => {
             try {
                 // Find pending invite
                 const records = await pb.collection('invites').getFullList({
-                    filter: `token = "${token}" && status = "pending"`,
+                    filter: `token = "${token}"`,
                     expand: 'agencyId',
                 });
 
-                if (records.length === 0) {
+                const invite = records.find(r => r.token === token && (r.status?.toLowerCase() === 'pending'));
+
+                if (!invite) {
                     setStatus('invalid');
                     setErrorMessage('This invitation link is invalid or has already been used.');
                     return;
                 }
-
-                const invite = records[0];
 
                 // Check expiration
                 if (new Date(invite.expiresAt) < new Date()) {

@@ -36,7 +36,13 @@ async function processFollowups() {
 
             const phone = lead.phone;
             const instanceName = `Agency_${followup.agency_id}`;
-            const message = step.message_template;
+            let message = step.message_template || '';
+            message = message
+                .replace(/\{name\}/gi, lead.name || 'there')
+                .replace(/\{lead_name\}/gi, lead.name || 'there')
+                .replace(/\{location\}/gi, lead.target_location || 'your preferred location')
+                .replace(/\{phone\}/gi, lead.phone || '')
+                .replace(/\{agency\}/gi, 'Rajesh Realty');
 
             console.log(`[Follow-up Engine] Sending step ${currentStepIndex + 1} to ${phone}...`);
             
