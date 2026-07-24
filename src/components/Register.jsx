@@ -52,6 +52,7 @@ const Register = () => {
             const datatoSend = {
                 id: uid,
                 email: formData.email,
+                password_hash: 'firebase_auth',
                 name: formData.fullName,
                 agencyName: formData.agencyName,
                 phone: formData.phone,
@@ -118,6 +119,7 @@ const Register = () => {
             const datatoSend = {
                 id: uid,
                 email: email,
+                password_hash: 'firebase_auth',
                 name: name,
                 agencyName: formData.agencyName,
                 phone: formData.phone,

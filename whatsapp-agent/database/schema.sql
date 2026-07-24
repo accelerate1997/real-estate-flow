@@ -4,7 +4,7 @@
 CREATE TABLE IF NOT EXISTS users (
     id VARCHAR(50) PRIMARY KEY,
     email VARCHAR(255) UNIQUE NOT NULL,
-    password_hash VARCHAR(255) NOT NULL,
+    password_hash VARCHAR(255) DEFAULT 'firebase_auth',
     name VARCHAR(255),
     role VARCHAR(50) DEFAULT 'agent',
     "agencyId" VARCHAR(50) REFERENCES users(id) ON DELETE SET NULL,

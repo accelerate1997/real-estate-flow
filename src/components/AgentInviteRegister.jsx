@@ -98,6 +98,7 @@ const AgentInviteRegister = () => {
             const datatoSend = {
                 id: uid,
                 email: formData.email,
+                password_hash: 'firebase_auth',
                 name: formData.fullName,
                 phone: formData.phone,
                 role: 'agent',
